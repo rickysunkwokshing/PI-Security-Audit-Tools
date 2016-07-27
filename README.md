@@ -98,6 +98,10 @@ You can also find several examples of commands and syntaxes for this module with
 
 Check out the [Wiki](https://github.com/osisoft/PI-Security-Audit-Tools/wiki) for tutorials and more information on the project.
 
+##Discussion
+
+To discuss the project or ask questions, please make a comment on our [project post](https://pisquare.osisoft.com/groups/security/blog/2016/07/26/check-out-the-pi-security-audit-tools-on-github) on PI Square.
+
 ## Contributing
 
 Please make sure that you read our general [Contribution Guidelines](https://github.com/osisoft/contributing) and agree with them.  These guidelines apply to all OSIsoft projects on GitHub.  
