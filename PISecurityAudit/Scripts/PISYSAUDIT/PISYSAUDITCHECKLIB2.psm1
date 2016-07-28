@@ -942,8 +942,6 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
-	$weakTrustList = ""
-	$weakMappingList = ""
 	try
 	{		
 		# Execute the PIConfig scripts.
@@ -954,13 +952,12 @@ PROCESS
 																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel					
 		
 	$result = $true
-	$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
 																	
 	#Iterate through the returned results (is any) and append ; delimiter for the output message. 
 	if($noncompliantTrusts){
 	$noncompliantTrusts = $noncompliantTrusts | Foreach {$_ + ';'}		
 	$result = $false	
-	$msg += "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
+	$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
 	}
 
 	if($noncompliantMappings){
@@ -968,6 +965,11 @@ PROCESS
 	$result = $false	
 	$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
 	}
+
+	if($result -eq $true){
+		$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
+	}
+	
 
 	}
 	catch
