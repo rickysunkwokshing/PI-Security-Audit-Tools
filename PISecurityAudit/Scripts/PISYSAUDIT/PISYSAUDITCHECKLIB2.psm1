@@ -953,7 +953,9 @@ PROCESS
 		$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
 																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel					
 		
-		
+	$result = $true
+	$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
+																	
 	#Iterate through the returned results (is any) and append ; delimiter for the output message. 
 	if($noncompliantTrusts){
 	$noncompliantTrusts = $noncompliantTrusts | Foreach {$_ + ';'}		
