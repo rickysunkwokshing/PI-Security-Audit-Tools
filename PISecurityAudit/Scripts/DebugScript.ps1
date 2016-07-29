@@ -20,7 +20,6 @@
 
 If(Get-Module PISYSAudit){
 Remove-Module PISYSAudit}
-$DebugRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-$modulepath = (Split-Path $DebugRoot) + '\PISYSAUDIT.psd1'
+$modulepath = (Split-Path $PSScriptRoot) + '\PISYSAUDIT.psd1'
 Import-Module $modulepath
-piaudit
+piaudit 

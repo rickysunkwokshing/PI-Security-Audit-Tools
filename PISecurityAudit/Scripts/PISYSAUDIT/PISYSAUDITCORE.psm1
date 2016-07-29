@@ -3201,30 +3201,31 @@ PROCESS
 			# Construct new input file for the CLU
 			# Set the PIconfig output
 			$outputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_output.txt"
+			$outputDebugFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_output_debug.txt"
 			$inputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_input.dif"
-			
 
 			if(Test-Path $outputFilePath){Clear-Content $outputFilePath}
+			if(Test-Path $outputDebugFilePath){Clear-Content $outputDebugFilePath}
 			if(Test-Path $inputFilePath){Clear-Content $inputFilePath}
-			
 
 			Out-File -FilePath $inputFilePath -InputObject ("@outp " + $outputFilePath) -Encoding ASCII	
-			Add-Content -Path $inputFilePath -Value ("@echo none")
 			Add-Content -Path $inputFilePath -Value (Get-Content $PIConfigInputFilePath)			
 
 			# Start a piconfig as a local session.
 			# As the command is local to the PI Data Archive it will make use of Named Pipe.
 			Start-Process -FilePath $PIConfigExec `
 				-RedirectStandardInput $inputFilePath `
+				-RedirectStandardOutput $outputDebugFilePath `
 				-Wait -NoNewWindow			
 				
-		#	$msg = Get-Content -Path $outputDebugFilePath | Out-String
+			$msg = Get-Content -Path $outputDebugFilePath | Out-String
 			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
 
 			# Read the content.
 			$outputFileContent = Get-Content -Path $outputFilePath
 
 			if(Test-Path $outputFilePath){Remove-Item $outputFilePath}
+			if(Test-Path $outputDebugFilePath){Remove-Item $outputDebugFilePath}
 			if(Test-Path $inputFilePath){Remove-Item $inputFilePath}
 		}
 		else
@@ -3286,25 +3287,13 @@ PROCESS
 			# Set the output for the CLU.
 			$outputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_output.txt"														
 			
-			# Construct new input file for the CLU
-			# Set the PIconfig output
-			$outputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_output.txt"
-			$inputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_input.dif"
-
-			if(Test-Path $outputFilePath){Clear-Content $outputFilePath}
-			if(Test-Path $inputFilePath){Clear-Content $inputFilePath}
-
-			Out-File -FilePath $inputFilePath -InputObject ("@outp " + $outputFilePath) -Encoding ASCII	
-			Add-Content -Path $inputFilePath -Value ("@echo none")
-			Add-Content -Path $inputFilePath -Value (Get-Content $PIConfigInputFilePath)
-
 			#......................................................................................
 			# Start a piconfig remote session.
 			#......................................................................................
 			Start-Process -FilePath $PIConfigExec `
 				-ArgumentList $argList1 `
-				-RedirectStandardInput $inputFilePath `
-				-Wait -NoNewWindow																					
+				-RedirectStandardInput $PIConfigInputFilePath `
+				-RedirectStandardOutput $outputFilePath -Wait -NoNewWindow																							
 			
 			#......................................................................................
 			# Read the content remotely.
@@ -3321,8 +3310,8 @@ PROCESS
 				#......................................................................................
 				Start-Process -FilePath $PIConfigExec `
 					-ArgumentList $argList2 `
-					-RedirectStandardInput $inputFilePath `
-					-Wait -NoNewWindow
+					-RedirectStandardInput $PIConfigInputFilePath `
+					-RedirectStandardOutput $outputFilePath -Wait -NoNewWindow																							
 					
 				#......................................................................................
 				# Read the content remotely.
@@ -3974,21 +3963,15 @@ PROCESS
 	}				
 	
 	# Validate if no error occurs.
-	if($null -ne $outputFileContent)
+	foreach($line in $outputFileContent)
 	{
-		foreach($line in $outputFileContent)
-		{
-			# The message could look like: "Sqlcmd: Error: Microsoft SQL Server Native Client 11.0 : Login failed for user 'sa'.."
-			if($line.ToLower().Contains("login failed"))
-			{ return $null }		
-		}
-		# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
-		return $outputFileContent[$rowToRead].Trim()
+		# The message could look like: "Sqlcmd: Error: Microsoft SQL Server Native Client 11.0 : Login failed for user 'sa'.."
+		if($line.ToLower().Contains("login failed"))
+		{ return $null }		
 	}
-	else 
-	{
-		return $null
-	}		
+		
+	# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
+	return $outputFileContent[$rowToRead].TrimEnd()		
 }
 
 END {}
@@ -4497,19 +4480,17 @@ PROCESS
 			$fails = $results | Where {$_.AuditItemValue -ieq "fail"}
 
 			$recommendations=""
-			if($null -ne $fails){
+			if($fails.Count -gt 0){
 				$recommendations = "<div>
 										<h2>Recommendations for failed validations:</h2>"
 		
 				$fails | ForEach-Object{
 					$AuditFunctionName = (Get-Help $_.ID)[0].Name
 					$recommendationInfo = Get-Help $AuditFunctionName
-					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
-					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
 					$recommendations +=@"
 					<b id="$($_.ID)">$($recommendationInfo.Synopsis)</b>
 					<br/>
-					<p>$recommendationInfoDescription</p>
+					<p>$($recommendationInfo.Description.Text)</p>
 					<br/>
 "@
 				}
