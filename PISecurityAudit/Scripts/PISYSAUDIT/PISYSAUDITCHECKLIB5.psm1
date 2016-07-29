@@ -328,9 +328,25 @@ PROCESS
 		$enforceSSLQueryTemplate = "Get-WebConfigurationProperty -Location `"{0}`" -Filter `"system.webServer/security/access`" -Name `"sslFlags`""
 		$enforceSSLQuery = [string]::Format($enforceSSLQueryTemplate, $CSwebSite)
 		$SSLCheck = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $enforceSSLQuery -DBGLevel $DBGLevel
-
+		
+		$httpsBindingConfigured = $false
+		# Handle PS Version 2.0 where the web bindings need to be treated as a collection and looped through.
+		if($PSVersionTable.PSVersion.Major -eq 2)
+		{
+			foreach($WebBinding in $WebBindings)
+			{
+				if($WebBinding.protocol -contains "https"){
+					$httpsBindingConfigured = $true
+				}
+			}
+		}
+		else
+		{
+			$httpsBindingConfigured = $WebBindings.protocol -contains "https"
+		}
+		
 		# Evaluate both checks
-		if($WebBindings.protocol -contains "https" -and $SSLCheck -eq "Ssl") 
+		if($httpsBindingConfigured -and $SSLCheck.ToString() -eq "Ssl") 
 		{
 			# Everything checks out!
 			$result = $true
