@@ -5,7 +5,7 @@ This project is a framework to baseline the security configuration of your PI Sy
   
 A series of PowerShell script files (*.psm1) form a single module named PI System Audit Module (or PISysAudit Module) once loaded. You will find one core script containing the collection logic and library scripts containing the validation logic for different topics such as best practices to harden the machine, PI Server, etc. The module exposes several cmdlets either used for the internal logic or the external interface with the end-user.
 
-The PI System Audit Module (PISysAudit) requires PowerShell version 2 and later, it can be executed locally or remotely and make use of existing command line utilities to perform many tasks. This allows compatibility with many versions of the PI System.  
+The PI System Audit Module (PISysAudit) can be executed locally or remotely and make use of existing command line utilities to perform many tasks.  Note that the script requires PowerShell version 3.0 or later for the machine running the script, if a remote machine is targeted, that machine needs to have powershell 2.0 or later.  This allows compatibility with many versions of the PI System.  Full support for PowerShell version 2.0 on the client and target machine is documented as Issue [#57](https://github.com/osisoft/PI-Security-Audit-Tools/issues/57).
 
 The current version of the PISysAudit module implements validations covering machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX), SQL Server (AU4XXXX) and PI Coresight Server (AU5XXXX) best practices with the PI System.  
  

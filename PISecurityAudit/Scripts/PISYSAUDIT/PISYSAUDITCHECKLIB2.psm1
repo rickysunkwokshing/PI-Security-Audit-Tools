@@ -478,28 +478,31 @@ PROCESS
 
 		# Read each line to find the one containing the token to replace.		
 		$valueFound = $false
-		foreach($line in $outputFileContent)
-		{								
-			# Skip line if not containing the value autotrustconfig.
-			if($line.ToLower().Contains("editdays"))
-			{
-				# Set the flag.
-				$valueFound = $true
-				# Find the delimiter
-				$tokens = $line.Split(",")
+		if($null -ne $outputFileContent)
+		{
+			foreach($line in $outputFileContent)
+			{								
+				# Skip line if not containing the value autotrustconfig.
+				if($line.ToLower().Contains("editdays"))
+				{
+					# Set the flag.
+					$valueFound = $true
+					# Find the delimiter
+					$tokens = $line.Split(",")
 	
-				if($tokens[1] -eq 0) 
-				{ 
-					$result = $false 
-					$msg = "EditDays using non-compliant value of 0."
-				}
-				else 
-				{ 
-					$result = $true 
-					$msg = "EditDays specified as a non-zero value."
-				}
-				break								
-			}			
+					if($tokens[1] -eq 0) 
+					{ 
+						$result = $false 
+						$msg = "EditDays using non-compliant value of 0."
+					}
+					else 
+					{ 
+						$result = $true 
+						$msg = "EditDays specified as a non-zero value."
+					}
+					break								
+				}			
+			}
 		}
 		# The default value is set to 0 which is not compliant.
 		if($valueFound -eq $false) 
@@ -582,50 +585,53 @@ PROCESS
 
 		# Read each line to find the one containing the token to replace.		
 		$valueFound = $false
-		foreach($line in $outputFileContent)
-		{								
-			# Skip line if not containing the value autotrustconfig.
-			if($line.ToLower().Contains("autotrustconfig"))
-			{
-				# Set the flag.
-				$valueFound = $true
-				# Find the delimiter
-				$tokens = $line.Split(",")
-				
-				# 0 - Do not automatically create any PI Trust entries.
-				# 0x01 - Create the trust entry for the loopback IP address 127.0.0.1
-				# 0x02 - Create the trust entry for the "localhost" hostname
-				# 0x04 - Create the trust entry for the IP address
-				# 0x08 - Create the trust entry for the short hostname
-				# 0x10 - Create the trust entry for the FQDN hostname
-				# 0x1F - Create the old (pre 3.4.370.x) trust entries
-
-				switch ($tokens[1])
+		if($null -ne $outputFileContent)
+		{
+			foreach($line in $outputFileContent)
+			{								
+				# Skip line if not containing the value autotrustconfig.
+				if($line.ToLower().Contains("autotrustconfig"))
 				{
-					0   { $description = "Does not automatically create any PI Trust entries."; break; }
-					1   { $description = "Creates the trust entry for the loopback IP address 127.0.0.1"; break; }
-					2   { $description = "Creates the trust entry for the `"localhost`" hostname"; break; }
-					4   { $description = "Creates the trust entry for the IP address"; break; }
-					8   { $description = "Creates the trust entry for the short hostname"; break; }
-					16   { $description = "Creates the trust entry for the FQDN hostname"; break; }
-					32   { $description = "Creates the old (pre 3.4.370.x) trust entries"; break; }
-			
-					default {$description = "Unknown configuration" }
-				}
+					# Set the flag.
+					$valueFound = $true
+					# Find the delimiter
+					$tokens = $line.Split(",")
+				
+					# 0 - Do not automatically create any PI Trust entries.
+					# 0x01 - Create the trust entry for the loopback IP address 127.0.0.1
+					# 0x02 - Create the trust entry for the "localhost" hostname
+					# 0x04 - Create the trust entry for the IP address
+					# 0x08 - Create the trust entry for the short hostname
+					# 0x10 - Create the trust entry for the FQDN hostname
+					# 0x1F - Create the old (pre 3.4.370.x) trust entries
 
-				if($tokens[1] -le 1) 
-				{ 
-					$result = $true 
-					$msg = "Tuning parameter compliant: {0}"
-				}
-				else 
-				{ 
-					$result = $false
-					$msg = "Tuning parameter not compliant: {0}" 
-				}
-				$msg = [string]::Format($msg, $description)
-				break								
-			}			
+					switch ($tokens[1])
+					{
+						0   { $description = "Does not automatically create any PI Trust entries."; break; }
+						1   { $description = "Creates the trust entry for the loopback IP address 127.0.0.1"; break; }
+						2   { $description = "Creates the trust entry for the `"localhost`" hostname"; break; }
+						4   { $description = "Creates the trust entry for the IP address"; break; }
+						8   { $description = "Creates the trust entry for the short hostname"; break; }
+						16   { $description = "Creates the trust entry for the FQDN hostname"; break; }
+						32   { $description = "Creates the old (pre 3.4.370.x) trust entries"; break; }
+			
+						default {$description = "Unknown configuration" }
+					}
+
+					if($tokens[1] -le 1) 
+					{ 
+						$result = $true 
+						$msg = "Tuning parameter compliant: {0}"
+					}
+					else 
+					{ 
+						$result = $false
+						$msg = "Tuning parameter not compliant: {0}" 
+					}
+					$msg = [string]::Format($msg, $description)
+					break								
+				}			
+			}
 		}
 		# The default value is set to 1 which is compliant.
 		if($valueFound -eq $false) 
@@ -720,7 +726,8 @@ PROCESS
 
 		# Read each line to find the one containing the token to replace.	
 		$result = $false
-		foreach($line in $OutputFileContent)
+
+		foreach($line in $outputFileContent)
 		{								
 			if($line.Contains("Installation version"))
 			{								
@@ -747,17 +754,20 @@ PROCESS
 		
 		# Read each line to find the one containing the token to replace.
 		$valueFound = $false
-		foreach($line in $outputFileContent)
-		{								
-			if($line.ToLower().Contains("archive_maxqueryexecutionsec"))
-			{				
-				# First line only.
-				$tokens = $line.Split(",")
-				$timeout = [int16]$tokens[1]
-				$valueFound = $true
-				break
-			}
-		}			
+		if($null -ne $outputFileContent)
+		{
+			foreach($line in $outputFileContent)
+			{								
+				if($line.ToLower().Contains("archive_maxqueryexecutionsec"))
+				{				
+					# First line only.
+					$tokens = $line.Split(",")
+					$timeout = [int16]$tokens[1]
+					$valueFound = $true
+					break
+				}
+			}	
+		}		
 						
 		# Default value for PI Data Archive prior to 3.4.390.16 was 0
 		# Check if the timeout setting is between 60 and 300.
