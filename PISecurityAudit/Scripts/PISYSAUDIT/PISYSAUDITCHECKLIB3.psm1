@@ -492,7 +492,7 @@ PROCESS
 				# Master whitelist of approved extensions
 				[System.Collections.ArrayList] $allowedExtensions = 'docx','xlsx','csv','pdf','txt','rtf','jpg','jpeg','png','svg','tiff','gif'
 				# Extract configured whitelist from parameter value
-				[string] $extensionList = $line.Split('=')[1].TrimStart()
+				[string] $extensionList = $line.Split('=')[1].Trim()
 				if($extensionList -ne "")
 				{
 					[string[]] $extensions = $extensionList.Split(':')
@@ -597,7 +597,7 @@ PROCESS
 		{								
 			if($line.Contains("Version"))
 			{								
-				$installVersion = $line.Split('=').TrimStart()[1]
+				$installVersion = $line.Split('=')[1].Trim()
 				$installVersionTokens = $installVersion.Split(".")
 				# Form an integer value with all the version tokens.
 				[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
