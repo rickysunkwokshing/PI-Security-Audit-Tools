@@ -3963,15 +3963,18 @@ PROCESS
 	}				
 	
 	# Validate if no error occurs.
-	foreach($line in $outputFileContent)
+	if($null -ne $outputFileContent)
 	{
-		# The message could look like: "Sqlcmd: Error: Microsoft SQL Server Native Client 11.0 : Login failed for user 'sa'.."
-		if($line.ToLower().Contains("login failed"))
-		{ return $null }		
+		foreach($line in $outputFileContent)
+		{
+			# The message could look like: "Sqlcmd: Error: Microsoft SQL Server Native Client 11.0 : Login failed for user 'sa'.."
+			if($line.ToLower().Contains("login failed"))
+			{ return $null }		
+		}
 	}
 		
 	# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
-	return $outputFileContent[$rowToRead].TrimEnd()		
+	return $outputFileContent[$rowToRead].Trim()		
 }
 
 END {}
@@ -4591,8 +4594,17 @@ PROCESS
 						default {break}
 					}
 					$recommendationInfo = Get-Help $AuditFunctionName
+					# For PS Version 2 we need to treat the Description as a single item collection.
+					if($PSVersionTable.PSVersion.Major -eq 2)
+					{
+						$recommendationInfoDescription = $recommendationInfo.Description[0].Text
+					}
+					else 
+					{
+						$fnHelpDescription = $recommendationInfo.Description.Text
+					}
 					$recommendation = "<b id=`"{0}`">{1}</b><br/><p>{2}</p><br/>"
-					$recommendationsHTML += [string]::Format($recommendation, $fail.ID, $recommendationInfo.Synopsis, $recommendationInfo.Description.Text)
+					$recommendationsHTML += [string]::Format($recommendation, $fail.ID, $recommendationInfo.Synopsis, $recommendationInfoDescription)
 				}
 					$reportHTML += $recommendationsHTML
 			}
