@@ -3971,10 +3971,13 @@ PROCESS
 			if($line.ToLower().Contains("login failed"))
 			{ return $null }		
 		}
+		# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
+		return $outputFileContent[$rowToRead].Trim()
 	}
-		
-	# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
-	return $outputFileContent[$rowToRead].Trim()		
+	else 
+	{
+		return $null
+	}		
 }
 
 END {}
@@ -4397,13 +4400,16 @@ PROCESS
 	try
 	{
 		# Get the current timestamp for naming the file uniquely.
-		$ts = ([Datetime]::Now).ToString("yyyyMMdd_HHmmss")		
+		$now = Get-Date
+		$reportTimestamp = $now.ToString("dd-MMM-yyyy HH:mm:ss")
+		$reportFileTimestamp = $now.ToString("yyyy-MM-dd_HH-mm-ss")		
+		
 
 		# Get the Scripts path.
 		$exportPath = (Get-Variable "ExportPath" -Scope "Global").Value												
 						
 		# Create the log file in the same folder as the script. 
-		$fileName = "PISecurityAudit_" + $ts + ".csv"
+		$fileName = "PISecurityAudit_$reportFileTimestamp.csv"
 		$fileToExport = Join-Path -Path $exportPath -ChildPath $fileName
 
 		# Build a collection for output.
@@ -4431,20 +4437,77 @@ PROCESS
 		# Export to .csv but sort the results table first to have Failed items on the top sorted by Severity 
 		$results = $results | Sort-Object @{Expression="AuditItemValue";Descending=$false},@{Expression="Severity";Descending=$true},@{Expression="ID";Descending=$false}
 		$results | Export-Csv -Path $fileToExport -Encoding ASCII -NoType
-
-
-		
-
-		$now=Get-Date -format "dd-MMM-yyyy HH:mm:ss"
+	
 		
 		if($DetailReport){
 			
-			$fileName = "PISecurityAudit_DetailReport_" + $ts + ".html" 
+			$fileName = "PISecurityAudit_DetailReport_$reportFileTimestamp.html" 
 
 			$fileToExport = Join-Path -Path $exportPath -ChildPath $fileName
 
-			# Header for the report. 
-			$header = @"
+
+			# Construct HTML table and color code the rows by result and severity.
+			$tableRows=""
+			foreach($result in $results) 
+			{
+				$highlight = "`"`""
+				switch ($result.Severity.ToLower())
+				{
+					"severe" {$highlight="`"error`""; break}
+					"moderate" {$highlight="`"warning`""; break}
+					"low" {$highlight="`"info`""; break}
+				}
+	
+				$anchorTag=""
+				if($result.AuditItemValue -ieq "fail"){
+					$anchorTag = @"
+					<a href="#$($result.ID)">
+"@
+				}
+				$tableRow = @"
+				<tr class=$highlight>
+					<td>$anchorTag$($result.ID)</a></td>
+					<td>$($result.ServerName)</td>
+					<td>$($result.AuditItemName)</td>
+					<td>$($result.AuditItemValue)</td>
+					<td>$($result.Severity)</td>
+					<td>$($result.MessageList)</td>
+					<td>$($result.Group1)</td>
+					<td>$($result.Group2)</td>
+				</tr>
+"@ 
+				$tableRows+= $tableRow
+			}
+
+
+
+			# Get failed results and construct the recommendation section
+			$fails=@()
+			$fails = $results | Where {$_.AuditItemValue -ieq "fail"}
+
+			$recommendations=""
+			if($null -ne $fails){
+				$recommendations = "<div>
+										<h2>Recommendations for failed validations:</h2>"
+		
+				$fails | ForEach-Object{
+					$AuditFunctionName = (Get-Help $_.ID)[0].Name
+					$recommendationInfo = Get-Help $AuditFunctionName
+					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
+					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
+					$recommendations +=@"
+					<b id="$($_.ID)">$($recommendationInfo.Synopsis)</b>
+					<br/>
+					<p>$recommendationInfoDescription</p>
+					<br/>
+"@
+				}
+				$recommendations+="</div>"
+			}
+			
+
+			# HTML report. 
+			$reportHTML = @"
 			<html>
 				<head><meta name="viewport" content="width=device-width" />
 					<style type="text/css">
@@ -4489,129 +4552,36 @@ PROCESS
 					</style>
 
 			
-			</head>
+				</head>
 				<body>
-				<div style="padding-bottom:1em">
-					<h2>AUDIT SUMMARY </h2>
-					<h4>$($now)</h4> 
-				</div>
-"@
-			# Header for the summary table.
-			$tableHeader = @"
-			<table class="summarytable table">
-			<thead>	
-				<tr>
-					<th>ID</th>
-					<th>Server</th>
-					<th>Validation</th>
-					<th>Result</th> 
-					<th>Severity</th>
-					<th>Message</th>
-					<th>Category</th> 
-					<th>Area</th>
-				</tr>
-			</thead>
-"@
-			$reportHTML = $header + $tableHeader
+					<div style="padding-bottom:1em">
+						<h2>AUDIT SUMMARY </h2>
+						<h4>$reportTimestamp</h4> 
+					</div>
+
+					<table class="summarytable table">
+						<thead>	
+							<tr>
+								<th>ID</th>
+								<th>Server</th>
+								<th>Validation</th>
+								<th>Result</th> 
+								<th>Severity</th>
+								<th>Message</th>
+								<th>Category</th> 
+								<th>Area</th>
+							</tr>
+						</thead>
+						$tableRows
+					</table>
 			
-			# Construct table and color code the rows by result and severity.
-			$fails = @()
-			foreach($result in $results) 
-			{
-				$aTag = ""
-				$highlight = "`"`""
-				if($result.AuditItemValue.ToLower() -eq "fail"){
-					switch ($result.Severity.ToLower())
-					{
-						"severe" {$highlight="`"error`""; break}
-						"moderate" {$highlight="`"warning`""; break}
-						"low" {$highlight="`"info`""; break}
-					}
-					$fails += $result
+					<br/>
 
-					$resultID = $result.ID
-					$aTag = "<a href=`"#$resultID`">"
-				}
-
-				
-				
+					$Recommendations
 					
-				$tableRow = @"
-				<tr class={8}>
-				<td>$aTag{0}</a></td><td>{1}</td><td>{2}</td><td>{3}</td><td>{7}</td>
-				<td>{4}</td><td>{5}</td><td>{6}</td>
-				</tr>
-"@ 
-				$tableRow = [string]::Format($tableRow, $result.ID,$result.ServerName, $result.AuditItemName, 
-												$result.AuditItemValue, $result.MessageList, $result.Group1,
-												$result.Group2, $result.Severity, $highlight)
-				$reportHTML += $tableRow
-			}
-			# Add footer to the table.
-			$tableFooterHTML = "</table><br/>"
-			$reportHTML += $tableFooterHTML
-			
-			if($fails.Count -gt 0){
-				$fails = $fails | Sort-Object ID | Select-Object ID -unique
-				# Recommendations section
-				$recommendationsHTML = "<div>"
-				$recommendationsHTML += "<h2>Recommendations for failed validations:</h2>"
-				foreach($fail in $fails) 
-				{
-					switch ($fail.ID) 
-					{
-						"AU10001" {$AuditFunctionName = "Get-PISysAudit_CheckDomainMemberShip"; break}
-						"AU10002" {$AuditFunctionName = "Get-PISysAudit_CheckOSSKU"; break}
-						"AU10003" {$AuditFunctionName = "Get-PISysAudit_CheckFirewallEnabled"; break}
-						"AU10004" {$AuditFunctionName = "Get-PISysAudit_CheckAppLockerEnabled"; break}
-						"AU10005" {$AuditFunctionName = "Get-PISysAudit_CheckUACEnabled"; break}
-						"AU20001" {$AuditFunctionName = "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess"; break}
-						"AU20002" {$AuditFunctionName = "Get-PISysAudit_CheckPIAdminTrustsDisabled"; break}
-						"AU20003" {$AuditFunctionName = "Get-PISysAudit_CheckPIServerSubSysVersions"; break}
-						"AU20004" {$AuditFunctionName = "Get-PISysAudit_CheckEditDays"; break}
-						"AU20005" {$AuditFunctionName = "Get-PISysAudit_CheckAutoTrustConfig"; break}
-						"AU20006" {$AuditFunctionName = "Get-PISysAudit_CheckExpensiveQueryProtection"; break}
-						"AU20007" {$AuditFunctionName = "Get-PISysAudit_CheckExplicitLoginDisabled"; break}
-						"AU20008" {$AuditFunctionName = "Get-PISysAudit_CheckPIAdminUsage"; break}
-						"AU20009" {$AuditFunctionName = "Get-PISysAudit_CheckPISPN"; break} 
-						"AU20010" {break} # Check not yet implemented
-						"AU30001" {$AuditFunctionName = "Get-PISysAudit_CheckPIAFServiceConfiguredAccount"; break}
-						"AU30002" {$AuditFunctionName = "Get-PISysAudit_CheckPImpersonationModeForAFDataSets"; break}
-						"AU30003" {$AuditFunctionName = "Get-PISysAudit_CheckPIAFServicePrivileges"; break}
-						"AU30004" {$AuditFunctionName = "Get-PISysAudit_CheckPlugInVerifyLevel"; break}
-						"AU30005" {$AuditFunctionName = "Get-PISysAudit_CheckFileExtensionWhitelist"; break}
-						"AU30006" {$AuditFunctionName = "Get-PISysAudit_CheckAFServerVersion"; break}
-						"AU30007" {$AuditFunctionName = "Get-PISysAudit_CheckAFSPN"; break}
-						"AU40001" {$AuditFunctionName = "Get-PISysAudit_CheckSQLXPCommandShell"; break}
-						"AU40002" {$AuditFunctionName = "Get-PISysAudit_CheckSQLAdHocQueries"; break}
-						"AU40003" {$AuditFunctionName = "Get-PISysAudit_CheckSQLDBMailXPs"; break}
-						"AU40004" {$AuditFunctionName = "Get-PISysAudit_CheckSQLOLEAutomationProcs"; break}
-						"AU50001" {$AuditFunctionName = "Get-PISysAudit_CheckCoresightVersion"; break}
-						"AU50002" {$AuditFunctionName = "Get-PISysAudit_CheckCoresightAppPools"; break}
-						"AU50003" {$AuditFunctionName = "Get-PISysAudit_CoresightSSLcheck"; break}
-						"AU50004" {$AuditFunctionName = "Get-PISysAudit_CoresightSPNcheck"; break}
-
-						default {break}
-					}
-					$recommendationInfo = Get-Help $AuditFunctionName
-					# For PS Version 2 we need to treat the Description as a single item collection.
-					if($PSVersionTable.PSVersion.Major -eq 2)
-					{
-						$recommendationInfoDescription = $recommendationInfo.Description[0].Text
-					}
-					else 
-					{
-						$fnHelpDescription = $recommendationInfo.Description.Text
-					}
-					$recommendation = "<b id=`"{0}`">{1}</b><br/><p>{2}</p><br/>"
-					$recommendationsHTML += [string]::Format($recommendation, $fail.ID, $recommendationInfo.Synopsis, $recommendationInfoDescription)
-				}
-					$reportHTML += $recommendationsHTML
-			}
-			# Add footer to report.
-			$footerHTML = "</div></body></html>"
-			$reportHTML += $footerHTML 
-			
+				</body>
+			</html>
+"@		
 			# Print report to file.
 			$reportHTML | Out-File $fileToExport
 		}

@@ -726,7 +726,8 @@ PROCESS
 
 		# Read each line to find the one containing the token to replace.	
 		$result = $false
-		foreach($line in $OutputFileContent)
+
+		foreach($line in $outputFileContent)
 		{								
 			if($line.Contains("Installation version"))
 			{								
@@ -765,8 +766,9 @@ PROCESS
 					$valueFound = $true
 					break
 				}
-			}			
-		}			
+			}	
+		}		
+						
 		# Default value for PI Data Archive prior to 3.4.390.16 was 0
 		# Check if the timeout setting is between 60 and 300.
 		if(($valueFound -eq $false) -and ($installVersionInt64 -lt 3439016)) 
@@ -876,17 +878,18 @@ PROCESS
 					default {$description = "Unrecognized configuration" }
 				}
 		
+		$msgPolicy =""
 		if($ServerAuthPolicy -lt 3)
 		{
 			$result = $false
-			$msg = "Using non-compliant policy: {0}"
+			$msgPolicy = "Using non-compliant policy:"
 		} 
 		else 
 		{
 			$result = $true
-			$msg = "Using compliant policy: {0}"
+			$msgPolicy = "Using compliant policy:"
 		}
-		$msg = [string]::Format($msg, $description)
+		$msg = [string]::Format("{0} {1}", $msgPolicy,$description)
 
 	}
 	catch
@@ -949,54 +952,35 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
-	$weakTrustList = ""
-	$weakMappingList = ""
 	try
 	{		
 		# Execute the PIConfig scripts.
-		$outputFileContentTrust = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
+		$noncompliantTrusts = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 																
-		$outputFileContentMapping = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel						
-		# PowerShell 2.0 will error out on the foreach if file contents is null. 
-		if($null -ne $outputFileContentTrust)
-		{
-			# Filtering out piconfig exit messages from output
-			foreach($line in $outputFileContentTrust)
-			{
-				# Lines with delimiter have content of interest.
-				if($line.Contains("^"))
-				{
-					$weakTrustList += $line.SubString(0, $line.IndexOf("^")) + "; "
-				}
-			}
-		}
-		if($null -ne $outputFileContentMapping)
-		{
-			foreach($line in $outputFileContentMapping)
-			{
-				# Lines with delimiter have content of interest.
-				if($line.Contains("^"))
-				{
-					$weakMappingList += $line.SubString(0, $line.IndexOf("^")) + "; "
-				}
-			}
-		}																												
-		# Validate rules
-		# Check is piadmin is used in any mappings or trusts. If it is, list them in the output
+		$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel					
 		
-		if(($weakTrustList) -or ($weakMappingList))
-		{
-			$result = $false 
-			$msg = "Trust(s) that present weaknesses: " + $weakTrustList
-			$msg += "`nMapping(s) that present weaknesses: " + $weakMappingList
-		} 
-		else 
-		{
-			$result =$true
-			$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
-		}
+	$result = $true
+																	
+	#Iterate through the returned results (is any) and append ; delimiter for the output message. 
+	if($noncompliantTrusts){
+	$noncompliantTrusts = $noncompliantTrusts | Foreach {$_ + ';'}		
+	$result = $false	
+	$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
+	}
+
+	if($noncompliantMappings){
+	$noncompliantMappings =	$noncompliantMappings | Foreach {$_ + ';'}		
+	$result = $false	
+	$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
+	}
+
+	if($result -eq $true){
+		$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
+	}
+	
+
 	}
 	catch
 	{

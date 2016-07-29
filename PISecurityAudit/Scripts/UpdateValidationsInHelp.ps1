@@ -25,6 +25,7 @@ else{$PSVersion2 = $false}
 if($PSVersion2){$UpdateScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition}
 else {$UpdateScriptRoot = $PSScriptRoot}
 $rootModuleDir = Split-Path $UpdateScriptRoot
+
 if(Get-Module pisysaudit){remove-module pisysaudit}
 $modulepath = $rootModuleDir + '\PISYSAUDIT.psd1'
 Import-Module $modulepath
@@ -68,7 +69,7 @@ foreach ($line in $helpFile)
 					# Properly space the description and sanitize if of the html tags.
 					if($PSVersion2){$fnHelpDescription = $fnHelp.Description[0].Text}
 					else {$fnHelpDescription = $fnHelp.Description.Text}
-					$newHelp += "`r`n`t`t" + $fnHelp.Synopsis + "`r`n`t`t" + $($($($($fnHelpDescription `
+ 					$newHelp += "`r`n`t`t" + $fnHelp.Synopsis + "`r`n`t`t" + $($($($($fnHelpDescription `
 						-replace "`n","`r`n`t`t") -replace "<br/>","") -replace "</a>","") -replace '<a href=".*?">','') + "`r`n"
                 }
             }

@@ -23,4 +23,4 @@ Remove-Module PISYSAudit}
 $DebugRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 $modulepath = (Split-Path $DebugRoot) + '\PISYSAUDIT.psd1'
 Import-Module $modulepath
-piaudit -DBGLevel 2
+piaudit
