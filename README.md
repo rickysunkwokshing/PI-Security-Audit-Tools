@@ -5,7 +5,7 @@ This project is a framework to baseline the security configuration of your PI Sy
   
 A series of PowerShell script files (*.psm1) form a single module named PI System Audit Module (or PISysAudit Module) once loaded. You will find one core script containing the collection logic and library scripts containing the validation logic for different topics such as best practices to harden the machine, PI Server, etc. The module exposes several cmdlets either used for the internal logic or the external interface with the end-user.
 
-The PI System Audit Module (PISysAudit) requires PowerShell version 2 and later, it can be executed locally or remotely and make use of existing command line utilities to perform many tasks. This allows compatibility with many versions of the PI System.  
+The PI System Audit Module (PISysAudit) can be executed locally or remotely and make use of existing command line utilities to perform many tasks.  Note that the script requires PowerShell version 3.0 or later for the machine running the script, if a remote machine is targeted, that machine needs to have powershell 2.0 or later.  This allows compatibility with many versions of the PI System.  Full support for PowerShell version 2.0 on the client and target machine is documented as Issue [#57](https://github.com/osisoft/PI-Security-Audit-Tools/issues/57).
 
 The current version of the PISysAudit module implements validations covering machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX), SQL Server (AU4XXXX) and PI Coresight Server (AU5XXXX) best practices with the PI System.  
  
@@ -98,13 +98,20 @@ You can also find several examples of commands and syntaxes for this module with
 
 Check out the [Wiki](https://github.com/osisoft/PI-Security-Audit-Tools/wiki) for tutorials and more information on the project.
 
+##Discussion
+
+To discuss the project or ask questions, please make a comment on our [project post](https://pisquare.osisoft.com/groups/security/blog/2016/07/26/check-out-the-pi-security-audit-tools-on-github) on PI Square.
+
 ## Contributing
 
 Please make sure that you read our general [Contribution Guidelines](https://github.com/osisoft/contributing) and agree with them.  These guidelines apply to all OSIsoft projects on GitHub.  
 
 We welcome everyone to share enhancement requests, issues and contributions.  While all contributions will be considered by our team, we cannot accept any changes until they have been reviewed.  This is to ensure they are appropriate and aligned with the goals of the project.  We will make every effort to respond in a timely fashion, but please be patient during the review process.  
 
-To help streamline the process, please make sure that you review our guidance with respect to [Submitting Pull Requests, Issues and Enhancement Requests](https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Submitting-Pull-Requests,-Issues-and-Enhancement-Requests) on our Wiki page.  
+To help streamline the process, please make sure that you review our guidance with respect to [Submitting Pull Requests, Issues and Enhancement Requests](https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Submitting-Pull-Requests,-Issues-and-Enhancement-Requests) on our Wiki page. 
+
+Here is a quick start guide video on how to contribute:
+[PI Security Audit Tools: How to contribute improvements using Visual Studio](https://pisquare.osisoft.com/videos/1904)
 
 ## Licensing  
 
@@ -122,4 +129,4 @@ Copyright 2016 OSIsoft, LLC.
    See the License for the specific language governing permissions and
    limitations under the License.
    
-Please see the file named [LICENSE.md](LICENSE.md).
+Please see the file named [LICENSE](LICENSE).

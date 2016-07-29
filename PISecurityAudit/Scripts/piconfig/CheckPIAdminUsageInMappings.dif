@@ -1,9 +1,8 @@
 *This piconfig script finds all mappings with piadmin user
 *For more information on piconfig see the PI Server reference guide
-@deli ^
 @mode list
 @table piidentmap
-@ostr principaldisp^piident
+@ostr principaldisp;
 @sele piident=piadmin
 @ends
 @exit

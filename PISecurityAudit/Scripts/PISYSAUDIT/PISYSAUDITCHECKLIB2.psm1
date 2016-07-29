@@ -868,17 +868,18 @@ PROCESS
 					default {$description = "Unrecognized configuration" }
 				}
 		
+		$msgPolicy =""
 		if($ServerAuthPolicy -lt 3)
 		{
 			$result = $false
-			$msg = "Using non-compliant policy: {0}"
+			$msgPolicy = "Using non-compliant policy:"
 		} 
 		else 
 		{
 			$result = $true
-			$msg = "Using compliant policy: {0}"
+			$msgPolicy = "Using compliant policy:"
 		}
-		$msg = [string]::Format($msg, $description)
+		$msg = [string]::Format("{0} {1}", $msgPolicy,$description)
 
 	}
 	catch
@@ -941,49 +942,35 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
-	$weakTrustList = ""
-	$weakMappingList = ""
 	try
 	{		
 		# Execute the PIConfig scripts.
-		$outputFileContentTrust = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
+		$noncompliantTrusts = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 																
-		$outputFileContentMapping = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel						
+		$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel					
 		
-		# Filtering out piconfig exit messages from output
-		foreach($line in $outputFileContentTrust)
-		{
-			# Lines with delimiter have content of interest.
-			if($line.Contains("^"))
-			{
-				$weakTrustList += $line.SubString(0, $line.IndexOf("^")) + "; "
-			}
-		}
-		foreach($line in $outputFileContentMapping)
-		{
-			# Lines with delimiter have content of interest.
-			if($line.Contains("^"))
-			{
-				$weakMappingList += $line.SubString(0, $line.IndexOf("^")) + "; "
-			}
-		}
-																															
-		# Validate rules
-		# Check is piadmin is used in any mappings or trusts. If it is, list them in the output
-		
-		if(($weakTrustList) -or ($weakMappingList))
-		{
-			$result = $false 
-			$msg = "Trust(s) that present weaknesses: " + $weakTrustList
-			$msg += "`nMapping(s) that present weaknesses: " + $weakMappingList
-		} 
-		else 
-		{
-			$result =$true
-			$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
-		}
+	$result = $true
+																	
+	#Iterate through the returned results (is any) and append ; delimiter for the output message. 
+	if($noncompliantTrusts){
+	$noncompliantTrusts = $noncompliantTrusts | Foreach {$_ + ';'}		
+	$result = $false	
+	$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
+	}
+
+	if($noncompliantMappings){
+	$noncompliantMappings =	$noncompliantMappings | Foreach {$_ + ';'}		
+	$result = $false	
+	$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
+	}
+
+	if($result -eq $true){
+		$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
+	}
+	
+
 	}
 	catch
 	{
