@@ -3974,15 +3974,21 @@ PROCESS
 	}				
 	
 	# Validate if no error occurs.
-	foreach($line in $outputFileContent)
+	if($null -ne $outputFileContent)
 	{
-		# The message could look like: "Sqlcmd: Error: Microsoft SQL Server Native Client 11.0 : Login failed for user 'sa'.."
-		if($line.ToLower().Contains("login failed"))
-		{ return $null }		
+		foreach($line in $outputFileContent)
+		{
+			# The message could look like: "Sqlcmd: Error: Microsoft SQL Server Native Client 11.0 : Login failed for user 'sa'.."
+			if($line.ToLower().Contains("login failed"))
+			{ return $null }		
+		}
+		# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
+		return $outputFileContent[$rowToRead].Trim()
 	}
-		
-	# Get the scalar value returned. This value is stored on first row of the file.  Trim any whitespace.
-	return $outputFileContent[$rowToRead].TrimEnd()		
+	else 
+	{
+		return $null
+	}		
 }
 
 END {}
@@ -4491,17 +4497,19 @@ PROCESS
 			$fails = $results | Where {$_.AuditItemValue -ieq "fail"}
 
 			$recommendations=""
-			if($fails.Count -gt 0){
+			if($null -ne $fails){
 				$recommendations = "<div>
 										<h2>Recommendations for failed validations:</h2>"
 		
 				$fails | ForEach-Object{
 					$AuditFunctionName = (Get-Help $_.ID)[0].Name
 					$recommendationInfo = Get-Help $AuditFunctionName
+					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
+					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
 					$recommendations +=@"
 					<b id="$($_.ID)">$($recommendationInfo.Synopsis)</b>
 					<br/>
-					<p>$($recommendationInfo.Description.Text)</p>
+					<p>$recommendationInfoDescription</p>
 					<br/>
 "@
 				}
