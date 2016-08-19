@@ -17,7 +17,6 @@
 # * <Description of modification>
 # *
 # ************************************************************************
-# test change
 
 If(Get-Module PISYSAudit){
 Remove-Module PISYSAudit}
