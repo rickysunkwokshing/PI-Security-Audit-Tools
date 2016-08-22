@@ -39,6 +39,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary5
 {
+<#  
+.SYNOPSIS
+Get functions from machine library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
