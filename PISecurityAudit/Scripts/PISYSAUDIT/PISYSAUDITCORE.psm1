@@ -4363,7 +4363,8 @@ PROCESS
 		# Test if the key is already part of the list	
 		$item = $null	
 		$item = $ComputerParamsTable[$myKey]
-		if($null -eq $item) { $ComputerParamsTable.Add($myKey, $tempObj) }				
+		if($null -eq $item) { $ComputerParamsTable.Add($myKey, $tempObj) }
+		else { $ComputerParamsTable[$myKey] = $tempObj }				
 	}
 		
 	# Return the computer parameters table.
