@@ -244,7 +244,7 @@ param(
 			# The piconfig.exe is installed with PI SDK since version 1.4.0.416 on PINS									
 			
 			# Test for the PISERVER variable.
-			if($PIServer_path -ne $null)
+			if($null -ne $PIServer_path)
 			{							
 				if($cluFound -eq $false)
 				{
@@ -1856,7 +1856,7 @@ param(
 		[alias("mt")]
 		[ValidateSet("Error", "Warning", "Info", "Debug")]
 		[string]
-		$MessageType = "Info",						
+		$MessageType,						
 		[parameter(Mandatory=$true, Position=2, ParameterSetName = "Default")]
 		[alias("fn")]			
 		[string]
@@ -3311,6 +3311,7 @@ PROCESS
 			#......................................................................................			
 			$outputFileContent = Get-Content -Path $outputFilePath												
 			
+			if($null -eq $outputFileContent){$outputFileContent = ""}
 			#......................................................................................			
 			# Validate that the command succeeded
 			#......................................................................................									
@@ -3599,7 +3600,7 @@ param(
 		[parameter(Mandatory=$true, Position=3, ParameterSetName = "Default")]
 		[alias("q")]
 		[string]
-		$Query = "",
+		$Query,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]				
 		[string]
 		$InstanceName = "",								
@@ -4495,7 +4496,7 @@ PROCESS
 
 			# Get failed results and construct the recommendation section
 			$fails=@()
-			$fails = $results | Where {$_.AuditItemValue -ieq "fail"}
+			$fails = $results | Where-Object {$_.AuditItemValue -ieq "fail"}
 
 			$recommendations=""
 			if($null -ne $fails){
