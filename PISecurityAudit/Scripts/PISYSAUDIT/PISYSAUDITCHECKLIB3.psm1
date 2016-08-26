@@ -40,6 +40,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary3
 {
+<#  
+.SYNOPSIS
+Get functions from PI AF Server library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the PI AF Server compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
@@ -282,7 +286,6 @@ PROCESS
 		$securityWeaknessCounter = 0	
 		$securityWeakness = $false
 		$privilegeFound = $false		
-		$warningMessage = ""
 		
 		# Get the service account.
 		$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -priv "All" -sn "AFService" -dbgl $DBGLevel					
@@ -492,7 +495,7 @@ PROCESS
 				# Master whitelist of approved extensions
 				[System.Collections.ArrayList] $allowedExtensions = 'docx','xlsx','csv','pdf','txt','rtf','jpg','jpeg','png','svg','tiff','gif'
 				# Extract configured whitelist from parameter value
-				[string] $extensionList = $line.Split('=')[1].TrimStart()
+				[string] $extensionList = $line.Split('=')[1].Trim()
 				if($extensionList -ne "")
 				{
 					[string[]] $extensions = $extensionList.Split(':')
@@ -597,7 +600,7 @@ PROCESS
 		{								
 			if($line.Contains("Version"))
 			{								
-				$installVersion = $line.Split('=').TrimStart()[1]
+				$installVersion = $line.Split('=')[1].Trim()
 				$installVersionTokens = $installVersion.Split(".")
 				# Form an integer value with all the version tokens.
 				[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]

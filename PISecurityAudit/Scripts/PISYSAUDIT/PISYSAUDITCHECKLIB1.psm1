@@ -40,6 +40,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary1
 {
+<#  
+.SYNOPSIS
+Get functions from machine library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
@@ -428,7 +432,7 @@ PROCESS
 		$result = $false
 		# Read the AppLocker policy.
 		[xml] $appLockerPolicy = Get-PISysAudit_AppLockerState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		if($appLockerPolicy -ne $null)
+		if($null -ne $appLockerPolicy)
 		{
 			if($(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
 				$(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")

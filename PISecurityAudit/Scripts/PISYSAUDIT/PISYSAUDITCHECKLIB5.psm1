@@ -39,6 +39,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary5
 {
+<#  
+.SYNOPSIS
+Get functions from machine library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
@@ -329,8 +333,24 @@ PROCESS
 		$enforceSSLQuery = [string]::Format($enforceSSLQueryTemplate, $CSwebSite)
 		$SSLCheck = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $enforceSSLQuery -DBGLevel $DBGLevel
 
+		$httpsBindingConfigured = $false
+ 		# Handle PS Version 2.0 where the web bindings need to be treated as a collection and looped through.
+ 		if($PSVersionTable.PSVersion.Major -eq 2)
+ 		{
+ 			foreach($WebBinding in $WebBindings)
+ 			{
+ 				if($WebBinding.protocol -contains "https"){
+ 					$httpsBindingConfigured = $true
+ 				}
+ 			}
+ 		}
+ 		else
+ 		{
+ 			$httpsBindingConfigured = $WebBindings.protocol -contains "https"
+ 		}
+
 		# Evaluate both checks
-		if($WebBindings.protocol -contains "https" -and $SSLCheck -eq "Ssl") 
+		if($httpsBindingConfigured -and $SSLCheck.ToString() -eq "Ssl") 
 		{
 			# Everything checks out!
 			$result = $true
