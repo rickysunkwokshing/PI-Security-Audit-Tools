@@ -419,8 +419,9 @@ PROCESS
 					$portCert = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $portCertQuery -DBGLevel $DBGLevel
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
 					
-					$sslissuer = $(Get-ChildItem -Path Cert:\LocalMachine\My\$thumbprint | Format-List -Property issuer| Out-String).ToLower()
-					
+					$sslissuerTemplateQuery = "(Get-ChildItem -Path Cert:\LocalMachine\My\`"{0}`" | Format-List -Property issuer| Out-String).ToLower()"
+					$sslissuerQuery = [string]::Format($sslissuerTemplateQuery, $thumbprint)
+					$sslissuer = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $sslissuerQuery -DBGLevel $DBGLevel
 					$pos = $sslissuer.IndexOf("=")
 					$sslissuerTrim = $sslissuer.Substring($pos+1).Trim()
 					
