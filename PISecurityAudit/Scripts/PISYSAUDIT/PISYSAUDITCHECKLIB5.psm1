@@ -314,7 +314,7 @@ param(
 		$DBGLevel = 0)		
 BEGIN {}
 PROCESS
-{		
+{
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	
@@ -328,7 +328,7 @@ PROCESS
 		# Get Coresight Web Site bindings.
 		$WebBindingsQueryTemplate = "Get-WebBinding -Name `"{0}`""
 		$WebBindingsQuery = [string]::Format($WebBindingsQueryTemplate, $CSwebSite)
-		$WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
+		$global:WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
 
 		# Check if HTTPS binding is enabled.
 		$httpsBindingConfigured = $false
@@ -336,7 +336,7 @@ PROCESS
  		# Handle PS Version 2.0 where the web bindings need to be treated as a collection and looped through.
  		if($PSVersionTable.PSVersion.Major -eq 2)
  		{
- 			foreach($WebBinding in $WebBindings)
+ 			foreach($WebBinding in $global:WebBindings)
  			{
  				if($WebBinding.protocol -contains "https"){
  					$httpsBindingConfigured = $true
@@ -346,7 +346,7 @@ PROCESS
 		# Modern PowerShell is used.
  		else 
  		{
- 			$httpsBindingConfigured = $WebBindings.protocol -contains "https"
+ 			$httpsBindingConfigured = $global:WebBindings.protocol -contains "https"
  		}
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
@@ -414,7 +414,7 @@ PROCESS
 				$fqdn = $hostname + "." + $machineDomain
 
 				# Get the issuer of the SSL certificate used on the Coresight Web Site.
-				$matches = [regex]::Matches($WebBindings, 'https \*:([0-9]+):') 
+				$matches = [regex]::Matches($global:WebBindings, 'https \*:([0-9]+):') 
 				
 				# Go through all bindings.
 				foreach ($match in $matches) {
@@ -557,13 +557,28 @@ PROCESS
 	try
 	{		
 
-		# Coresight is using the http service class
+		# Coresight is using the http service class.
 		$serviceType = "http"
 
-		# Special 'service name' for Coresight
+		# Special 'service name' for Coresight.
+		# This is needed to distinguish between SPN check for IIS Apps such as Coresight, and Windows Services such as PI or AF.
 		$serviceName = "coresight"
-		
-		# Not checking if the other AppPool is running under the same identity, as that is done over in the Get-PISysAudit_CheckCoresightAppPools function
+
+		# Leverage WebBindings global variable and look for custom headers.
+		$matches = [regex]::Matches($global:WebBindings, ':{1}\d+:{1}(\S+)\s') 
+				
+		# Go through all bindings.
+		foreach ($match in $matches) 
+		{
+			$CSheader = $match.Groups[1].Captures[0].Value 				
+			If ($CSheader) 
+			{ 
+				$serviceName = "coresight_custom"
+				break 
+			}
+		}
+
+		# Not checking if the other AppPool is running under the same identity, as that is done over in the Get-PISysAudit_CheckCoresightAppPools function.
 
 		# Coresight is running under a custom domain account.
 		# Using the global variables $global:CSAppPoolSvc and $global:CSUserSvc to reduce the overhead.
@@ -581,7 +596,7 @@ PROCESS
 			$serviceType = "host"
 		}
 		
-		$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $LocalComputer -rcn $RemoteComputerName -appPool $csappPool -dbgl $DBGLevel
+		$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $LocalComputer -rcn $RemoteComputerName -appPool $csappPool -CustomHeader $CSheader -dbgl $DBGLevel
 
 		If ($result) 
 		{ 

@@ -3485,6 +3485,10 @@ param(
 		[string]
 		$csappPool,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("CustomHeader")]
+		[string]
+		$csCHeader,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)
@@ -3495,15 +3499,6 @@ PROCESS
 	
 	try
 	{
-		If ( $ServiceName -ne "coresight") 
-		{
-			# Get the Service account
-			$svcacc = Get-PISysAudit_ServiceLogOnAccount $ServiceName -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		}
-		Else
-		{
-			$svcacc = $csappPool
-		}
 		# Get Domain info
 		$MachineDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 
@@ -3513,10 +3508,97 @@ PROCESS
 		# Build FQDN using hostname and domain strings
 		$fqdn = $hostname + "." + $machineDomain
 
+		# SPN check is not done for PI Coresight.
+		If ( $ServiceName -ne "coresight" -and $ServiceName -ne "coresight_custom") 
+		{
+			# Get the Service account
+			$svcacc = Get-PISysAudit_ServiceLogOnAccount $ServiceName -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		}
+		
+		# SPN check is done for PI Coresight using a custom host header.
+		ElseIf ( $ServiceName -ne "coresight" ) 
+		{ 
+			$svcaccMod = $csappPool # REST HERE!!!!
+			
+			$AliasTypeCheck = nslookup $csCHeader
+
+			$csCHeaderLong = $csCHeader + "." + $MachineDomain
+
+			If ($AliasTypeCheck -match "Aliases:") 
+			{ 
+			# Alias (CNAME) 
+
+			$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+
+			# Verify hostnane AND FQDN SPNs are assigned to the service account
+			$spnCounter = 0
+			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
+			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeader.ToLower())
+			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
+			foreach($line in $spnCheck)
+			{
+				switch($line.ToLower().Trim())
+				{
+					$csCHeaderSPN {$spnCounter++; break}
+					$csCHeaderLongSPN {$spnCounter++; break}
+					$hostnameSPN {$spnCounter++; break}
+					$fqdnSPN {$spnCounter++; break}
+					default {break}
+				}
+			}
+
+			# FUTURE ENHANCEMENT:
+			# Return details to improve messaging in case of failure
+			If ($spnCounter -eq 4) { $result = $true } 
+			Else { $result =  $false }
+		
+			return $result		
+			
+			} 
+			
+			Else 
+			{ 
+			# Host (A) 
+
+			$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+
+			# Verify hostnane AND FQDN SPNs are assigned to the service account
+			$spnCounter = 0
+			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeader.ToLower())
+			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
+			foreach($line in $spnCheck)
+			{
+				switch($line.ToLower().Trim())
+				{
+					$csCHeaderSPN {$spnCounter++; break}
+					$csCHeaderLongSPN {$spnCounter++; break}
+					default {break}
+				}
+			}
+
+			# FUTURE ENHANCEMENT:
+			# Return details to improve messaging in case of failure
+			If ($spnCounter -eq 2) { $result = $true } 
+			Else { $result =  $false }
+		
+			return $result
+			
+			
+			}
+		
+		}
+		# SPN check is done for PI Coresight without custom headers
+		Else
+		{
+			# In case of PI Coresight, the AppPool account is used in the SPN check.
+			$svcacc = $csappPool
+		}
+
 		# Distinguish between Domain/Virtual account and Machine Accounts
 		If ($svcacc.Contains("\")) 
 		{
-			# If NT Service account is running the AF Server service, use the hostname when verifying the SPN assignment
+			# If NT Service account is used, use the hostname when verifying the SPN assignment
 			If ($svcacc.ToLower().Contains("nt service")) 
 			{ 
 				$svcaccMod = $hostname 
@@ -3536,7 +3618,7 @@ PROCESS
 		}
 
 		# Run setspn and convert it to a string (no capital letters)
-		$spnCheck = $(setspn -l $svcaccMod) 
+		$spnCheck = $(setspn -l $svcaccMod).ToLower() 
 
 		# Verify hostnane AND FQDN SPNs are assigned to the service account
 		$spnCounter = 0
