@@ -40,6 +40,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary4
 {
+<#  
+.SYNOPSIS
+Get functions from machine library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the SQL Server compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	

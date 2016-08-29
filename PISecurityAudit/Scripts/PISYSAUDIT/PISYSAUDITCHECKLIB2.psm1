@@ -40,6 +40,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary2
 {
+<#  
+.SYNOPSIS
+Get functions from PI Data Archive library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
@@ -377,16 +381,6 @@ PROCESS
 				$tokens = $line.Split(",")
 				$installationVersion  = $tokens[1]						
 			}		
-			elseif($line.Contains("Installation binaries"))
-			{								
-				$tokens = $line.Split(",")
-				$installationBinaries  = $tokens[1]						
-			}
-			elseif($line.Contains("PI Build Name"))
-			{								
-				$tokens = $line.Split(",")
-				$buildName  = $tokens[1]						
-			}
 		}
 		
 		$result = $false
@@ -965,13 +959,13 @@ PROCESS
 																	
 	#Iterate through the returned results (is any) and append ; delimiter for the output message. 
 	if($noncompliantTrusts){
-	$noncompliantTrusts = $noncompliantTrusts | Foreach {$_ + ';'}		
+	$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
 	$result = $false	
 	$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
 	}
 
 	if($noncompliantMappings){
-	$noncompliantMappings =	$noncompliantMappings | Foreach {$_ + ';'}		
+	$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
 	$result = $false	
 	$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
 	}
@@ -1013,9 +1007,10 @@ function Get-PISysAudit_CheckPISPN
 AU20009 - Check PI Server SPN
 .DESCRIPTION
 VALIDATION: Checks PI Data Archive SPN assignment.<br/>
-COMPLIANCE: PI Data Archive SPNs exist and are assigned to the pinetmgr Service account. 
-This makes Kerberos Authentication possible.  For more information, see "PI and Kerberos 
-authentication" in the PI Live Library. <br/>
+COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running pinetmgr. 
+Presently only local system is supported.  Correct SPN assignment makes Kerberos 
+Authentication possible.  For more information, see "PI and Kerberos authentication" in 
+the PI Live Library. <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     

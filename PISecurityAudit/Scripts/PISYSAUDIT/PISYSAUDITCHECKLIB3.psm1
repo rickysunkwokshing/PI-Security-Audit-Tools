@@ -40,6 +40,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary3
 {
+<#  
+.SYNOPSIS
+Get functions from PI AF Server library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the PI AF Server compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
@@ -282,7 +286,6 @@ PROCESS
 		$securityWeaknessCounter = 0	
 		$securityWeakness = $false
 		$privilegeFound = $false		
-		$warningMessage = ""
 		
 		# Get the service account.
 		$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -priv "All" -sn "AFService" -dbgl $DBGLevel					
