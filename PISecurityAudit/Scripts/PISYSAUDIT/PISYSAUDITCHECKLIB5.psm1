@@ -414,14 +414,18 @@ PROCESS
 				# Get the issuer of the SSL certificate used on the Coresight Web Site.
 				$matches = [regex]::Matches($WebBindings, 'https \*:([0-9]+):') 
 				 foreach ($match in $matches) {
-					$portCert = netsh http show sslcert ipport=0.0.0.0:$($match.Groups[1].Captures[0].Value)
+					$portCertTemplateQuery = "netsh http show sslcert ipport=0.0.0.0:`"{0}`""
+					$portCertQuery = [string]::Format($portCertTemplateQuery, $($match.Groups[1].Captures[0].Value))
+					$portCert = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $portCertQuery -DBGLevel $DBGLevel
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
+					
 					$sslissuer = $(Get-ChildItem -Path Cert:\LocalMachine\My\$thumbprint | Format-List -Property issuer| Out-String).ToLower()
+					
 					$pos = $sslissuer.IndexOf("=")
 					$sslissuerTrim = $sslissuer.Substring($pos+1).Trim()
 					
 					 # Certificate is self-signed (barring false positive).
-					 If ($sslissuerTrim -eq $fqdn) 
+					 If ($sslissuerTrim.ToLower() -eq $fqdn.ToLower()) 
 					 {
 						 $result = $false 
 						 $severity = "Low"
@@ -545,13 +549,7 @@ PROCESS
 		# Special 'service name' for Coresight
 		$serviceName = "coresight"
 		
-		# Get Hostname of the CS server
-		$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		
-		$targetName = $hostname
-		
 		# Not checking if the other AppPool is running under the same identity, as that is done over in the Get-PISysAudit_CheckCoresightAppPools function
-
 		# Get the Identity Type of Coresight Service AppPool
 		$QuerySvcAppPool = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
 		$CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
