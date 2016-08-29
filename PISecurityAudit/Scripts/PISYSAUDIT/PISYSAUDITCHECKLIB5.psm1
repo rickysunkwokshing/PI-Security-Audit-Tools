@@ -413,21 +413,32 @@ PROCESS
 
 				# Get the issuer of the SSL certificate used on the Coresight Web Site.
 				$matches = [regex]::Matches($WebBindings, 'https \*:([0-9]+):') 
-				 foreach ($match in $matches) {
+				
+				# Go through all bindings.
+				foreach ($match in $matches) {
+
+					# Find SSL certificate for each binding of the PI Coresight Web Site.
 					$portCertTemplateQuery = "netsh http show sslcert ipport=0.0.0.0:`"{0}`""
 					$portCertQuery = [string]::Format($portCertTemplateQuery, $($match.Groups[1].Captures[0].Value))
 					$portCert = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $portCertQuery -DBGLevel $DBGLevel
+					
+					# Get the Thumbprint from all SSL certificates that have been found.
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
 					
-					$sslissuerTemplateQuery = "(Get-ChildItem -Path Cert:\LocalMachine\My\`"{0}`" | Format-List -Property issuer| Out-String).ToLower()"
+					# Using the Thumbrpint, find the Issuer of the SSL certificate.
+					$sslissuerTemplateQuery = "(Get-ChildItem -Path Cert:\LocalMachine\My\`"{0}`" | Format-List -Property issuer| Out-String)"
 					$sslissuerQuery = [string]::Format($sslissuerTemplateQuery, $thumbprint)
 					$sslissuer = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $sslissuerQuery -DBGLevel $DBGLevel
+					
+					# Trim and only get the actual SSL issuer in a single string.
 					$pos = $sslissuer.IndexOf("=")
 					$sslissuerTrim = $sslissuer.Substring($pos+1).Trim()
 					
 					 # Certificate is self-signed (barring false positive).
+					 
+					# The Issuer is compared with the FQDN of the machine. This can lead to false positives (e.g. a leftover certificate from before the machine was renamed etc.)
 					 If ($sslissuerTrim.ToLower() -eq $fqdn.ToLower()) 
-					 {
+					 { 
 						 $result = $false 
 						 $severity = "Low"
 						 $msg = "The SSL certificate is self-signed."
