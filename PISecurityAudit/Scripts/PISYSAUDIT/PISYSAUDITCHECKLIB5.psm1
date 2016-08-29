@@ -174,30 +174,32 @@ PROCESS
 	try
 	{	
 		# Get the Identity Type of Coresight Service AppPool.
+		# Store it in a global variable that's used in the SPN check later on.
 		$QuerySvcAppPool = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
-		$CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
+		$global:CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
 
 		# Get the Identity Type of Coresight Admin AppPool.
 		$QueryAdmAppPool = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.identitytype"
 		$CSAppPoolAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmAppPool -DBGLevel $DBGLevel
 
-		# Get the User running Coresight Service AppPool.
+		# Get the User running Coresight Service AppPool. 
+		# Store it in a global variable that's used in the SPN check later on.
 		$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
-		$CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
+		$global:CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
 
 		# Get the User running Coresight Admin AppPool.
 		$QueryAdmUser = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.username.value"
 		$CSUserAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmUser -DBGLevel $DBGLevel
 
 		# Both Coresight AppPools must run under the same identity.
-		If ( $CSAppPoolSvc -eq $CSAppPoolAdm -and $CSUserSvc -eq $CSUserAdm ) 
+		If ( $global:CSAppPoolSvc -eq $CSAppPoolAdm -and $global:CSUserSvc -eq $CSUserAdm ) 
 		{ 
 
 			# If a custom account is used, we need to distinguish between a local and domain account.
-			If ( $CSAppPoolSvc -eq "SpecificUser") 
+			If ( $global:CSAppPoolSvc -eq "SpecificUser") 
 			{
 				# Local user would use ".\user" format.
-				If ($CSUserSvc -contains ".\" ) 
+				If ($global:CSUserSvc -contains ".\" ) 
 				{ 
 					$result = $false
 					$msg =  "Local User is running Coresight AppPools. Please use a custom domain account."
@@ -211,10 +213,10 @@ PROCESS
 					$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 					
 					# Get position of \ within the AppPool identity string.
-					$position = $CSUserSvc.IndexOf("\")
+					$position = $global:CSUserSvc.IndexOf("\")
 					
 					# Remove the \username part from the AppPool identity string.
-					$LsplitName = $CSUserSvc.Substring(0, $position)
+					$LsplitName = $global:CSUserSvc.Substring(0, $position)
 
 					# Detect local user.
 					If ($hostname -eq $LsplitName )
@@ -233,7 +235,7 @@ PROCESS
 
 			}
 			# LocalSystem is running the Coresight AppPools. That's a bad idea.
-			ElseIf ($CSAppPoolSvc -eq "LocalSystem" ) 
+			ElseIf ($global:CSAppPoolSvc -eq "LocalSystem" ) 
 			{ 
 				$result = $false
 				$msg =  "Local System is running both Coresight AppPools. Use a custom domain account instead."
@@ -243,7 +245,7 @@ PROCESS
 			Else 
 			{
 				$result = $true
-				$msg =  $CSAppPoolSvc + " is running the Coresight AppPools. Use a custom domain account instead."
+				$msg =  $global:CSAppPoolSvc + " is running the Coresight AppPools. Use a custom domain account instead."
 
 			}
 		}
@@ -562,23 +564,20 @@ PROCESS
 		$serviceName = "coresight"
 		
 		# Not checking if the other AppPool is running under the same identity, as that is done over in the Get-PISysAudit_CheckCoresightAppPools function
-		# Get the Identity Type of Coresight Service AppPool
-		$QuerySvcAppPool = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
-		$CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
 
-		# Get the User running Coresight Service AppPool
-		$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
-		$CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
-
-		If ( $CSAppPoolSvc -eq "SpecificUser") 
+		# Coresight is running under a custom domain account.
+		# Using the global variables $global:CSAppPoolSvc and $global:CSUserSvc to reduce the overhead.
+		If ( $global:CSAppPoolSvc -eq "SpecificUser") 
 		{ 
-			$csappPool = $CSUserSvc 
+			$csappPool = $global:CSUserSvc 
 		} 
+
+		# Coresight is running under a machine account.
 		Else 
 		{ 
 			$csappPool = $hostname 
 
-			# Machine accounts don't need http SPN
+			# Machine accounts don't need HTTP service class as it's already included in the HOST service class.
 			$serviceType = "host"
 		}
 		
