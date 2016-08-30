@@ -119,7 +119,7 @@ PROCESS
 		$result = "N/A"
 	}	
 	
-	# Define the results in the audit table	
+	# Define the results in the audit table.
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU50001" `
 									-msg $msg `

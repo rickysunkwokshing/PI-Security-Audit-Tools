@@ -3499,13 +3499,13 @@ PROCESS
 	
 	try
 	{
-		# Get Domain info
+		# Get Domain info.
 		$MachineDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 
-		# Get Hostname
+		# Get Hostname.
 		$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 
-		# Build FQDN using hostname and domain strings
+		# Build FQDN using hostname and domain strings.
 		$fqdn = $hostname + "." + $machineDomain
 
 		# SPN check is not done for PI Coresight.
@@ -3521,15 +3521,15 @@ PROCESS
 			# Pass the Coresight AppPool identity as the service account.
 			$svcacc = $csappPool
 			
-				# Distinguish between Domain/Virtual account and Machine Accounts
+				# Distinguish between Domain/Virtual account and Machine Accounts.
 				If ($svcacc.Contains("\")) 
 				{
-					# If NT Service account is used, use the hostname when verifying the SPN assignment
+					# If NT Service account is used, use the hostname when verifying the SPN assignment.
 					If ($svcacc.ToLower().Contains("nt service")) 
 					{ 
 						$svcaccMod = $hostname 
 					} 
-					# Else use the username to verify the SPN assignment
+					# Else use the username to verify the SPN assignment.
 					Else 
 					{ 
 						$svcaccMod = $svcacc
@@ -3537,17 +3537,27 @@ PROCESS
 						if($svcaccMod.Split("\")[0] -eq "."){return $false}
 					} 
 				}
-				# For machine accounts such as Network Service or Local System, use the hostname when verifying the SPN assignment
+				# For machine accounts such as Network Service or Local System, use the hostname when verifying the SPN assignment.
 				Else 
 				{ 
 					$svcaccMod = $hostname 
 				}
 
+				# Take Custom header information and create its short and long version.
+				If ($CoresightHeader -match "\.") 
+				{
+					$csCHeaderLong = $CoresightHeader
+					$pos = $CoresightHeader.IndexOf(".")
+					$csCHeaderShort = $CoresightHeader.Substring(0, $pos)
+				} 
+				Else 
+				{ 
+					$csCHeaderShort = $CoresightHeader
+					$csCHeaderLong = $CoresightHeader + "." + $MachineDomain
+				}
+
 			# Deal with the custom header - run nslookup and capture the result.
 			$AliasTypeCheck = nslookup $CoresightHeader
-
-			# Need to add a check for short vs. fully qualified header!!
-			$csCHeaderLong = $CoresightHeader + "." + $MachineDomain
 
 			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
 			If ($AliasTypeCheck -match "Aliases:") 
@@ -3567,7 +3577,7 @@ PROCESS
 			
 			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
-			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $CoresightHeader.ToLower())
+			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeaderShort.ToLower())
 			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
 			
 			foreach($line in $spnCheck)
@@ -3583,7 +3593,7 @@ PROCESS
 			}
 
 			# FUTURE ENHANCEMENT:
-			# Return details to improve messaging in case of failure
+			# Return details to improve messaging in case of failure.
 			If ($spnCounter -eq 4) { $result = $true } 
 			Else { $result =  $false }
 		
@@ -3599,7 +3609,7 @@ PROCESS
 
 			# Verify hostnane AND FQDN SPNs are assigned to the service account.
 			$spnCounter = 0
-			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $CoresightHeader.ToLower())
+			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeaderShort.ToLower())
 			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
 			foreach($line in $spnCheck)
 			{
