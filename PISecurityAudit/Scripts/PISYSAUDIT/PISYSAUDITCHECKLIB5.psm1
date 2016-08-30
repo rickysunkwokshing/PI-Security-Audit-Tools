@@ -413,8 +413,9 @@ PROCESS
 				# Build FQDN using hostname and domain strings.
 				$fqdn = $hostname + "." + $machineDomain
 
+				$BindingsToString = $($global:WebBindings) | Out-String
 				# Get the issuer of the SSL certificate used on the Coresight Web Site.
-				$matches = [regex]::Matches($global:WebBindings, 'https \*:([0-9]+):') 
+				$matches = [regex]::Matches($BindingsToString, 'https \*:([0-9]+):') 
 				
 				# Go through all bindings.
 				foreach ($match in $matches) {
@@ -564,21 +565,22 @@ PROCESS
 		# This is needed to distinguish between SPN check for IIS Apps such as Coresight, and Windows Services such as PI or AF.
 		$serviceName = "coresight"
 
+		# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
+		$BindingsToString = $($global:WebBindings) | Out-String
+
 		# Leverage WebBindings global variable and look for custom headers.
-		$matches = [regex]::Matches($global:WebBindings, ':{1}\d+:{1}(\S+)\s') 
+		$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
 				
 		# Go through all bindings.
 		foreach ($match in $matches) 
 		{
 			$CSheader = $match.Groups[1].Captures[0].Value 				
-			If ($CSheader) 
+			If ($CSheader) # A custom host header is used!
 			{ 
 				$serviceName = "coresight_custom"
 				break 
 			}
 		}
-
-		# Not checking if the other AppPool is running under the same identity, as that is done over in the Get-PISysAudit_CheckCoresightAppPools function.
 
 		# Coresight is running under a custom domain account.
 		# Using the global variables $global:CSAppPoolSvc and $global:CSUserSvc to reduce the overhead.
@@ -592,7 +594,7 @@ PROCESS
 		{ 
 			$csappPool = $hostname 
 
-			# Machine accounts don't need HTTP service class as it's already included in the HOST service class.
+			# Machine accounts don't need HTTP service class - it's already included in the HOST service class.
 			$serviceType = "host"
 		}
 		
