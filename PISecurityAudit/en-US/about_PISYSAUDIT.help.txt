@@ -284,8 +284,8 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 
 		AU50003 - Coresight SSL check
 		VALIDATION: Checks whether SSL is enabled and enforced on the Coresight Web Site.
-		COMPLIANCE: A valid https binding is configured and only connections with SSL should be allowed.
-		For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library. 
+		COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
+		For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library.
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
 
 		AU50004 - Coresight SPN check
