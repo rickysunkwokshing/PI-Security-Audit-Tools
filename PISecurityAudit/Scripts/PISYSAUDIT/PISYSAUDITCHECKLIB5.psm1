@@ -174,7 +174,6 @@ PROCESS
 	try
 	{	
 		# Get the Identity Type of Coresight Service AppPool.
-		# Store it in a global variable that's used in the SPN check later on.
 		$QuerySvcAppPool = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
 		$global:CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
 
@@ -182,8 +181,7 @@ PROCESS
 		$QueryAdmAppPool = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.identitytype"
 		$CSAppPoolAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmAppPool -DBGLevel $DBGLevel
 
-		# Get the User running Coresight Service AppPool. 
-		# Store it in a global variable that's used in the SPN check later on.
+		# Get the User running Coresight Service AppPool.
 		$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
 		$global:CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
 
@@ -314,7 +312,7 @@ param(
 		$DBGLevel = 0)		
 BEGIN {}
 PROCESS
-{
+{		
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	
@@ -328,7 +326,7 @@ PROCESS
 		# Get Coresight Web Site bindings.
 		$WebBindingsQueryTemplate = "Get-WebBinding -Name `"{0}`""
 		$WebBindingsQuery = [string]::Format($WebBindingsQueryTemplate, $CSwebSite)
-		$global:WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
+		$WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
 
 		# Check if HTTPS binding is enabled.
 		$httpsBindingConfigured = $false
@@ -336,7 +334,7 @@ PROCESS
  		# Handle PS Version 2.0 where the web bindings need to be treated as a collection and looped through.
  		if($PSVersionTable.PSVersion.Major -eq 2)
  		{
- 			foreach($WebBinding in $global:WebBindings)
+ 			foreach($WebBinding in $WebBindings)
  			{
  				if($WebBinding.protocol -contains "https"){
  					$httpsBindingConfigured = $true
@@ -346,7 +344,7 @@ PROCESS
 		# Modern PowerShell is used.
  		else 
  		{
- 			$httpsBindingConfigured = $global:WebBindings.protocol -contains "https"
+ 			$httpsBindingConfigured = $WebBindings.protocol -contains "https"
  		}
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
@@ -413,11 +411,8 @@ PROCESS
 				# Build FQDN using hostname and domain strings.
 				$fqdn = $hostname + "." + $machineDomain
 
-				# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
-				$BindingsToString = $($global:WebBindings) | Out-String
-				
 				# Get the issuer of the SSL certificate used on the Coresight Web Site.
-				$matches = [regex]::Matches($BindingsToString, 'https \*:([0-9]+):') 
+				$matches = [regex]::Matches($WebBindings, 'https \*:([0-9]+):') 
 				
 				# Go through all bindings.
 				foreach ($match in $matches) {
@@ -560,6 +555,16 @@ PROCESS
 	try
 	{		
 
+		# Get the name of PI Coresight Web Site.
+		$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
+		$attribute = "WebSite"
+		$CSwebSite = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -a $attribute -DBGLevel $DBGLevel	
+
+		# Get Coresight Web Site bindings.
+		$WebBindingsQueryTemplate = "Get-WebBinding -Name `"{0}`""
+		$WebBindingsQuery = [string]::Format($WebBindingsQueryTemplate, $CSwebSite)
+		$WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
+
 		# Coresight is using the http service class.
 		$serviceType = "http"
 
@@ -568,7 +573,7 @@ PROCESS
 		$serviceName = "coresight"
 
 		# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
-		$BindingsToString = $($global:WebBindings) | Out-String
+		$BindingsToString = $($WebBindings) | Out-String
 
 		# Leverage WebBindings global variable and look for custom headers.
 		$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
