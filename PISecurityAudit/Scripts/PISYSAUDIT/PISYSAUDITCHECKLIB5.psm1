@@ -413,7 +413,9 @@ PROCESS
 				# Build FQDN using hostname and domain strings.
 				$fqdn = $hostname + "." + $machineDomain
 
+				# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
 				$BindingsToString = $($global:WebBindings) | Out-String
+				
 				# Get the issuer of the SSL certificate used on the Coresight Web Site.
 				$matches = [regex]::Matches($BindingsToString, 'https \*:([0-9]+):') 
 				
