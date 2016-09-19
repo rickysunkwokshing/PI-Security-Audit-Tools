@@ -10,8 +10,9 @@ The PI System Audit Module (PISysAudit) can be executed locally or remotely and 
 
 The current version of the PISysAudit module implements validations covering machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX), SQL Server (AU4XXXX) and PI Coresight Server (AU5XXXX) best practices with the PI System.
 
-_Validations:_
-```
+### Validations
+
+```markdown
 AU10001 - Machine: Domain Membership Check
 AU10002 - Machine: OS SKU
 AU10003 - Machine: Validate if Windows firewall is enabled
@@ -58,7 +59,7 @@ The PISysAudit module does not require installation; you only need to extract th
 
 For example, if you have decompressed the package inside your user folder (C:\users\<user>\documents\PISecurityAudit), you need to import the module the following:
 
-```
+```powershell
   Import-Module "C:\users\<user>\documents\PISecurityAudit\pisysaudit"
 ```
 
