@@ -109,7 +109,7 @@ To discuss the project or ask questions, please make a comment on our [project p
 
 Please make sure that you read our general [Contribution Guidelines](https://github.com/osisoft/contributing) and agree with them.  These guidelines apply to all OSIsoft projects on GitHub.
 
-We welcome everyone to share enhancement requests, issues and contributions.  While all contributions will be considered by our team, we cannot accept any changes until they have been reviewed.  This is to ensure they are appropriate and aligned with the goals of the project.  We will make every effort to respond in a timely fashion, but please be patient during the review process.  
+We welcome everyone to share enhancement requests, issues and contributions.  While all contributions will be considered by our team, we cannot accept any changes until they have been reviewed.  This is to ensure they are appropriate and aligned with the goals of the project.  We will make every effort to respond in a timely fashion, but please be patient during the review process.
 
 To help streamline the process, please make sure that you review our guidance with respect to [Submitting Pull Requests, Issues and Enhancement Requests](https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Submitting-Pull-Requests,-Issues-and-Enhancement-Requests) on our Wiki page.
 
