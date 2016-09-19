@@ -18,7 +18,7 @@ AU10002 - Machine: OS SKU
 AU10003 - Machine: Validate if Windows firewall is enabled
 AU10004 - Machine: AppLocker state
 AU10005 - Machine: UAC enabled
-AU20001 - PI Data Archive: Table Securit
+AU20001 - PI Data Archive: Table Security
 AU20002 - PI Data Archive: PI Admin Trusts Disabled
 AU20003 - PI Data Archive: Subsystem Version
 AU20004 - PI Data Archive: Edit Days
