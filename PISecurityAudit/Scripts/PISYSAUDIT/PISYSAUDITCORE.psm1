@@ -4161,7 +4161,11 @@ param(
 		[parameter(Mandatory=$true, Position=5, ParameterSetName = "Default")]
 		[alias("aiv")]
 		[object]
-		$AuditItemValue,		
+		$AuditItemValue,
+		[parameter(Mandatory=$true, Position=5, ParameterSetName = "Default")]
+		[alias("aif")]
+		[String]
+		$AuditItemFunction,		
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("msg")]
 		[String]
@@ -4210,6 +4214,7 @@ PROCESS
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ServerName" -Value $computerName
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditItemName" -Value $AuditItemName
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditItemValue" -Value $AuditItemValue	
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditItemFunction" -Value $AuditItemFunction
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "MessageList" -Value $MessageList
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group1" -Value $Group1
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group2" -Value $Group2
@@ -4631,7 +4636,7 @@ PROCESS
 										<h2>Recommendations for failed validations:</h2>"
 		
 				$fails | ForEach-Object{
-					$AuditFunctionName = (Get-Help $_.ID)[0].Name
+					$AuditFunctionName = $_.AuditItemFunction
 					$recommendationInfo = Get-Help $AuditFunctionName
 					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
 					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
