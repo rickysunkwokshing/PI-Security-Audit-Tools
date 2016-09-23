@@ -126,7 +126,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU10001" `
 										-ain "Domain Membership Check" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Domain" `
 										-Severity "Severe"																				 
 }
@@ -288,7 +288,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU10002" `
 										-ain "Operating System SKU" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Operating System" `
 										-Severity "Severe"													
 }
@@ -380,7 +380,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU10003" `
 										-ain "Firewall Enabled" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
 										-Severity "Moderate"																				 
 }
@@ -462,7 +462,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU10004" `
 										-ain "AppLocker Enabled" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
 										-Severity "Moderate"																				 
 }
@@ -561,7 +561,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU10005" `
 										-ain "UAC Enabled" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
 										-Severity $severity																				 
 }
@@ -626,7 +626,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU1xxxx" `
 									-ain "<Name>" -aiv $result `
-									-msg $msg `
+									-aif $fn -msg $msg `
 									-Group1 "<Category 1>" -Group2 "<Category 2>" `
 									-Group3 "<Category 3>" -Group4 "<Category 4>" `
 									-Severity "<Severity>"																																																
