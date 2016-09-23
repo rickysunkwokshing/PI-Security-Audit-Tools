@@ -124,7 +124,7 @@ PROCESS
 	# Define the results in the audit table		
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30001" `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-ain "Configured Account" -aiv $result `
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity "Severe"
@@ -230,7 +230,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30002" `
 										-ain "Impersonation mode for AF Data Sets" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity "Low"
 										
@@ -349,7 +349,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30003" `
 										-ain "PI AF Server Service privileges" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity "Severe"																					
 }
@@ -430,7 +430,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30004" `
 										-ain "PI AF Server Plugin Verify Level" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity "Moderate"
 										
@@ -542,7 +542,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30005" `
 										-ain "PI AF Server File Extension Whitelist" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity "Moderate"
 										
@@ -632,7 +632,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30006" `
 										-ain "PI AF Server Version" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity "Moderate"
 										
@@ -709,7 +709,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU30007" `
 										-ain "PI AF Server SPN Check" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server"`
 										-Severity "Moderate"
 }
@@ -774,7 +774,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU3xxxx" `
 										-ain "<Name>" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "<Category 1>" -Group2 "<Category 2>" -Group3 "<Category 3>" -Group4 "<Category 4>"`
 										-Severity "<Severity>"
 }
