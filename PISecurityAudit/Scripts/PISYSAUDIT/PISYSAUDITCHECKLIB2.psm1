@@ -197,7 +197,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20001" `
 										-ain "PI Data Archive Table Security" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "DB Security" `
 										-Severity "Moderate"																		
 }
@@ -304,7 +304,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20002" `
 										-ain "PI Admin Trusts Disabled" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity "Severe"																		
 }
@@ -409,7 +409,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20003" `
 										-ain "PI Data Archive SubSystem Versions" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "PI Subsystems" `
 										-Severity $Severity									
 }
@@ -517,7 +517,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20004" `
 										-ain "Edit Days" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity "Severe"												
 }
@@ -646,7 +646,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20005" `
 										-ain "Auto Trust Configuration" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "Authentication" `
 										-Severity "Severe"	
 										
@@ -802,7 +802,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20006" `
 										-ain "Expensive Query Protection" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "PI Archive Subsystem" `
 										-Severity "Severe"																		
 }
@@ -898,7 +898,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20007" `
 										-ain "Explicit login disabled" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity "Severe"								
 }
@@ -988,7 +988,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20008" `
 										-ain "piadmin is not used" -aiv $result `
-										-msg  $msg `
+										-aif $fn -msg  $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity "Severe"								
 }
@@ -1065,7 +1065,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20009" `
 										-ain "PI Data Archive SPN Check" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
 										-Severity "Moderate"								
 }
@@ -1129,7 +1129,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20010" `
 										-ain "Trust configuration strength" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity "Severe"								
 }
@@ -1194,7 +1194,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU2xxxx" `
 										-ain "<Name>" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "<Category 1>" -Group2 "<Category 2>" -Group3 "<Category 3>" -Group4 "<Category 4>"`
 										-Severity "<Severity>"								
 }
