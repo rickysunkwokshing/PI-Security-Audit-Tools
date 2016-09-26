@@ -47,14 +47,14 @@ Get functions from PI Data Archive library.
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
-	#$listOfFunctions.Add("Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckPIAdminUsage", 1)
-	#$listOfFunctions.Add("Get-PISysAudit_CheckPIServerSubSysVersions", 1)
-	#$listOfFunctions.Add("Get-PISysAudit_CheckEditDays", 1)
-	#$listOfFunctions.Add("Get-PISysAudit_CheckAutoTrustConfig", 1)
-	#$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerSubSysVersions", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckEditDays", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckAutoTrustConfig", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckExplicitLoginDisabled",1)
-	#$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
 				
 	# Return the list.
 	return $listOfFunctions	
@@ -1176,9 +1176,9 @@ END {}
 # ........................................................................
 # <Do not remove>
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary2
+Export-ModuleMember Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 Export-ModuleMember Get-PISysAudit_CheckPIAdminUsage
 Export-ModuleMember Get-PISysAudit_CheckPIServerSubSysVersions
-Export-ModuleMember Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 Export-ModuleMember Get-PISysAudit_CheckEditDays
 Export-ModuleMember Get-PISysAudit_CheckAutoTrustConfig
 Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
