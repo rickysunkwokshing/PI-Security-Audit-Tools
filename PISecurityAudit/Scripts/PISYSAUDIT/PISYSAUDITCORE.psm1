@@ -2004,78 +2004,6 @@ END {}
 #End of exported function
 #***************************
 }
-	
-function Set-PISysAudit_EnvVariable
-{
-<#  
-.SYNOPSIS
-(Core functionality) Set a machine related environment variable.
-.DESCRIPTION
-Set a machine related environment variable.
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("vn")]
-		[string]
-		$VariableName,
-		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
-		[alias("v")]
-		[string]
-		$Value,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)
-BEGIN {}
-PROCESS
-{
-	$fn = GetFunctionName
-	
-	# Write to an environment variable.
-	# Always use the Machine context to read the variable.
-	try
-	{
-		# Execute the SetEnvironmentVariable method locally or remotely via the Invoke-Command cmdlet.
-		# Always use the Machine context to write the variable.
-		if($LocalComputer)
-		{
-			[Environment]::SetEnvironmentVariable($VariableName, $Value, "Machine")				
-		}				
-		else
-		{			
-			$scriptBlockCmd = [string]::Format("[Environment]::SetEnvironmentVariable(""{0}"", ""{1}"", ""Machine"")", $VariableName)									
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}				
-	}
-	catch
-	{		
-		# Return the error message.
-		$msgTemplate1 = "A problem occurred while setting the environment variable: {0} on local machine."
-		$msgTemplate2 = "A problem occurred while setting the environment variable: {0} on {1} machine."
-		if($LocalComputer)
-		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
-		else
-		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message, $RemoteComputerName) }
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
-	}		
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
 
 function Get-PISysAudit_EnvVariable
 {
@@ -4983,7 +4911,6 @@ Set-Alias pwdondisk New-PISysAudit_PasswordOnDisk
 # <Do not remove>
 Export-ModuleMember Initialize-PISysAudit
 Export-ModuleMember Set-PISysAudit_SaltKey
-Export-ModuleMember Set-PISysAudit_EnvVariable
 Export-ModuleMember Get-PISysAudit_EnvVariable
 Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey
