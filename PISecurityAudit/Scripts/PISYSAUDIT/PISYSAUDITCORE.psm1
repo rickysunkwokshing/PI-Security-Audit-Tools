@@ -1233,6 +1233,12 @@ param(
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 		
+		# Get the piconfig CLU location on the machine where the script runs.		
+		if( -not(Test-Path variable:global:PISysAuditPIConfigExec) )
+		{
+			if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
+		}
+
 		# Validate the presence of a PI Data Archive
 		if((ValidateIfHasPIDataArchiveRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
 		{
@@ -1697,9 +1703,6 @@ PROCESS
 		
 		# Set the ShowUI flag
 		New-Variable -Name "PISysAuditShowUI" -Scope "Global" -Visibility "Public" -Value $ShowUI		
-		
-		# Get the piconfig CLU location on the machine where the script runs.		
-		if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
 									
 		# Set an PISysAuditInitialized flag
 		New-Variable -Name "PISysAuditInitialized" -Scope "Global" -Visibility "Public" -Value $true				
