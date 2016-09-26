@@ -214,11 +214,15 @@ function Get-PISysAudit_CheckPIAdminUsage
 .SYNOPSIS
 AU20002 - PI Admin Trusts Disabled Check
 .DESCRIPTION
-VALIDATION: verifies that the piadmin PI User cannot be used in a PI Trust. <br/>
-COMPLIANCE: disable Trusts with piadmin.  This can be done by checking "User 
-cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To access
-this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to the 
-PI User tab, right click the piadmin entry and select Properties in the context menu.
+VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.<br/>
+COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
+PI Identity with appropriate privilege for the applications that will use it.  Will also
+check if trusts with piadmin have been disabled globally.  This can be done by checking 
+"User cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To 
+access this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to 
+the PI User tab, right click the piadmin entry and select Properties in the context menu.  
+For more information, see "Security Best Practice" #4 in KB00833: <br/>
+<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 ">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
