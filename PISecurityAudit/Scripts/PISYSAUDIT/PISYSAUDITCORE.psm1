@@ -39,6 +39,7 @@
 #	PasswordPath
 #	PISysAuditInitialized
 #	PISysAuditCachedSecurePWD
+#   PISysAuditIsElevated
 # ........................................................................
 
 # ........................................................................
@@ -310,6 +311,31 @@ param(
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		return $false
 	}	
+}
+
+function CheckIfRunningElevated
+{
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+		
+	$fn = GetFunctionName		
+	
+	try
+	{
+		$windowsPrinciple = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
+		return $windowsPrinciple.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)         
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "Error encountered when checking if running elevated."						
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		return $false
+	}
 }
 
 function ValidateFileContent
@@ -1355,7 +1381,8 @@ param(
 	try
 	{
 		# Read from the global constant bag.
-		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
+		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value
+		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value				
 		
 		# Validate the presence of a PI AF Server
 		if((ValidateIfHasPIAFServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
@@ -1560,13 +1587,21 @@ param(
 	{
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-				
+		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value	
+			
 		# Validate the presence of IIS
 		if((ValidateIfHasPICoresightRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
 		{
 			# Return the error message.
 			$msgTemplate = "The computer {0} does not have the PI Coresight role or the validation failed"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			return
+		}
+
+		if($ComputerParams.IsLocal -and -not($IsElevated))
+		{
+			$msg = "Elevation required to run Audit checks using IIS Cmdlet.  Run PowerShell as Administrator to complete these checks."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			return
 		}
@@ -1669,6 +1704,10 @@ PROCESS
 		# Set folder names required by the script.
 		SetFolders
 		
+		# Set global variable checking for elevated status.
+		$IsElevated = CheckIfRunningElevated
+		New-Variable -Name "PISysAuditIsElevated" -Scope "Global" -Visibility "Public" -Value $IsElevated
+
 		# Validate if used with PowerShell version 2.x and more	
 		$majorVersionPS = $Host.Version.Major	
 		if($majorVersionPS -lt 2)
@@ -2961,6 +3000,15 @@ PROCESS
 
 		if($LocalComputer)
 		{						
+			$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value
+			
+			if(-not($IsElevated))
+			{
+				$msg = "Elevation required to run Audit checks using AFDiag.  Run PowerShell as Administrator to complete these checks."
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return $null
+			}
+
 			# Set the output folder.
 			$scriptTempFilesPath = (Get-Variable "scriptsPathTemp" -Scope "Global").Value 
 			# Define the arguments required by the afdiag.exe command						
