@@ -3197,7 +3197,7 @@ PROCESS
 				-RedirectStandardInput $inputFilePath `
 				-Wait -NoNewWindow			
 				
-		#	$msg = Get-Content -Path $outputDebugFilePath | Out-String
+			#	$msg = Get-Content -Path $outputDebugFilePath | Out-String
 			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
 
 			# Read the content.
@@ -3261,17 +3261,17 @@ PROCESS
 			# Use the Windows IS authentication mechanism first and the Trust one if
 			# if fails.
 			$argList1 = [string]::Format(" -Node `"{0}`" -Windows", $RemoteComputerName)					
-			$argList2 = [string]::Format(" -Node `"{0}`" -Trust", $RemoteComputerName)					
-			# Set the output for the CLU.
-			$outputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_output.txt"														
+			$argList2 = [string]::Format(" -Node `"{0}`" -Trust", $RemoteComputerName)																		
 			
 			# Construct new input file for the CLU
 			# Set the PIconfig output
 			$outputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_output.txt"
 			$inputFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_input.dif"
+			$errFilePath = Join-Path -Path $scriptsPathTemp -ChildPath "piconfig_err_output.txt"
 
 			if(Test-Path $outputFilePath){Clear-Content $outputFilePath}
 			if(Test-Path $inputFilePath){Clear-Content $inputFilePath}
+			if(Test-Path $errFilePath){Clear-Content $errFilePath}
 
 			Out-File -FilePath $inputFilePath -InputObject ("@outp " + $outputFilePath) -Encoding ASCII	
 			Add-Content -Path $inputFilePath -Value ("@echo none")
@@ -3283,6 +3283,7 @@ PROCESS
 			Start-Process -FilePath $PIConfigExec `
 				-ArgumentList $argList1 `
 				-RedirectStandardInput $inputFilePath `
+				-RedirectStandardOutput $errFilePath `
 				-Wait -NoNewWindow																					
 			
 			#......................................................................................
@@ -3290,7 +3291,23 @@ PROCESS
 			#......................................................................................			
 			$outputFileContent = Get-Content -Path $outputFilePath												
 			
-			if($null -eq $outputFileContent){$outputFileContent = ""}
+			if($null -eq $outputFileContent)
+			{
+				$outputFileContent = ""
+				$errFileContent = Get-Content -Path $errFilePath
+				if($null -ne $errFileContent)
+				{ 
+					if(ValidateFileContent $errFileContent "no read access")
+					{
+						# Return the error message.		
+						$msgTemplate = "An authentication or authorization issue occurred with piconfig while running {0}"
+						$msg = [string]::Format($msgTemplate, $inputFilePath)
+						Write-PISysAudit_LogMessage $msg "Error" $fn
+						return $null
+					}
+				}
+			}
+
 			#......................................................................................			
 			# Validate that the command succeeded
 			#......................................................................................									
@@ -3322,6 +3339,8 @@ PROCESS
 			}
 
 			if(Test-Path $outputFilePath){Remove-Item $outputFilePath}
+			if(Test-Path $inputFilePath){Remove-Item $inputFilePath}
+			if(Test-Path $errFilePath){Remove-Item $errFilePath}
 		}
 							
 		# Return the output file path.

@@ -286,37 +286,47 @@ PROCESS
 			# Check whether using the piadmin user for trusts is blocked globally
 			$piadminTrustsGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
 																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-			# Validate rules
-		
-			# Example of output.
-			# piadmin,24		
-		
-			# Read each line to find the one containing the token to replace.
-			foreach($line in $piadminTrustsGlobalSetting)
-			{								
-				# First line only.
-				$tokens = $line.Split(",")
-				$securityBits = [int16]$tokens[1]
-				break
-			}
-		
-			#Look for piadmin with identid=1
-			# Requires:
-			#	- explicit login disabled (bit5=16) <- Covered in AU20007
-			#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
-			#	- trust login disabled (bit3=4)
-			$trustLoginDisabled = $securityBits -band 4
-		
-			if($trustLoginDisabled) 
-			{ 
-				$result = $true 
-				$msg += "The piadmin user cannot be assigned to a trust."
-			} 
-			else 
+			if($null -eq $piadminTrustsGlobalSetting)
 			{
-				$result = $false 
-				$msg += "However, the piadmin user can still be assigned to a trust."
-				$Severity = "moderate"
+				# Return the error message.
+				$msg = "Global piadmin trust disabled parameter not returned.  Cannot proceed with check."					
+				Write-PISysAudit_LogMessage $msg "Warning" $fn 									
+				$result = "N/A"
+			}
+			else
+			{
+				# Validate rules
+		
+				# Example of output.
+				# piadmin,24		
+		
+				# Read each line to find the one containing the token to replace.
+				foreach($line in $piadminTrustsGlobalSetting)
+				{								
+					# First line only.
+					$tokens = $line.Split(",")
+					$securityBits = [int16]$tokens[1]
+					break
+				}
+		
+				#Look for piadmin with identid=1
+				# Requires:
+				#	- explicit login disabled (bit5=16) <- Covered in AU20007
+				#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
+				#	- trust login disabled (bit3=4)
+				$trustLoginDisabled = $securityBits -band 4
+		
+				if($trustLoginDisabled) 
+				{ 
+					$result = $true 
+					$msg += "The piadmin user cannot be assigned to a trust."
+				} 
+				else 
+				{
+					$result = $false 
+					$msg += "However, the piadmin user can still be assigned to a trust."
+					$Severity = "moderate"
+				}
 			}
 		}		
 	}
