@@ -133,11 +133,15 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		access so that you can grant those applications access explicitly.
 
 		AU20002 - PI Admin Trusts Disabled Check
-		VALIDATION: verifies that the piadmin PI User cannot be used in a PI Trust. 
-		COMPLIANCE: disable Trusts with piadmin.  This can be done by checking "User 
-		cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To access
-		this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to the 
-		PI User tab, right click the piadmin entry and select Properties in the context menu.
+		VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.
+		COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
+		PI Identity with appropriate privilege for the applications that will use it.  Will also
+		check if trusts with piadmin have been disabled globally.  This can be done by checking 
+		"User cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To 
+		access this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to 
+		the PI User tab, right click the piadmin entry and select Properties in the context menu.  
+		For more information, see "Security Best Practice" #4 in KB00833: 
+		https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 
 
 		AU20003 - PI Data Archive SubSystem Version Check
 		VALIDATION: verifies that the PI Data Archive is using the most recent release.   
@@ -176,18 +180,12 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		Best Practice #3" in KB00833. 
 		https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 
 
-		AU20008 - Check if piadmin is not used
-		VALIDATION: verifies that piadmin is not used in trusts or mappings. 
-		COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
-		PI Identity with appropriate privilege for the applications that will use it.  For more 
-		information, see "Security Best Practice" #4 in KB00833: 
-		https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 
-
-		AU20009 - Check PI Server SPN
+		AU20008 - Check PI Server SPN
 		VALIDATION: Checks PI Data Archive SPN assignment.
-		COMPLIANCE: PI Data Archive SPNs exist and are assigned to the pinetmgr Service account. 
-		This makes Kerberos Authentication possible.  For more information, see "PI and Kerberos 
-		authentication" in the PI Live Library. 
+		COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running pinetmgr. 
+		Presently only local system is supported.  Correct SPN assignment makes Kerberos 
+		Authentication possible.  For more information, see "PI and Kerberos authentication" in 
+		the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D 
 
 		AU30001 - PI AF Server Service Account Check
@@ -285,7 +283,7 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		AU50003 - Coresight SSL check
 		VALIDATION: Checks whether SSL is enabled and enforced on the Coresight Web Site.
 		COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
-		For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library.
+		For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
 
 		AU50004 - Coresight SPN check
@@ -314,6 +312,7 @@ CONTRIBUTE
         https://github.com/osisoft/PI-System-Audit-Tools/issues
         
         
+
 
 
 
