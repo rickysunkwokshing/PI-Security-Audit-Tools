@@ -631,46 +631,63 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$installVersion = $null
 	try
 	{						
-		# Read the afdiag.exe command output.
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-
-		
-		# Verify that we can read AF Diag output.
-		if($null -eq $outputFileContent)
+		# Get install version via PowerShell, fall back to AFDiag
+		if($global:ArePowerShellToolsAvailable)
 		{
-			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
-			$result = "N/A"
+			$installVersion = $global:AFServerConnection.ServerVersion
 		}
 		else
 		{
-			# Read each line to find the one containing the token to replace.
-			foreach($line in $outputFileContent)
-			{								
-				if($line.Contains("Version"))
+			# Read the afdiag.exe command output.
+			$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
+			# Verify that we can read AF Diag output.
+			if($null -eq $outputFileContent)
+			{
+				$msg = "AFDiag output not found.  Cannot continue processing the validation check"
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				$result = "N/A"
+			}
+			else
+			{
+				# Read each line to find the one containing the token to replace.
+				foreach($line in $outputFileContent)
 				{								
-					$installVersion = $line.Split('=')[1].Trim()
-					$installVersionTokens = $installVersion.Split(".")
-					# Form an integer value with all the version tokens.
-					[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
-					$installVersionInt64 = [Convert]::ToInt64($temp)
-					if($installVersionInt64 -gt 2800000)
-					{
-						$result = $true
-						$msg = "Server version is compliant."
-					}
-					else
-					{
-						$result = $false
-						$msg = "Server version is non-compliant: {0}."
-						$msg = [string]::Format($msg, $installVersion)
-					}
-					break
-				}						
+					if($line.Contains("Version"))
+					{								
+						$installVersion = $line.Split('=')[1].Trim()
+						break
+					}						
+				}
 			}	
-		}			
+		}
+		# Perform logic on install version
+		if($null -ne $installVersion)
+		{
+			$installVersionTokens = $installVersion.Split(".")
+			# Form an integer value with all the version tokens.
+			[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
+			$installVersionInt64 = [Convert]::ToInt64($temp)
+			if($installVersionInt64 -gt 2800000)
+			{
+				$result = $true
+				$msg = "Server version is compliant."
+			}
+			else
+			{
+				$result = $false
+				$msg = "Server version is non-compliant: {0}."
+				$msg = [string]::Format($msg, $installVersion)
+			}		
+		}
+		else
+		{
+			$msg = "AF version not found.  Cannot continue processing the validation check"
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$result = "N/A"
+		}	
 	}
 	catch
 	{

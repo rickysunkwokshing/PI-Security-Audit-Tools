@@ -1145,6 +1145,23 @@ param(
 	}	
 }
 
+function ValidatePowerShellToolsAvailable
+{
+    # Check for availability of PowerShell Tools for the PI System
+    if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
+	{
+		if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
+		{
+			Import-Module -Name OSIsoft.PowerShell
+			$global:ArePowerShellToolsAvailable = $true
+		}
+		else
+		{
+			$global:ArePowerShellToolsAvailable = $false
+		}
+	}
+}
+
 function StartComputerAudit
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
@@ -1286,18 +1303,7 @@ param(
 		}
 
 		# Check for availability of PowerShell Tools for the PI System
-		if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
-		{
-			if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
-			{
-				Import-Module -Name OSIsoft.PowerShell
-				$global:ArePowerShellToolsAvailable = $true
-			}
-			else
-			{
-				$global:ArePowerShellToolsAvailable = $false
-			}
-		}
+		ValidatePowerShellToolsAvailable
 
 		if($global:ArePowerShellToolsAvailable)
 		{
@@ -1458,6 +1464,38 @@ param(
 			return
 		}						
 		
+		# Check for availability of PowerShell Tools for the PI System
+		ValidatePowerShellToolsAvailable
+
+		if($global:ArePowerShellToolsAvailable)
+		{
+			try
+			{
+				$global:AFServerConnection = Connect-AFServer -AFServer $(Get-AFServer -Name $ComputerParams.ComputerName)
+				if($global:AFServerConnection.ConnectionInfo.IsConnected)
+				{
+					$msgTemplate = "Successfully connected to the PI AF Server {0} with PowerShell."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+				}
+				else
+				{
+					$msgTemplate = "Unable to access the PI AF Server {0} with PowerShell.  Check if there is a valid mapping for your user."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell."
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+				return
+			}
+		}
+
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI AF Server component on '{0}' computer"
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
