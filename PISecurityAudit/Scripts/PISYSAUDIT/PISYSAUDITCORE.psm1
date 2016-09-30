@@ -1253,17 +1253,12 @@ param(
 					
 	# Get and store the function Name.
 	$fn = GetFunctionName
-	
+	$global:PIDataArchiveConnection = $null
+
 	try
 	{
 		# Read from the global constant bag.
-		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-		
-		# Get the piconfig CLU location on the machine where the script runs.		
-		if( -not(Test-Path variable:global:PISysAuditPIConfigExec) )
-		{
-			if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
-		}
+		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value						
 
 		# Validate the presence of a PI Data Archive
 		if((ValidateIfHasPIDataArchiveRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
@@ -1286,22 +1281,76 @@ param(
 			# Return the error message.
 			$msgTemplate = "The PI Data Archive {0} is not accessible over port 5450"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 			return
 		}
 
-		# After we've validated connections over 5450, make sure PI Utilities will be able to connect.
-		if($testConnection.Connected)
+		# Check for availability of PowerShell Tools for the PI System
+		if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
 		{
-			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAvailability.dif" `
-																-lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
-			if($null -eq $outputFileContent)
+			if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
 			{
-				$msgTemplate = "Unable to access the PI Data Archive {0} with piconfig.  Check if there is a valid mapping for your user."
+				Import-Module -Name OSIsoft.PowerShell
+				$global:ArePowerShellToolsAvailable = $true
+			}
+			else
+			{
+				$global:ArePowerShellToolsAvailable = $false
+			}
+		}
+
+		if($global:ArePowerShellToolsAvailable)
+		{
+			try
+			{
+				$global:PIDataArchiveConnection = Connect-PIDataArchive -PIDataArchiveMachineName $ComputerParams.ComputerName
+				if($global:PIDataArchiveConnection.Connected){
+					$msgTemplate = "Successfully connected to the PI Data Archive {0} with PowerShell."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+				}
+				else
+				{
+					$msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell."
 				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 				return
 			}
+		}
+		else
+		{
+			$msgTemplate = "Unable to locate the PowerShell Tools for the PI System on the computer running this script.  The piconfig utility will be used instead."
+			Write-PISysAudit_LogMessage $msg "Info" $fn
+
+			# Get the piconfig CLU location on the machine where the script runs.		
+			if( -not(Test-Path variable:global:PISysAuditPIConfigExec) )
+			{
+				if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
+			}
+
+			# After we've validated connections over 5450, make sure PI Utilities will be able to connect.
+			if($testConnection.Connected)
+			{
+				$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAvailability.dif" `
+																	-lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
+				if($null -eq $outputFileContent)
+				{
+					$msgTemplate = "Unable to access the PI Data Archive {0} with piconfig.  Check if there is a valid mapping for your user."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+			}
+
 		}
 		
 		# Get the list of functions to execute.
@@ -1346,6 +1395,10 @@ param(
 			# Call the function.
 			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel																																							
 		}
+
+		# Disconnect if PowerShell Tools are used.
+		if($global:PIDataArchiveConnection.Connected){$global:PIDataArchiveConnection.Disconnect()}
+
 		# Set the progress.
 		if($ShowUI)
 		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
