@@ -40,6 +40,10 @@ function GetFunctionName
 # ........................................................................
 function Get-PISysAudit_FunctionsFromLibrary4
 {
+<#  
+.SYNOPSIS
+Get functions from machine library.
+#>
 	# Form a list of all functions that need to be called to test
 	# the SQL Server compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
@@ -142,7 +146,7 @@ PROCESS
 	# Define the results in the audit table		
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU40001" `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-ain "SQL Server xp_CmdShell Check" -aiv $result `
 										-Group1 "Machine" -Group2 "SQL Server" `
 										-Severity "Severe"
@@ -246,7 +250,7 @@ PROCESS
 	# Define the results in the audit table		
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU40002" `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-ain "SQL Server Adhoc Queries Check" -aiv $result `
 										-Group1 "Machine" -Group2 "SQL Server" `
 										-Severity "Severe"
@@ -350,7 +354,7 @@ PROCESS
 	# Define the results in the audit table		
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU40003" `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-ain "SQL Server DB Mail XPs Check" -aiv $result `
 										-Group1 "Machine" -Group2 "SQL Server" `
 										-Severity "Severe"
@@ -455,7 +459,7 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU40004" `
 										-ain "SQL Server OLE Automation Procedures Check" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "SQL Server" `
 										-Severity "Severe"
 										
@@ -535,7 +539,7 @@ try
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU3xxxx" `
 										-ain "<Name>" -aiv $result `
-										-msg $msg `
+										-aif $fn -msg $msg `
 										-Group1 "<Category 1>" -Group2 "<Category 2>" -Group3 "<Category 3>" -Group4 "<Category 4>"`
 										-Severity "<Severity>"
 }

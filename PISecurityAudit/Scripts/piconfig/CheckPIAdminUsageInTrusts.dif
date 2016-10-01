@@ -3,6 +3,6 @@
 @mode list
 @table pitrust
 @ostr trust
-@sele piuser=piadmin
+@sele piuser=piadmin,flags=0
 @ends
 @exit

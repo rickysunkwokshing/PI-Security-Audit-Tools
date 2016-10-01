@@ -244,7 +244,7 @@ param(
 			# The piconfig.exe is installed with PI SDK since version 1.4.0.416 on PINS									
 			
 			# Test for the PISERVER variable.
-			if($PIServer_path -ne $null)
+			if($null -ne $PIServer_path)
 			{							
 				if($cluFound -eq $false)
 				{
@@ -1856,7 +1856,7 @@ param(
 		[alias("mt")]
 		[ValidateSet("Error", "Warning", "Info", "Debug")]
 		[string]
-		$MessageType = "Info",						
+		$MessageType,						
 		[parameter(Mandatory=$true, Position=2, ParameterSetName = "Default")]
 		[alias("fn")]			
 		[string]
@@ -3311,6 +3311,7 @@ PROCESS
 			#......................................................................................			
 			$outputFileContent = Get-Content -Path $outputFilePath												
 			
+			if($null -eq $outputFileContent){$outputFileContent = ""}
 			#......................................................................................			
 			# Validate that the command succeeded
 			#......................................................................................									
@@ -3484,6 +3485,10 @@ param(
 		[string]
 		$csappPool,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("CustomHeader")]
+		[string]
+		$CoresightHeader,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)
@@ -3494,33 +3499,156 @@ PROCESS
 	
 	try
 	{
-		If ( $ServiceName -ne "coresight") 
+		# Get Domain info.
+		$MachineDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+
+		# Get Hostname.
+		$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+
+		# Build FQDN using hostname and domain strings.
+		$fqdn = $hostname + "." + $machineDomain
+
+		# SPN check is not done for PI Coresight.
+		If ( $ServiceName -ne "coresight" -and $ServiceName -ne "coresight_custom") 
 		{
 			# Get the Service account
 			$svcacc = Get-PISysAudit_ServiceLogOnAccount $ServiceName -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 		}
+		
+		# SPN check is done for PI Coresight using a custom host header.
+		ElseIf ( $ServiceName -ne "coresight" ) 
+		{ 
+			# Pass the Coresight AppPool identity as the service account.
+			$svcacc = $csappPool
+			
+				# Distinguish between Domain/Virtual account and Machine Accounts.
+				If ($svcacc.Contains("\")) 
+				{
+					# If NT Service account is used, use the hostname when verifying the SPN assignment.
+					If ($svcacc.ToLower().Contains("nt service")) 
+					{ 
+						$svcaccMod = $hostname 
+					} 
+					# Else use the username to verify the SPN assignment.
+					Else 
+					{ 
+						$svcaccMod = $svcacc
+						# If it's a local account, then there cannot be an SPN assigned.
+						if($svcaccMod.Split("\")[0] -eq "."){return $false}
+					} 
+				}
+				# For machine accounts such as Network Service or Local System, use the hostname when verifying the SPN assignment.
+				Else 
+				{ 
+					$svcaccMod = $hostname 
+				}
+
+				# Take Custom header information and create its short and long version.
+				If ($CoresightHeader -match "\.") 
+				{
+					$csCHeaderLong = $CoresightHeader
+					$pos = $CoresightHeader.IndexOf(".")
+					$csCHeaderShort = $CoresightHeader.Substring(0, $pos)
+				} 
+				Else 
+				{ 
+					$csCHeaderShort = $CoresightHeader
+					$csCHeaderLong = $CoresightHeader + "." + $MachineDomain
+				}
+
+			# Deal with the custom header - run nslookup and capture the result.
+			$AliasTypeCheck = nslookup $CoresightHeader
+
+			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
+			If ($AliasTypeCheck -match "Aliases:") 
+			{ 
+			# Dealing with Alias (CNAME). 
+
+			$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+
+			# Verify hostnane AND FQDN SPNs are assigned to the service account.
+			#
+			# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
+			# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
+			#
+			# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
+
+			$spnCounter = 0
+			
+			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
+			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeaderShort.ToLower())
+			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
+			
+			foreach($line in $spnCheck)
+			{
+				switch($line.ToLower().Trim())
+				{
+					$csCHeaderSPN {$spnCounter++; break}
+					$csCHeaderLongSPN {$spnCounter++; break}
+					$hostnameSPN {$spnCounter++; break}
+					$fqdnSPN {$spnCounter++; break}
+					default {break}
+				}
+			}
+
+			# FUTURE ENHANCEMENT:
+			# Return details to improve messaging in case of failure.
+			If ($spnCounter -eq 4) { $result = $true } 
+			Else { $result =  $false }
+		
+			return $result		
+			
+			} 
+			
+			Else 
+			{ 
+			# Host (A) 
+
+			$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+
+			# Verify hostnane AND FQDN SPNs are assigned to the service account.
+			$spnCounter = 0
+			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeaderShort.ToLower())
+			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
+			foreach($line in $spnCheck)
+			{
+				switch($line.ToLower().Trim())
+				{
+					$csCHeaderSPN {$spnCounter++; break}
+					$csCHeaderLongSPN {$spnCounter++; break}
+					default {break}
+				}
+			}
+
+			# FUTURE ENHANCEMENT:
+			# Return details to improve messaging in case of failure.
+			If ($spnCounter -eq 2) { $result = $true } 
+			Else { $result =  $false }
+		
+			return $result
+			
+			
+			}
+		}
+		# SPN check is done for PI Coresight without custom headers.
 		Else
 		{
+			# In case of PI Coresight, the AppPool account is used in the SPN check.
 			$svcacc = $csappPool
 		}
-		# Get Domain info
-		$MachineDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 
-		# Get Hostname
-		$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 
-		# Build FQDN using hostname and domain strings
-		$fqdn = $hostname + "." + $machineDomain
-
-		# Distinguish between Domain/Virtual account and Machine Accounts
+		# Proceed with checking SPN for Coresight or non-IIS app (PI/AF).
+		# Distinguish between Domain/Virtual account and Machine Accounts.
 		If ($svcacc.Contains("\")) 
 		{
-			# If NT Service account is running the AF Server service, use the hostname when verifying the SPN assignment
+			# If NT Service account is used, use the hostname when verifying the SPN assignment.
 			If ($svcacc.ToLower().Contains("nt service")) 
 			{ 
 				$svcaccMod = $hostname 
 			} 
-			# Else use the username to verify the SPN assignment
+			# Else use the username to verify the SPN assignment.
 			Else 
 			{ 
 				$svcaccMod = $svcacc
@@ -3528,16 +3656,16 @@ PROCESS
 				if($svcaccMod.Split("\")[0] -eq "."){return $false}
 			} 
 		}
-		# For machine accounts such as Network Service or Local System, use the hostname when verifying the SPN assignment
+		# For machine accounts such as Network Service or Local System, use the hostname when verifying the SPN assignment.
 		Else 
 		{ 
 			$svcaccMod = $hostname 
 		}
 
-		# Run setspn and convert it to a string (no capital letters)
-		$spnCheck = $(setspn -l $svcaccMod) 
+		# Run setspn and convert it to a string (no capital letters).
+		$spnCheck = $(setspn -l $svcaccMod).ToLower() 
 
-		# Verify hostnane AND FQDN SPNs are assigned to the service account
+		# Verify hostnane AND FQDN SPNs are assigned to the service account.
 		$spnCounter = 0
 		$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 		$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
@@ -3552,7 +3680,7 @@ PROCESS
 		}
 
 		# FUTURE ENHANCEMENT:
-		# Return details to improve messaging in case of failure
+		# Return details to improve messaging in case of failure.
 		If ($spnCounter -eq 2) { $result = $true } 
 		Else { $result =  $false }
 		
@@ -3599,7 +3727,7 @@ param(
 		[parameter(Mandatory=$true, Position=3, ParameterSetName = "Default")]
 		[alias("q")]
 		[string]
-		$Query = "",
+		$Query,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]				
 		[string]
 		$InstanceName = "",								
@@ -4033,7 +4161,11 @@ param(
 		[parameter(Mandatory=$true, Position=5, ParameterSetName = "Default")]
 		[alias("aiv")]
 		[object]
-		$AuditItemValue,		
+		$AuditItemValue,
+		[parameter(Mandatory=$true, Position=5, ParameterSetName = "Default")]
+		[alias("aif")]
+		[String]
+		$AuditItemFunction,		
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("msg")]
 		[String]
@@ -4082,6 +4214,7 @@ PROCESS
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ServerName" -Value $computerName
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditItemName" -Value $AuditItemName
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditItemValue" -Value $AuditItemValue	
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditItemFunction" -Value $AuditItemFunction
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "MessageList" -Value $MessageList
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group1" -Value $Group1
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group2" -Value $Group2
@@ -4363,7 +4496,8 @@ PROCESS
 		# Test if the key is already part of the list	
 		$item = $null	
 		$item = $ComputerParamsTable[$myKey]
-		if($null -eq $item) { $ComputerParamsTable.Add($myKey, $tempObj) }				
+		if($null -eq $item) { $ComputerParamsTable.Add($myKey, $tempObj) }
+		else { $ComputerParamsTable[$myKey] = $tempObj }				
 	}
 		
 	# Return the computer parameters table.
@@ -4494,7 +4628,7 @@ PROCESS
 
 			# Get failed results and construct the recommendation section
 			$fails=@()
-			$fails = $results | Where {$_.AuditItemValue -ieq "fail"}
+			$fails = $results | Where-Object {$_.AuditItemValue -ieq "fail"}
 
 			$recommendations=""
 			if($null -ne $fails){
@@ -4502,7 +4636,7 @@ PROCESS
 										<h2>Recommendations for failed validations:</h2>"
 		
 				$fails | ForEach-Object{
-					$AuditFunctionName = (Get-Help $_.ID)[0].Name
+					$AuditFunctionName = $_.AuditItemFunction
 					$recommendationInfo = Get-Help $AuditFunctionName
 					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
 					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
