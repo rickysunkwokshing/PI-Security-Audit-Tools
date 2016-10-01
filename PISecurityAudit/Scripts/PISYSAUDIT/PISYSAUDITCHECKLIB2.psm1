@@ -48,13 +48,12 @@ Get functions from PI Data Archive library.
 	# the PI Data Archive compliance.
 	[System.Collections.HashTable]$listOfFunctions = @{}	
 	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckPIAdminUsage", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerSubSysVersions", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAdminTrustsDisabled", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckEditDays", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckAutoTrustConfig", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckExplicitLoginDisabled",1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAdminUsage",1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
 				
 	# Return the list.
@@ -209,17 +208,21 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CheckPIAdminTrustsDisabled
+function Get-PISysAudit_CheckPIAdminUsage
 {
 <#  
 .SYNOPSIS
 AU20002 - PI Admin Trusts Disabled Check
 .DESCRIPTION
-VALIDATION: verifies that the piadmin PI User cannot be used in a PI Trust. <br/>
-COMPLIANCE: disable Trusts with piadmin.  This can be done by checking "User 
-cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To access
-this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to the 
-PI User tab, right click the piadmin entry and select Properties in the context menu.
+VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.<br/>
+COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
+PI Identity with appropriate privilege for the applications that will use it.  Will also
+check if trusts with piadmin have been disabled globally.  This can be done by checking 
+"User cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To 
+access this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to 
+the PI User tab, right click the piadmin entry and select Properties in the context menu.  
+For more information, see "Security Best Practice" #4 in KB00833: <br/>
+<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 ">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -245,50 +248,87 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$Severity = "Unknown"
 	try
 	{							
 		# Initialize objects.
-		$securityValidationCounter = 0
-		$securityBits = 0								
+		$securityBits = 0	
+		$explicitLoginDisabled = $false							
 											
 		# Execute the PIConfig script.
-		$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
+			
+		# Check for trusts assigned to the piadmin user 
+		$noncompliantTrusts = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		# Check for mappings assigned to the piadmin user		
+		$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
 																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
-
-		# Validate rules
 		
-		# Example of output.
-		# piadmin,24		
-		
-		# Read each line to find the one containing the token to replace.
-		foreach($line in $outputFileContent)
-		{								
-			# First line only.
-			$tokens = $line.Split(",")
-			$securityBits = [int16]$tokens[1]
-			break
+		$result = $true
+																	
+		#Iterate through the returned results (is any) and append ; delimiter for the output message. 
+		if($noncompliantTrusts){
+			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
+			$result = $false	
+			$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
+			$Severity = "severe"
 		}
+
+		if($noncompliantMappings){
+			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
+			$result = $false	
+			$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
+			$Severity = "severe"
+		}
+
+		if($result -eq $true){
+			$msg = "No Trust(s) or Mapping(s) identified as weaknesses.  "
+			# Check whether using the piadmin user for trusts is blocked globally
+			$piadminTrustsGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			if($null -eq $piadminTrustsGlobalSetting)
+			{
+				# Return the error message.
+				$msg = "Global piadmin trust disabled parameter not returned.  Cannot proceed with check."					
+				Write-PISysAudit_LogMessage $msg "Warning" $fn 									
+				$result = "N/A"
+			}
+			else
+			{
+				# Validate rules
 		
-		#Look for piadmin with identid=1
-		# Requires:
-		#	- explicit login disabled (bit5=16)
-		#	- deletion disabled (bit4=8)
-		#	- trust login disabled (bit3=4)
-		if ( $securityBits -band 4 ) { $securityValidationCounter++ }
-		if ( $securityBits -band 8 ) { $securityValidationCounter++ }
-		if ( $securityBits -band 16 ) { $securityValidationCounter++ }
+				# Example of output.
+				# piadmin,24		
 		
-		# Check if the counter is 3 = compliant, 2 or less it is not compliant
-		if($securityValidationCounter -eq 3) 
-		{ 
-			$result = $true 
-			$msg = "The piadmin user cannot be assigned to a trust."
-		} 
-		else 
-		{ 
-			$result = $false 
-			$msg = "The piadmin user can be assigned to a trust."
-		}	
+				# Read each line to find the one containing the token to replace.
+				foreach($line in $piadminTrustsGlobalSetting)
+				{								
+					# First line only.
+					$tokens = $line.Split(",")
+					$securityBits = [int16]$tokens[1]
+					break
+				}
+		
+				#Look for piadmin with identid=1
+				# Requires:
+				#	- explicit login disabled (bit5=16) <- Covered in AU20007
+				#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
+				#	- trust login disabled (bit3=4)
+				$trustLoginDisabled = $securityBits -band 4
+		
+				if($trustLoginDisabled) 
+				{ 
+					$result = $true 
+					$msg += "The piadmin user cannot be assigned to a trust."
+				} 
+				else 
+				{
+					$result = $false 
+					$msg += "However, the piadmin user can still be assigned to a trust."
+					$Severity = "moderate"
+				}
+			}
+		}		
 	}
 	catch
 	{
@@ -303,10 +343,10 @@ PROCESS
 	#......................................				
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20002" `
-										-ain "PI Admin Trusts Disabled" -aiv $result `
+										-ain "Do not use PI Admin" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Severe"																		
+										-Severity $Severity																		
 }
 
 END {}
@@ -395,7 +435,7 @@ PROCESS
 		$upgradeMessage = "Upgrading to 3.4.400.1162 is recommended."
 		if ($installVersionInt64 -ge 344001162) { $result = $true; $msg = "Version is compliant"; $Severity = "severe" }
 		elseif ($installVersionInt64 -ge 3438036 -and $installVersionInt64 -lt 344001162 ) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }	
-		elseif ($installVersionInt64 -lt 3438036) { $result = $false; $msg = $upgradeMessage; $Severity = "critical" }
+		elseif ($installVersionInt64 -lt 3438036) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }
 	}
 	catch
 	{
@@ -851,7 +891,7 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
-
+	$Severity = "Unknown"
 	try
 	{		
 		# Execute the PIConfig script.
@@ -859,15 +899,15 @@ PROCESS
 																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel						
 		
 		# Validate rules
-		$ServerAuthPolicy = $outputFileContent[0]
+		$ServerAuthPolicy = $outputFileContent.ToInt32($null)
 		
 		switch ($ServerAuthPolicy)
 				{
-					0   { $description = "All authentication options enabled."; break; }
-					2   { $description = "Explicit logins for users with blank passwords disabled."; break; }
-					3   { $description = "Explicit logins disabled."; break; }
-					19   { $description = "Explicit logins and SDK Trusts disabled."; break; }
-					51   { $description = "All trusts and explicit login disabled."; break; }
+					0   { $description = "All authentication options enabled. "; break; }
+					2   { $description = "Explicit logins for users with blank passwords disabled. "; break; }
+					3   { $description = "Explicit logins disabled. "; break; }
+					19   { $description = "Explicit logins and SDK Trusts disabled. "; break; }
+					51   { $description = "All trusts and explicit login disabled. "; break; }
 			
 					default {$description = "Unrecognized configuration" }
 				}
@@ -877,6 +917,36 @@ PROCESS
 		{
 			$result = $false
 			$msgPolicy = "Using non-compliant policy:"
+			$Severity = "severe"
+
+			# Check whether piadmin user can use explicit login
+			$piadminExplicitLoginGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
+																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			# Validate rules
+		
+			# Example of output.
+			# piadmin,24		
+		
+			# Read each line to find the one containing the token to replace.
+			foreach($line in $piadminExplicitLoginGlobalSetting)
+			{								
+				# First line only.
+				$tokens = $line.Split(",")
+				$securityBits = [int16]$tokens[1]
+				break
+			}
+		
+			#Look for piadmin with identid=1
+			# Requires:
+			#	- explicit login disabled (bit5=16) 
+			#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
+			#	- trust login disabled (bit3=4) <- Covered in AU20002
+			if(-not($securityBits -band 16))
+			{
+				$description += "Explicit login allowed for piadmin."
+				$Severity = "severe"
+			}
+
 		} 
 		else 
 		{
@@ -900,101 +970,10 @@ PROCESS
 										-ain "Explicit login disabled" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Severe"								
+										-Severity $Severity								
 }
 
 END {}
-#***************************
-#End of exported function
-#***************************
-}
-
-
-function Get-PISysAudit_CheckPIAdminUsage
-{
-<#  
-.SYNOPSIS
-AU20008 - Check if piadmin is not used
-.DESCRIPTION
-VALIDATION: verifies that piadmin is not used in trusts or mappings. <br/>
-COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
-PI Identity with appropriate privilege for the applications that will use it.  For more 
-information, see "Security Best Practice" #4 in KB00833: <br/>
-<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 ">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(							
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("at")]
-		[System.Collections.HashTable]
-		$AuditTable,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)		
-BEGIN {}
-PROCESS
-{		
-	# Get and store the function Name.
-	$fn = GetFunctionName
-	$msg = ""
-	try
-	{		
-		# Execute the PIConfig scripts.
-		$noncompliantTrusts = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-																
-		$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel					
-		
-	$result = $true
-																	
-	#Iterate through the returned results (is any) and append ; delimiter for the output message. 
-	if($noncompliantTrusts){
-	$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
-	$result = $false	
-	$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
-	}
-
-	if($noncompliantMappings){
-	$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
-	$result = $false	
-	$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
-	}
-
-	if($result -eq $true){
-		$msg = "No Trust(s) or Mapping(s) identified as weaknesses."
-	}
-	
-
-	}
-	catch
-	{
-		# Return the error message.
-		$msg = "A problem occurred during the processing of the validation check."					
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
-		$result = "N/A"
-	}
-	
-	# Define the results in the audit table	
-	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
-										-at $AuditTable "AU20008" `
-										-ain "piadmin is not used" -aiv $result `
-										-aif $fn -msg  $msg `
-										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Severe"								
-}
-
-END {}
-
 #***************************
 #End of exported function
 #***************************
@@ -1004,7 +983,7 @@ function Get-PISysAudit_CheckPISPN
 {
 <#  
 .SYNOPSIS
-AU20009 - Check PI Server SPN
+AU20008 - Check PI Server SPN
 .DESCRIPTION
 VALIDATION: Checks PI Data Archive SPN assignment.<br/>
 COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running pinetmgr. 
@@ -1081,7 +1060,7 @@ function Get-PISysAudit_CheckTrusts
 {
 <#  
 .SYNOPSIS
-AU20010 - Trust configuration strength
+AU20009 - Trust configuration strength
 .DESCRIPTION
 Audit ID: AU20010
 Audit Check Name: Trust configuration strength
@@ -1211,14 +1190,13 @@ END {}
 # ........................................................................
 # <Do not remove>
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary2
-Export-ModuleMember Get-PISysAudit_CheckPIAdminTrustsDisabled
-Export-ModuleMember Get-PISysAudit_CheckPIServerSubSysVersions
 Export-ModuleMember Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
+Export-ModuleMember Get-PISysAudit_CheckPIAdminUsage
+Export-ModuleMember Get-PISysAudit_CheckPIServerSubSysVersions
 Export-ModuleMember Get-PISysAudit_CheckEditDays
 Export-ModuleMember Get-PISysAudit_CheckAutoTrustConfig
 Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
 Export-ModuleMember Get-PISysAudit_CheckExplicitLoginDisabled
-Export-ModuleMember Get-PISysAudit_CheckPIAdminUsage
 Export-ModuleMember Get-PISysAudit_CheckPISPN
 # </Do not remove>
 
