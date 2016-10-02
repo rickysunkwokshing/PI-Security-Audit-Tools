@@ -1574,15 +1574,33 @@ param(
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 				
 		# Validate the presence of a SQL Server
-		if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-										-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)
-										
+		if($PSVersionTable.PSVersion.Major -gt 2 -and $ComputerParams.PasswordFile -eq "")
 		{
-			# Return the error message.
-			$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
-			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
-			return
+			try
+			{
+				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -RemoteComputerName $ComputerParams.ComputerName -InstanceName $ComputerParams.InstanceName -ScalarValue 'TEST' | Out-Null
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return
+			}
+		}
+		else
+		{
+			if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+											-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)
+										
+			{
+				# Return the error message.
+				$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return
+			}
 		}
 		
 		# Get the list of functions to execute.
@@ -3900,6 +3918,67 @@ END {}
 #***************************
 }
 
+function Invoke-Sqlcmd_ScalarValue
+{
+<#
+.SYNOPSIS
+(Core functionality) Perform a SQL query against a local/remote computer using the Invoke-Sqlcmd Cmdlet.
+.DESCRIPTION
+Perform a SQL query against a local/remote computer using the Invoke-Sqlcmd Cmdlet.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[AllowEmptyString()]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,		
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("q")]
+		[string]
+		$Query,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]				
+		[string]
+		$ScalarValue,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]				
+		[string]
+		$InstanceName = "",									
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,							
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName		
+															
+	try
+	{
+		if($null -eq $InstanceName -or $InstanceName -eq "Default"){ $ServerInstance = $RemoteComputerName }
+		else{ $ServerInstance = $RemoteComputerName + '\' + $InstanceName }
+		$value = Invoke-Sqlcmd -Query $query -ServerInstance $ServerInstance | Select-Object -ExpandProperty $ScalarValue
+	}
+	catch
+	{
+		# Return the error message.
+		$msgTemplate = "A problem occurred during the SQL Query: {0}"
+		$msg = [string]::Format($msgTemplate, $_.Exception.Message)
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_		
+		$value = $null
+	}
+	return $value
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery
 {
 <#
@@ -5086,6 +5165,7 @@ Export-ModuleMember Invoke-PISysAudit_PIConfigScript
 Export-ModuleMember Invoke-PISysAudit_PIVersionCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery
+Export-ModuleMember Invoke-Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
 Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject

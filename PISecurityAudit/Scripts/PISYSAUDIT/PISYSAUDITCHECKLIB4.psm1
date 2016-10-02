@@ -108,13 +108,22 @@ PROCESS
 	$msg = ""
 	try
 	{											
-		# Build and execute the query.			
-		$query = "SELECT value_in_use FROM Master.sys.configurations WHERE name = 'xp_cmdshell'"		
-		$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
-																		-q $query -rspc $true -InstanceName $InstanceName `
-																		-IntegratedSecurity $IntegratedSecurity `
-																		-user $UserName -pf $PasswordFile `
-																		-dbgl $DBGLevel	
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'xp_cmdshell'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}
 								
 		# Check if the value is 1 = not compliant, 0 it is.								
 		if($null -eq $value)
@@ -212,13 +221,22 @@ PROCESS
 	$msg = ""
 	try
 	{											
-		# Build and execute the query.			
-		$query = "SELECT value_in_use FROM Master.sys.configurations WHERE name = 'Ad Hoc Distributed Queries'"				
-		$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
-																		-q $query -rspc $true -InstanceName $InstanceName `
-																		-IntegratedSecurity $IntegratedSecurity `
-																		-user $UserName -pf $PasswordFile `
-																		-dbgl $DBGLevel	
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Ad Hoc Distributed Queries'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}
 		
 		# Check if the value is 1 = not compliant, 0 it is.								
 		if($null -eq $value)
@@ -316,13 +334,23 @@ PROCESS
 	$msg = ""
 	try
 	{											
-		# Build and execute the query.			
-		$query = "SELECT value_in_use FROM Master.sys.configurations WHERE name = 'Database Mail XPs'"				
-		$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
-																		-q $query -rspc $true -InstanceName $InstanceName `
-																		-IntegratedSecurity $IntegratedSecurity `
-																		-user $UserName -pf $PasswordFile `
-																		-dbgl $DBGLevel	
+		
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Database Mail XPs'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}
 		
 		# Check if the value is 1 = not compliant, 0 it is.								
 		if($null -eq $value)
@@ -420,13 +448,23 @@ PROCESS
 	$msg = ""
 	try
 	{											
-		# Build and execute the query.			
-		$query = "SELECT value_in_use FROM Master.sys.configurations WHERE name = 'Ole Automation Procedures'"				
-		$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
-																		-q $query -rspc $true -InstanceName $InstanceName `
-																		-IntegratedSecurity $IntegratedSecurity `
-																		-user $UserName -pf $PasswordFile `
-																		-dbgl $DBGLevel	
+		
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Ole Automation Procedures'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}	
 		
 		# Check if the value is 1 = not compliant, 0 it is.								
 		if($null -eq $value)
