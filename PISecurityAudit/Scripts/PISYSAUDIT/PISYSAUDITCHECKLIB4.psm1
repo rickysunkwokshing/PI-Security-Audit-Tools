@@ -51,7 +51,11 @@ Get functions from machine library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckSQLAdHocQueries", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckSQLDBMailXPs", 1)			
 	$listOfFunctions.Add("Get-PISysAudit_CheckSQLOLEAutomationProcs", 1)			
-	
+	$listOfFunctions.Add("Get-PISysAudit_CheckSQLsa", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckSQLRemoteAccess", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckCrossDBOwnershipChaining", 1)			
+	$listOfFunctions.Add("Get-PISysAudit_CheckCLR", 1)
+
 	# Return the list.
 	return $listOfFunctions		
 }
@@ -112,7 +116,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'xp_cmdshell'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		if($global:UseSQLCmdlets)
 		{
 			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
 		}	
@@ -225,7 +229,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Ad Hoc Distributed Queries'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		if($global:UseSQLCmdlets)
 		{
 			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
 		}	
@@ -339,7 +343,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Database Mail XPs'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		if($global:UseSQLCmdlets)
 		{
 			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
 		}	
@@ -453,7 +457,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Ole Automation Procedures'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		if($PSVersionTable.PSVersion.Major -gt 2 -and $PasswordFile -eq "")
+		if($global:UseSQLCmdlets)
 		{
 			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
 		}	
@@ -500,6 +504,495 @@ PROCESS
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "SQL Server" `
 										-Severity "Severe"
+										
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckCLR
+{
+<#  
+.SYNOPSIS
+AU40005 - SQL Server CLR Configuration Option Check
+.DESCRIPTION
+VALIDATION: verifies that SQL Server does not have CLR enabled.<br/> 
+COMPLIANCE: disable the CLR option.  This option can be configured using 
+the Policy-Based Management or the sp_configure stored procedure. For 
+more information, see:<br/>
+<a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,				
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",					
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$InstanceName = "Default",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("user")]
+		[string]
+		$UserName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("pf")]
+		[string]
+		$PasswordFile = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{	
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{											
+		
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'clr enabled'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($global:UseSQLCmdlets)
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}	
+		
+		# Check if the value is 1 = not compliant, 0 it is.								
+		if($null -eq $value)
+		{
+			# Return the error message.
+			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			$result = "N/A"
+		}				
+		elseif($value -eq 0) 
+		{
+			$result = $true 
+			$msg = "CLR disabled."
+		}
+		else 
+		{ 
+			$result = $false
+			$msg = "CLR enabled."
+		}	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+				
+	# Define the results in the audit table		
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU40005" `
+										-ain "SQL Server CLR Enabled Configuration Option Check" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "SQL Server" `
+										-Severity "Severe"
+										
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckCrossDBOwnershipChaining
+{
+<#  
+.SYNOPSIS
+AU40006 - SQL Server Cross DB Ownership Chaining Option Check
+.DESCRIPTION
+VALIDATION: verifies that SQL Server does not have Cross DB Ownership 
+Chaining enabled.<br/> 
+COMPLIANCE: disable the Cross DB Ownership Chaining option.  This option 
+can be configured using the Policy-Based Management or the sp_configure 
+stored procedure. For more information, see:<br/>
+<a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,				
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",					
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$InstanceName = "Default",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("user")]
+		[string]
+		$UserName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("pf")]
+		[string]
+		$PasswordFile = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{	
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{											
+		
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Cross db ownership chaining'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($global:UseSQLCmdlets)
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}	
+		
+		# Check if the value is 1 = not compliant, 0 it is.								
+		if($null -eq $value)
+		{
+			# Return the error message.
+			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			$result = "N/A"
+		}				
+		elseif($value -eq 0) 
+		{
+			$result = $true 
+			$msg = "Cross DB Ownership Chaining disabled."
+		}
+		else 
+		{ 
+			$result = $false
+			$msg = "Cross DB Ownership Chaining enabled."
+		}	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+				
+	# Define the results in the audit table		
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU40006" `
+										-ain "SQL Server Cross DB Ownership Chaining Check" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "SQL Server" `
+										-Severity "Severe"
+										
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckSQLRemoteAccess
+{
+<#  
+.SYNOPSIS
+AU40007 - SQL Server Remote Access Option Check
+.DESCRIPTION
+VALIDATION: verifies that SQL Server does not have Remote Access 
+enabled.<br/> 
+COMPLIANCE: disable the Remote Access option.  This option can 
+be configured using the Policy-Based Management or the sp_configure 
+stored procedure. For more information, see:<br/>
+<a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,				
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",					
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$InstanceName = "Default",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("user")]
+		[string]
+		$UserName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("pf")]
+		[string]
+		$PasswordFile = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{	
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{											
+		
+		# Build and execute the query.
+		$requestedScalar = "value_in_use"			
+		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Remote access'"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($global:UseSQLCmdlets)
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}	
+		
+		# Check if the value is 1 = not compliant, 0 it is.								
+		if($null -eq $value)
+		{
+			# Return the error message.
+			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			$result = "N/A"
+		}				
+		elseif($value -eq 0) 
+		{
+			$result = $true 
+			$msg = "Remote Access disabled."
+		}
+		else 
+		{ 
+			$result = $false
+			$msg = "Remote Access enabled."
+		}	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+				
+	# Define the results in the audit table		
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU40007" `
+										-ain "SQL Server Remote Access Check" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "SQL Server" `
+										-Severity "Severe"
+										
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckSQLsa
+{
+<#  
+.SYNOPSIS
+AU40008 - SQL Server sa Login Check
+.DESCRIPTION
+VALIDATION: verifies that SQL Server does not have the sa login enabled 
+enabled.<br/> 
+COMPLIANCE: disable the sa login.  This option can 
+be configured using the Policy-Based Management or the sp_configure 
+stored procedure. For more information, see:<br/>
+<a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,				
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",					
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$InstanceName = "Default",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("user")]
+		[string]
+		$UserName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("pf")]
+		[string]
+		$PasswordFile = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{	
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = "Unknown"
+	try
+	{											
+		
+		# Build and execute the query.
+		$requestedScalar = "is_disabled"			
+		$queryTemplate = "SELECT {0} FROM master.sys.server_principals WHERE sid = 0x01"
+		$query = [string]::Format($queryTemplate,$requestedScalar)
+		if($global:UseSQLCmdlets)
+		{
+			$value = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+		}	
+		else
+		{			
+			$value = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																			-q $query -rspc $true -InstanceName $InstanceName `
+																			-IntegratedSecurity $IntegratedSecurity `
+																			-user $UserName -pf $PasswordFile `
+																			-dbgl $DBGLevel	
+		}	
+		
+		# Check if the value is 1 = not compliant, 0 it is.								
+		if($null -eq $value)
+		{
+			# Return the error message.
+			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			$result = "N/A"
+		}				
+		elseif($value -eq 1) 
+		{
+			$result = $true 
+			$msg = "Login sa disabled."
+		}
+		else 
+		{ 
+			$result = $false
+			$msg = "Login sa enabled."
+			$Severity = "Severe"
+
+			# Build and execute the query.
+			$sarenamed = 0
+			$requestedScalar = "sa_renamed"			
+			$queryTemplate = "SELECT (CASE name WHEN 'sa' THEN 0 ELSE 1 END) as {0} FROM master.sys.server_principals WHERE sid = 0x01"
+			$query = [string]::Format($queryTemplate,$requestedScalar)
+			if($global:UseSQLCmdlets)
+			{
+				$sarenamed = Invoke-Sqlcmd_ScalarValue -Query $query -RemoteComputerName $RemoteComputerName -InstanceName $InstanceName -ScalarValue $requestedScalar	
+			}	
+			else
+			{			
+				$sarenamed = Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery -lc $LocalComputer -rcn $RemoteComputerName `
+																				-q $query -rspc $true -InstanceName $InstanceName `
+																				-IntegratedSecurity $IntegratedSecurity `
+																				-user $UserName -pf $PasswordFile `
+																				-dbgl $DBGLevel	
+			}
+			
+			if($sarenamed -eq 0)
+			{
+				$msg += "  Well known default name sa in use."
+			}
+			else
+			{
+				$msg += "  Login name changed from the default."
+				$Severity = "Moderate"
+			}
+		}	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+				
+	# Define the results in the audit table		
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU40008" `
+										-ain "SQL Server sa Login Account Check" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "SQL Server" `
+										-Severity $Severity
 										
 }
 
@@ -598,6 +1091,10 @@ Export-ModuleMember Get-PISysAudit_CheckSQLXPCommandShell
 Export-ModuleMember Get-PISysAudit_CheckSQLAdHocQueries
 Export-ModuleMember Get-PISysAudit_CheckSQLDBMailXPs
 Export-ModuleMember Get-PISysAudit_CheckSQLOLEAutomationProcs
+Export-ModuleMember Get-PISysAudit_CheckSQLsa
+Export-ModuleMember Get-PISysAudit_CheckSQLRemoteAccess
+Export-ModuleMember Get-PISysAudit_CheckCrossDBOwnershipChaining
+Export-ModuleMember Get-PISysAudit_CheckCLR
 # </Do not remove>
 
 # ........................................................................

@@ -1574,7 +1574,8 @@ param(
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 				
 		# Validate the presence of a SQL Server
-		if($PSVersionTable.PSVersion.Major -gt 2 -and $ComputerParams.PasswordFile -eq "")
+		$global:UseSQLCmdlets = $PSVersionTable.PSVersion.Major -gt 2 -and $ComputerParams.PasswordFile -eq ""
+		if($global:UseSQLCmdlets)
 		{
 			try
 			{
