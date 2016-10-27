@@ -53,8 +53,8 @@ Get functions from machine library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckSQLOLEAutomationProcs", 1)			
 	$listOfFunctions.Add("Get-PISysAudit_CheckSQLsa", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckSQLRemoteAccess", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckCrossDBOwnershipChaining", 1)			
-	$listOfFunctions.Add("Get-PISysAudit_CheckCLR", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckSQLCrossDBOwnershipChaining", 1)			
+	$listOfFunctions.Add("Get-PISysAudit_CheckSQLCLR", 1)
 
 	# Return the list.
 	return $listOfFunctions		
@@ -514,7 +514,7 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CheckCLR
+function Get-PISysAudit_CheckSQLCLR
 {
 <#  
 .SYNOPSIS
@@ -628,7 +628,7 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CheckCrossDBOwnershipChaining
+function Get-PISysAudit_CheckSQLCrossDBOwnershipChaining
 {
 <#  
 .SYNOPSIS
@@ -1093,8 +1093,8 @@ Export-ModuleMember Get-PISysAudit_CheckSQLDBMailXPs
 Export-ModuleMember Get-PISysAudit_CheckSQLOLEAutomationProcs
 Export-ModuleMember Get-PISysAudit_CheckSQLsa
 Export-ModuleMember Get-PISysAudit_CheckSQLRemoteAccess
-Export-ModuleMember Get-PISysAudit_CheckCrossDBOwnershipChaining
-Export-ModuleMember Get-PISysAudit_CheckCLR
+Export-ModuleMember Get-PISysAudit_CheckSQLCrossDBOwnershipChaining
+Export-ModuleMember Get-PISysAudit_CheckSQLCLR
 # </Do not remove>
 
 # ........................................................................
