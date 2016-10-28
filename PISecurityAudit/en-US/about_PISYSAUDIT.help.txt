@@ -132,7 +132,7 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		removing PIWorld access, you need to evaluate which applications are relying on that 
 		access so that you can grant those applications access explicitly.
 
-		AU20002 - PI Admin Trusts Disabled Check
+		AU20002 - PI Admin Usage Check
 		VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.
 		COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
 		PI Identity with appropriate privilege for the applications that will use it.  Will also
@@ -268,6 +268,37 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		more information, see:
 		https://msdn.microsoft.com/en-us/library/ms191188.aspx
 
+		AU40005 - SQL Server CLR Configuration Option Check
+		VALIDATION: verifies that SQL Server does not have CLR enabled. 
+		COMPLIANCE: disable the CLR option.  This option can be configured using 
+		the Policy-Based Management or the sp_configure stored procedure. For 
+		more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
+		AU40006 - SQL Server Cross DB Ownership Chaining Option Check
+		VALIDATION: verifies that SQL Server does not have Cross DB Ownership 
+		Chaining enabled. 
+		COMPLIANCE: disable the Cross DB Ownership Chaining option.  This option 
+		can be configured using the Policy-Based Management or the sp_configure 
+		stored procedure. For more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
+		AU40007 - SQL Server Remote Access Option Check
+		VALIDATION: verifies that SQL Server does not have Remote Access 
+		enabled. 
+		COMPLIANCE: disable the Remote Access option.  This option can 
+		be configured using the Policy-Based Management or the sp_configure 
+		stored procedure. For more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
+		AU40008 - SQL Server sa Login Check
+		VALIDATION: verifies that SQL Server does not have the sa login enabled 
+		enabled. 
+		COMPLIANCE: disable the sa login.  This option can 
+		be configured using the Policy-Based Management or the sp_configure 
+		stored procedure. For more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
 		AU50001 - Check for latest version of Coresight
 		VALIDATION: verifies PI Coresight version.
 		COMPLIANCE: upgrade to the latest version of PI Coresight.  For more information, 
@@ -312,6 +343,7 @@ CONTRIBUTE
         https://github.com/osisoft/PI-System-Audit-Tools/issues
         
         
+
 
 
 
