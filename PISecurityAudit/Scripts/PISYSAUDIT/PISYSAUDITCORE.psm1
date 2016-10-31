@@ -1579,6 +1579,11 @@ param(
 		{
 			try
 			{
+				# Push and Pop are to prevent a context switch to the SQL shell from persisting after invocation of SQL commands.
+				Push-Location
+				Import-Module SQLPS -DisableNameChecking
+				Pop-Location
+				# Simplest query to return a response to ensure we can query the SQL server
 				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -RemoteComputerName $ComputerParams.ComputerName -InstanceName $ComputerParams.InstanceName -ScalarValue 'TEST' | Out-Null
 			}
 			catch
