@@ -1145,7 +1145,7 @@ param(
 	}	
 }
 
-function ValidatePowerShellToolsAvailable
+function Test-PowerShellToolsForPISystemAvailable
 {
     # Check for availability of PowerShell Tools for the PI System
     if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
@@ -1303,7 +1303,7 @@ param(
 		}
 
 		# Check for availability of PowerShell Tools for the PI System
-		ValidatePowerShellToolsAvailable
+		Test-PowerShellToolsForPISystemAvailable
 
 		if($global:ArePowerShellToolsAvailable)
 		{
@@ -1465,7 +1465,7 @@ param(
 		}						
 		
 		# Check for availability of PowerShell Tools for the PI System
-		ValidatePowerShellToolsAvailable
+		Test-PowerShellToolsForPISystemAvailable
 
 		if($global:ArePowerShellToolsAvailable)
 		{
@@ -5184,6 +5184,7 @@ Export-ModuleMember -Alias piauditparams
 Export-ModuleMember -Alias pisysauditparams
 Export-ModuleMember -Alias piaudit
 Export-ModuleMember -Alias pwdondisk
+Export-ModuleMember Test-PowerShellToolsForPISystemAvailable
 # </Do not remove>
 
 # ........................................................................

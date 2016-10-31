@@ -73,6 +73,7 @@ Get functions from machine library.
 	$listOfFunctions.Add("PISecConfig_ExportPIMappings", 1)
 	$listOfFunctions.Add("PISecConfig_ExportPITrusts", 1)
 	$listOfFunctions.Add("PISecConfig_ExportPINetManagerStats", 1)
+	$listOfFunctions.Add("PISecConfig_ExportPIMessageLogs", 1)
 	return $listOfFunctions		
 }
 
@@ -281,11 +282,46 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PITrust -Connection $PIDataArchiveConnection  `
-                            | Select-Object Name, Identity, Domain, OSUser, ApplicationName, NetworkHost, IPAddress, NetMask, IsEnabled 
+		$outputFileContentRaw = Get-PIConnectionStatistics -Connection $PIDataArchiveConnection
+		# Note: ConvertSelectionToPSObject is not used for NetManStats because attributes are dictionary entries and it is simpler to convert them directly to NoteProperties
+		# while transposing to work with native export to CSV
+		$outputFileContent = @()
+		foreach ($row in $outputFileContentRaw)
+		{
+			$entry = New-Object PSObject 
+			for ($index=0; $index -lt $row.Count; $index++)
+			{
+				$entry | Add-Member -MemberType NoteProperty -Name $row.Name[$index] -Value $row.Value[$index]
+			}
+			$outputFileContent += $entry
+		}
+														
+		return (NewConfigDataItem "PINetManagerStats" $outputFileContent)	
+	}
+	catch
+	{ 					
+		Write-Output $("A problem occurred during " + $fn + ": " + $_.Exception.Message)
+	}													
+}
+
+function PISecConfig_ExportPIMessageLogs
+{
+<#  
+.SYNOPSIS
+Export PI Message Logs of severity Warning or above for the past month.
+#>
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pida")]
+		[object] $PIDataArchiveConnection)
+		
+	$fn = GetFunctionName
+	try
+	{		
+		$outputFileContentRaw = Get-PIMessage -Connection $PIDataArchiveConnection -Starttime $(Get-Date).AddMonths(-1) -Endtime $(Get-Date) -SeverityType Warning | Select *
 
 		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw														
-		return (NewConfigDataItem "PINetManagerStats" $outputFileContent)	
+		return (NewConfigDataItem "PIMessages" $outputFileContent)	
 	}
 	catch
 	{ 					
@@ -326,28 +362,28 @@ param(
 BEGIN {}
 PROCESS 
 {
+		Test-PowerShellToolsForPISystemAvailable
+		if(!$global:ArePowerShellToolsAvailable)
+		{ 
+			Write-Output "PowerShell Tools for the PI System are required for export functionality. Exiting..." 
+			break
+		}
 		# Get the list of functions to execute.
 		$listOfFunctions = Get-PISecConfig_FunctionsFromLibrary
 		# Connect to PI Data Archive
 		$PIDataArchiveConnection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchiveComputerName
-		
+		# Set export folder
 		$exportFolderPathRoot = SetRootExportFolder
 		$exportFolderPath = Join-Path -Path $exportFolderPathRoot -ChildPath $PIDataArchiveComputerName
 		if (!(Test-Path $exportFolderPath)){ New-Item $exportFolderPath -type directory }
-
-		$PISecConfigData = @()
+		
 		foreach($function in $listOfFunctions.GetEnumerator())
 		{
-			$tmpPISecConfigData = $null
-			$tmpPISecConfigData = & $function.Name -pida $PIDataArchiveConnection
-			$PISecConfigData += $tmpPISecConfigData
-		}
-		foreach($PISecConfigDataItem in $PISecConfigData)
-		{
+			$PISecConfigDataItem = $null
+			$PISecConfigDataItem = & $function.Name -pida $PIDataArchiveConnection
 			$exportFilePath = $exportFolderPath + "\" + $PISecConfigDataItem.FileName + ".csv"
 			$PISecConfigDataItem.FileContent | Export-Csv -Path $exportFilePath -Encoding ASCII -NoTypeInformation
 		}
-		
 }
 END{}
 }
