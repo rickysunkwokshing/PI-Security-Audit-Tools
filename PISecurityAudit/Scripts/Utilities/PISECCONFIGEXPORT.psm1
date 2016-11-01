@@ -340,7 +340,7 @@ Export security configuration information.
 
 .DESCRIPTION
 The following information is exported.
-		Security Configuration
+	Security Configuration
 		1. Export PI Database Security to a CSV file
 		2. Export PI Firewall to a CSV file
 		3. Export PI Users to a CSV file
@@ -348,11 +348,19 @@ The following information is exported.
 		5. Export PI Mappings to a CSV file
 		6. Export PI Trusts to a CSV file
 		7. Export PI Security Level to a CSV file
-		Connection Info
+	Connection Info
 		8. Export Network Manager Statistics to a CSV file
-		Logs
+	Logs
 		9. Export one month of warning, error and critical 
 		messages logs from the PI Data Archive
+The syntax is...				 
+Export-PISecConfig [[-PIDataArchiveComputerName | -pida] <string>]
+.PARAMETER pida
+The PI Data Archive to dump the security configuration from.
+.EXAMPLE
+Export-PISecConfig -PIDataArchiveComputerName PIDataArchive01
+.LINK
+https://pisquare.osisoft.com
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(
