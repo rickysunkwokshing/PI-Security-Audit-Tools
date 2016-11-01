@@ -1145,6 +1145,23 @@ param(
 	}	
 }
 
+function ValidatePowerShellToolsAvailable
+{
+    # Check for availability of PowerShell Tools for the PI System
+    if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
+	{
+		if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
+		{
+			Import-Module -Name OSIsoft.PowerShell
+			$global:ArePowerShellToolsAvailable = $true
+		}
+		else
+		{
+			$global:ArePowerShellToolsAvailable = $false
+		}
+	}
+}
+
 function StartComputerAudit
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
@@ -1253,17 +1270,12 @@ param(
 					
 	# Get and store the function Name.
 	$fn = GetFunctionName
-	
+	$global:PIDataArchiveConnection = $null
+
 	try
 	{
 		# Read from the global constant bag.
-		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-		
-		# Get the piconfig CLU location on the machine where the script runs.		
-		if( -not(Test-Path variable:global:PISysAuditPIConfigExec) )
-		{
-			if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
-		}
+		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value						
 
 		# Validate the presence of a PI Data Archive
 		if((ValidateIfHasPIDataArchiveRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
@@ -1286,22 +1298,65 @@ param(
 			# Return the error message.
 			$msgTemplate = "The PI Data Archive {0} is not accessible over port 5450"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 			return
 		}
 
-		# After we've validated connections over 5450, make sure PI Utilities will be able to connect.
-		if($testConnection.Connected)
+		# Check for availability of PowerShell Tools for the PI System
+		ValidatePowerShellToolsAvailable
+
+		if($global:ArePowerShellToolsAvailable)
 		{
-			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAvailability.dif" `
-																-lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
-			if($null -eq $outputFileContent)
+			try
 			{
-				$msgTemplate = "Unable to access the PI Data Archive {0} with piconfig.  Check if there is a valid mapping for your user."
+				$global:PIDataArchiveConnection = Connect-PIDataArchive -PIDataArchiveMachineName $ComputerParams.ComputerName
+				if($global:PIDataArchiveConnection.Connected){
+					$msgTemplate = "Successfully connected to the PI Data Archive {0} with PowerShell."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+				}
+				else
+				{
+					$msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell."
 				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 				return
 			}
+		}
+		else
+		{
+			$msgTemplate = "Unable to locate the PowerShell Tools for the PI System on the computer running this script.  The piconfig utility will be used instead."
+			Write-PISysAudit_LogMessage $msg "Info" $fn
+
+			# Get the piconfig CLU location on the machine where the script runs.		
+			if( -not(Test-Path variable:global:PISysAuditPIConfigExec) )
+			{
+				if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
+			}
+
+			# After we've validated connections over 5450, make sure PI Utilities will be able to connect.
+			if($testConnection.Connected)
+			{
+				$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAvailability.dif" `
+																	-lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
+				if($null -eq $outputFileContent)
+				{
+					$msgTemplate = "Unable to access the PI Data Archive {0} with piconfig.  Check if there is a valid mapping for your user."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+			}
+
 		}
 		
 		# Get the list of functions to execute.
@@ -1346,6 +1401,10 @@ param(
 			# Call the function.
 			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel																																							
 		}
+
+		# Disconnect if PowerShell Tools are used.
+		if($global:PIDataArchiveConnection.Connected){$global:PIDataArchiveConnection.Disconnect()}
+
 		# Set the progress.
 		if($ShowUI)
 		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
@@ -1405,6 +1464,38 @@ param(
 			return
 		}						
 		
+		# Check for availability of PowerShell Tools for the PI System
+		ValidatePowerShellToolsAvailable
+
+		if($global:ArePowerShellToolsAvailable)
+		{
+			try
+			{
+				$global:AFServerConnection = Connect-AFServer -AFServer $(Get-AFServer -Name $ComputerParams.ComputerName)
+				if($global:AFServerConnection.ConnectionInfo.IsConnected)
+				{
+					$msgTemplate = "Successfully connected to the PI AF Server {0} with PowerShell."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+				}
+				else
+				{
+					$msgTemplate = "Unable to access the PI AF Server {0} with PowerShell.  Check if there is a valid mapping for your user."
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell."
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+				return
+			}
+		}
+
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI AF Server component on '{0}' computer"
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
@@ -1483,15 +1574,34 @@ param(
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 				
 		# Validate the presence of a SQL Server
-		if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-										-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)
-										
+		$global:UseSQLCmdlets = $PSVersionTable.PSVersion.Major -gt 2 -and $ComputerParams.PasswordFile -eq ""
+		if($global:UseSQLCmdlets)
 		{
-			# Return the error message.
-			$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
-			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
-			return
+			try
+			{
+				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -RemoteComputerName $ComputerParams.ComputerName -InstanceName $ComputerParams.InstanceName -ScalarValue 'TEST' | Out-Null
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return
+			}
+		}
+		else
+		{
+			if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+											-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)
+										
+			{
+				# Return the error message.
+				$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return
+			}
 		}
 		
 		# Get the list of functions to execute.
@@ -3809,6 +3919,67 @@ END {}
 #***************************
 }
 
+function Invoke-Sqlcmd_ScalarValue
+{
+<#
+.SYNOPSIS
+(Core functionality) Perform a SQL query against a local/remote computer using the Invoke-Sqlcmd Cmdlet.
+.DESCRIPTION
+Perform a SQL query against a local/remote computer using the Invoke-Sqlcmd Cmdlet.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[AllowEmptyString()]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,		
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("q")]
+		[string]
+		$Query,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]				
+		[string]
+		$ScalarValue,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]				
+		[string]
+		$InstanceName = "",									
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,							
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName		
+															
+	try
+	{
+		if($null -eq $InstanceName -or $InstanceName -eq "Default"){ $ServerInstance = $RemoteComputerName }
+		else{ $ServerInstance = $RemoteComputerName + '\' + $InstanceName }
+		$value = Invoke-Sqlcmd -Query $query -ServerInstance $ServerInstance | Select-Object -ExpandProperty $ScalarValue
+	}
+	catch
+	{
+		# Return the error message.
+		$msgTemplate = "A problem occurred during the SQL Query: {0}"
+		$msg = [string]::Format($msgTemplate, $_.Exception.Message)
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_		
+		$value = $null
+	}
+	return $value
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery
 {
 <#
@@ -4995,6 +5166,7 @@ Export-ModuleMember Invoke-PISysAudit_PIConfigScript
 Export-ModuleMember Invoke-PISysAudit_PIVersionCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery
+Export-ModuleMember Invoke-Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
 Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject

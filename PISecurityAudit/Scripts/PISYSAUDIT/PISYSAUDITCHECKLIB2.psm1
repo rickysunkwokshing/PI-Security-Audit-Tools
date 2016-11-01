@@ -101,11 +101,20 @@ PROCESS
 		# Initialize objects.
 		$securityWeaknessCounter = 0
 		$warningMessage = ""
-														
-		# Execute the PIConfig script.
-		$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIWorldReadAccess.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel				
 		
+		if($global:ArePowerShellToolsAvailable)
+		{
+			$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConnection `
+										| Sort-Object -Property Tablename `
+										| ForEach-Object {$_.Tablename + "^" + $_.Security} `
+										| ForEach-Object {$_.Replace(")",") |").Trim("|")}
+		}
+		else
+		{											
+			# Execute the PIConfig script.
+			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIWorldReadAccess.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel				
+		}
 		# Validate rules	
 	
 		# Example of output.
@@ -212,7 +221,7 @@ function Get-PISysAudit_CheckPIAdminUsage
 {
 <#  
 .SYNOPSIS
-AU20002 - PI Admin Trusts Disabled Check
+AU20002 - PI Admin Usage Check
 .DESCRIPTION
 VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.<br/>
 COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
@@ -253,17 +262,33 @@ PROCESS
 	{							
 		# Initialize objects.
 		$securityBits = 0	
-		$explicitLoginDisabled = $false							
+		$piadminTrustsDisabled = $false							
 											
-		# Execute the PIConfig script.
+		if($global:ArePowerShellToolsAvailable)
+		{
+			# Execute PowerShell cmdlets
+
+			# CheckPIAdminUsageInTrusts.dif
+			$noncompliantTrusts = Get-PITrust -Connection $global:PIDataArchiveConnection `
+									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
+									| ForEach-Object {$_.Name}
+
+			# CheckPIAdminUsageInMappings.dif
+			$noncompliantMappings = Get-PIMapping -Connection $global:PIDataArchiveConnection `
+									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
+									| ForEach-Object {$_.PrincipalName}
+		}
+		else
+		{
+			# Execute the PIConfig script.
 			
-		# Check for trusts assigned to the piadmin user 
-		$noncompliantTrusts = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		# Check for mappings assigned to the piadmin user		
-		$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
-		
+			# Check for trusts assigned to the piadmin user 
+			$noncompliantTrusts = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInTrusts.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			# Check for mappings assigned to the piadmin user		
+			$noncompliantMappings = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminUsageInMappings.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
+		}
 		$result = $true
 																	
 		#Iterate through the returned results (is any) and append ; delimiter for the output message. 
@@ -283,50 +308,58 @@ PROCESS
 
 		if($result -eq $true){
 			$msg = "No Trust(s) or Mapping(s) identified as weaknesses.  "
+			
 			# Check whether using the piadmin user for trusts is blocked globally
-			$piadminTrustsGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-			if($null -eq $piadminTrustsGlobalSetting)
+			if($global:ArePowerShellToolsAvailable)
 			{
-				# Return the error message.
-				$msg = "Global piadmin trust disabled parameter not returned.  Cannot proceed with check."					
-				Write-PISysAudit_LogMessage $msg "Warning" $fn 									
-				$result = "N/A"
+				$piadminTrustsDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowTrusts)
 			}
 			else
 			{
-				# Validate rules
-		
-				# Example of output.
-				# piadmin,24		
-		
-				# Read each line to find the one containing the token to replace.
-				foreach($line in $piadminTrustsGlobalSetting)
-				{								
-					# First line only.
-					$tokens = $line.Split(",")
-					$securityBits = [int16]$tokens[1]
-					break
+				$piadminTrustsGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				if($null -eq $piadminTrustsGlobalSetting)
+				{
+					# Return the error message.
+					$msg = "Global piadmin trust disabled parameter not returned.  Cannot proceed with check."					
+					Write-PISysAudit_LogMessage $msg "Warning" $fn 									
+					$result = "N/A"
 				}
-		
-				#Look for piadmin with identid=1
-				# Requires:
-				#	- explicit login disabled (bit5=16) <- Covered in AU20007
-				#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
-				#	- trust login disabled (bit3=4)
-				$trustLoginDisabled = $securityBits -band 4
-		
-				if($trustLoginDisabled) 
-				{ 
-					$result = $true 
-					$msg += "The piadmin user cannot be assigned to a trust."
-				} 
 				else 
 				{
+					# Validate rules
+		
+					# Example of output.
+					# piadmin,24		
+		
+					# Read each line to find the one containing the token to replace.
+					foreach($line in $piadminTrustsGlobalSetting)
+					{								
+						# First line only.
+						$tokens = $line.Split(",")
+						$securityBits = [int16]$tokens[1]
+						break
+					}
+		
+					# Look for piadmin with identid=1
+					# Requires:
+					#	- explicit login disabled (bit5=16) <- Covered in AU20007
+					#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
+					#	- trust login disabled (bit3=4)
+					$piadminTrustsDisabled = $securityBits -band 4
+				}
+			}
+ 
+			if($piadminTrustsDisabled) 
+			{ 
+				$result = $true 
+				$msg += "The piadmin user cannot be assigned to a trust."
+			} 
+			else 
+			{
 					$result = $false 
 					$msg += "However, the piadmin user can still be assigned to a trust."
 					$Severity = "moderate"
-				}
 			}
 		}		
 	}
@@ -343,7 +376,7 @@ PROCESS
 	#......................................				
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20002" `
-										-ain "Do not use PI Admin" -aiv $result `
+										-ain "PI Admin Usage" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity $Severity																		
@@ -395,34 +428,41 @@ PROCESS
 	$Severity = "Unknown"
 	try
 	{					
-		# Execute the piversion CLU.
-		$outputFileContent = Invoke-PISysAudit_PIVersionCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
-				
-		# Validate rules		
-		
-		# Example of output.	
-		# Installation version,3.4.390.16
-		# Installation binaries,64-bit
-		# PI Build Name,390_Release_20120924.1
-		# --------------------------------
-		# C:\Program Files\PI\adm\apisnap.exe,Release Branch,3.4.390.16
-		# C:\Program Files\PI\adm\ipisql.exe,Release Branch,3.4.390.16
-		# ...
-		# C:\Program Files\PI\bin\piaflink.exe,Release Branch,3.4.390.16
-		# C:\Program Files\PI\bin\pialarm.exe,Release Branch,3.4.390.16
-		# ...
-
-		# Read each line to find the one containing the token to replace.	
-		$result = $false
-		foreach($line in $OutputFileContent)
-		{								
-			if($line.Contains("Installation version"))
-			{								
-				$tokens = $line.Split(",")
-				$installationVersion  = $tokens[1]						
-			}		
+		if($global:ArePowerShellToolsAvailable)
+		{
+			$installationVersion = $global:PIDataArchiveConnection.ServerVersion.ToString()
 		}
+		else
+		{
+			# Execute the piversion CLU.
+			$outputFileContent = Invoke-PISysAudit_PIVersionCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
+				
+			# Validate rules		
 		
+			# Example of output.	
+			# Installation version,3.4.390.16
+			# Installation binaries,64-bit
+			# PI Build Name,390_Release_20120924.1
+			# --------------------------------
+			# C:\Program Files\PI\adm\apisnap.exe,Release Branch,3.4.390.16
+			# C:\Program Files\PI\adm\ipisql.exe,Release Branch,3.4.390.16
+			# ...
+			# C:\Program Files\PI\bin\piaflink.exe,Release Branch,3.4.390.16
+			# C:\Program Files\PI\bin\pialarm.exe,Release Branch,3.4.390.16
+			# ...
+
+			# Read each line to find the one containing the token to replace.	
+			$result = $false
+			foreach($line in $OutputFileContent)
+			{								
+				if($line.Contains("Installation version"))
+				{								
+					$tokens = $line.Split(",")
+					$installationVersion = $tokens[1]
+					break				
+				}		
+			}
+		}
 		$result = $false
 		$installVersionTokens = $installationVersion.Split(".")
 		# Form an integer value with all the version tokens.
@@ -498,52 +538,57 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$EditDays = $null
 	try
 	{
-		# Execute the PIConfig script.
-		$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckEditDays.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel																						
-		
+
 		# Validate rules	
 	
 		# Example of output.
 		# if the file is empty, it means it is configure to default value of 1
 		# otherwise the file would contain Autotrustconfig,<value>
-
-		# Read each line to find the one containing the token to replace.		
-		$valueFound = $false
-		if($null -ne $outputFileContent)
+		if($global:ArePowerShellToolsAvailable)
+		{ 
+			$EditDays = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "EditDays" | Select-Object -ExpandProperty Value
+		}
+		else
 		{
-			foreach($line in $outputFileContent)
-			{								
-				# Skip line if not containing the value autotrustconfig.
-				if($line.ToLower().Contains("editdays"))
-				{
-					# Set the flag.
-					$valueFound = $true
-					# Find the delimiter
-					$tokens = $line.Split(",")
-	
-					if($tokens[1] -eq 0) 
-					{ 
-						$result = $false 
-						$msg = "EditDays using non-compliant value of 0."
-					}
-					else 
-					{ 
-						$result = $true 
-						$msg = "EditDays specified as a non-zero value."
-					}
-					break								
-				}			
+			# Execute the PIConfig script.
+			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckEditDays.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			if($null -ne $outputFileContent)
+			{
+				foreach($line in $outputFileContent)
+				{								
+					# Skip line if not containing the value autotrustconfig.
+					if($line.ToLower().Contains("editdays"))
+					{
+						# Find the delimiter
+						$EditDays = $line.Split(",")[1]
+						break
+					}			
+				}
 			}
 		}
 		# The default value is set to 0 which is not compliant.
-		if($valueFound -eq $false) 
+		if($null -eq $EditDays) 
 		{ 
 			$result = $false
 			$msg = "EditDays not specified, using non-compliant default of 0."
-		}		
+		}
+		else 
+		{
+			if($EditDays -eq 0) 
+			{ 
+				$result = $false 
+				$msg = "EditDays using non-compliant value of 0."
+			}
+			else 
+			{ 
+				$result = $true 
+				$msg = "EditDays specified as a non-zero value."
+			}	
+		}			
 	}
 	catch
 	{
@@ -605,74 +650,80 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$AutoTrustConfig = $null
 	try
 	{
-		# Execute the PIConfig script.
-		$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckAutoTrustConfig.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel																						
-																		
 		# Validate rules	
 	
 		# Example of output.
 		# if the file is empty, it means it is configure to default value of 1
 		# otherwise the file would contain Autotrustconfig,<value>
 
-		# Read each line to find the one containing the token to replace.		
-		$valueFound = $false
-		if($null -ne $outputFileContent)
-		{
-			foreach($line in $outputFileContent)
-			{								
-				# Skip line if not containing the value autotrustconfig.
-				if($line.ToLower().Contains("autotrustconfig"))
-				{
-					# Set the flag.
-					$valueFound = $true
-					# Find the delimiter
-					$tokens = $line.Split(",")
-				
-					# 0 - Do not automatically create any PI Trust entries.
-					# 0x01 - Create the trust entry for the loopback IP address 127.0.0.1
-					# 0x02 - Create the trust entry for the "localhost" hostname
-					# 0x04 - Create the trust entry for the IP address
-					# 0x08 - Create the trust entry for the short hostname
-					# 0x10 - Create the trust entry for the FQDN hostname
-					# 0x1F - Create the old (pre 3.4.370.x) trust entries
-
-					switch ($tokens[1])
-					{
-						0   { $description = "Does not automatically create any PI Trust entries."; break; }
-						1   { $description = "Creates the trust entry for the loopback IP address 127.0.0.1"; break; }
-						2   { $description = "Creates the trust entry for the `"localhost`" hostname"; break; }
-						4   { $description = "Creates the trust entry for the IP address"; break; }
-						8   { $description = "Creates the trust entry for the short hostname"; break; }
-						16   { $description = "Creates the trust entry for the FQDN hostname"; break; }
-						32   { $description = "Creates the old (pre 3.4.370.x) trust entries"; break; }
-			
-						default {$description = "Unknown configuration" }
-					}
-
-					if($tokens[1] -le 1) 
-					{ 
-						$result = $true 
-						$msg = "Tuning parameter compliant: {0}"
-					}
-					else 
-					{ 
-						$result = $false
-						$msg = "Tuning parameter not compliant: {0}" 
-					}
-					$msg = [string]::Format($msg, $description)
-					break								
-				}			
-			}
-		}
-		# The default value is set to 1 which is compliant.
-		if($valueFound -eq $false) 
+		if($global:ArePowerShellToolsAvailable)
 		{ 
+			$AutoTrustConfig = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "AutoTrustConfig" | Select-Object -ExpandProperty Value
+		}
+		else
+		{
+			# Execute the PIConfig script.
+			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckAutoTrustConfig.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
+			
+			# Read each line to find the one containing the token to replace.
+			if($null -ne $outputFileContent)
+			{
+				foreach($line in $outputFileContent)
+				{
+					# Skip line if not containing the value autotrustconfig.
+					if($line.ToLower().Contains("autotrustconfig"))
+					{
+						# Find the delimiter
+						$AutoTrustConfig = $line.Split(",")[1]
+						break
+					}
+				}
+			}
+		}					
+																		
+		# 0 - Do not automatically create any PI Trust entries.
+		# 0x01 - Create the trust entry for the loopback IP address 127.0.0.1
+		# 0x02 - Create the trust entry for the "localhost" hostname
+		# 0x04 - Create the trust entry for the IP address
+		# 0x08 - Create the trust entry for the short hostname
+		# 0x10 - Create the trust entry for the FQDN hostname
+		# 0x1F - Create the old (pre 3.4.370.x) trust entries
+
+		switch ($AutoTrustConfig)
+		{
+			0   { $description = "Does not automatically create any PI Trust entries."; break; }
+			1   { $description = "Creates the trust entry for the loopback IP address 127.0.0.1"; break; }
+			2   { $description = "Creates the trust entry for the `"localhost`" hostname"; break; }
+			4   { $description = "Creates the trust entry for the IP address"; break; }
+			8   { $description = "Creates the trust entry for the short hostname"; break; }
+			16   { $description = "Creates the trust entry for the FQDN hostname"; break; }
+			32   { $description = "Creates the old (pre 3.4.370.x) trust entries"; break; }
+			
+			default {$description = "Unknown configuration" }
+		}
+
+		if($null -eq $AutoTrustConfig)
+		{
+			# The default value is set to 1 which is compliant.
 			$result = $true 
 			$msg = "Tuning parameter compliant: Create the trust entry for the loopback IP address 127.0.0.1"
-		}		
+		}
+		elseif($AutoTrustConfig -le 1) 
+		{ 
+			$result = $true 
+			$msg = "Tuning parameter compliant: {0}"
+			$msg = [string]::Format($msg, $description)
+		}
+		else 
+		{ 
+			$result = $false
+			$msg = "Tuning parameter not compliant: {0}" 
+			$msg = [string]::Format($msg, $description)
+		}								
 	}
 	catch
 	{
@@ -735,97 +786,100 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$Archive_MaxQueryExecutionSec = $null
 	try
-	{							
-		# Initialize objects.
-		$securityValidationCounter = 0
-		$securityBits = 0								
-										
-		# Execute the piversion CLU.
-		$outputFileContent = Invoke-PISysAudit_PIVersionCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel	
+	{														
 		
-		# Validate rules		
-		
-		# Example of output.	
-		# Installation version,3.4.390.16
-		# Installation binaries,64-bit
-		# PI Build Name,390_Release_20120924.1
-		# --------------------------------
-		# C:\Program Files\PI\adm\apisnap.exe,Release Branch,3.4.390.16
-		# C:\Program Files\PI\adm\ipisql.exe,Release Branch,3.4.390.16
-		# ...
-		# C:\Program Files\PI\bin\piaflink.exe,Release Branch,3.4.390.16
-		# C:\Program Files\PI\bin\pialarm.exe,Release Branch,3.4.390.16
-		# ...
-
-		# Read each line to find the one containing the token to replace.	
-		$result = $false
-
-		foreach($line in $outputFileContent)
-		{								
-			if($line.Contains("Installation version"))
-			{								
-				$tokens = $line.Split(",")
-				$installationVersion  = $tokens[1]						
-			}					
-		}
-		$installVersionTokens = $installationVersion.Split(".")
-		# Form an integer value with all the version tokens.
-		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
-		$installVersionInt64 = [Convert]::ToInt64($temp)
-		
-		
-		# Execute the PIConfig script.
-		$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckExpensiveQuery.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-						
 		# Validate rules
 		
 		# Example of output.
 		# if the file is empty, it means it is configure to default value of 0 if the piarchss
 		# is prior to (KB 3224OSI8) 3.4.390.x, otherwise it is set to 260.		
-		# otherwise the file would contain Archive_MaxQueryExecutionSec,<value>				
-		
-		# Read each line to find the one containing the token to replace.
-		$valueFound = $false
-		if($null -ne $outputFileContent)
+		# otherwise the file would contain Archive_MaxQueryExecutionSec,<value>
+										
+		if($global:ArePowerShellToolsAvailable)
+		{ 
+			# Get installation version
+			$installationVersion = $global:PIDataArchiveConnection.ServerVersion.ToString()
+			# Get tuning parameter value 
+			$temp = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Archive_MaxQueryExecutionSec" | Select-Object -ExpandProperty Value
+			# Using temp because otherwise null (Default) will be coerced to 0 when int16 conversion is applied.
+			if($null -ne $temp){[int16]$Archive_MaxQueryExecutionSec = $temp}
+		}
+		else
 		{
+			# Execute the piversion CLU.
+			$outputFileContent = Invoke-PISysAudit_PIVersionCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			# Validate rules		
+		
+			# Example of output.	
+			# Installation version,3.4.390.16
+			# Installation binaries,64-bit
+			# PI Build Name,390_Release_20120924.1
+			# --------------------------------
+			# C:\Program Files\PI\adm\apisnap.exe,Release Branch,3.4.390.16
+			# C:\Program Files\PI\adm\ipisql.exe,Release Branch,3.4.390.16
+			# ...
+			# C:\Program Files\PI\bin\piaflink.exe,Release Branch,3.4.390.16
+			# C:\Program Files\PI\bin\pialarm.exe,Release Branch,3.4.390.16
+			# ...
+
 			foreach($line in $outputFileContent)
 			{								
-				if($line.ToLower().Contains("archive_maxqueryexecutionsec"))
-				{				
-					# First line only.
+				if($line.Contains("Installation version"))
+				{								
 					$tokens = $line.Split(",")
-					$timeout = [int16]$tokens[1]
-					$valueFound = $true
-					break
-				}
+					$installationVersion  = $tokens[1]						
+				}					
+			}
+			
+			# Execute the PIConfig script.
+			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckExpensiveQuery.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			# Read each line to find the one containing the token to replace.
+			if($null -ne $outputFileContent)
+			{
+				foreach($line in $outputFileContent)
+				{								
+					if($line.ToLower().Contains("archive_maxqueryexecutionsec"))
+					{				
+						# First line only.
+						$tokens = $line.Split(",")
+						$Archive_MaxQueryExecutionSec = [int16]$tokens[1]
+						break
+					}
+				}	
 			}	
-		}		
-						
+		}
+		
+		$installVersionTokens = $installationVersion.Split(".")
+		# Form an integer value with all the version tokens.
+		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
+		$installVersionInt64 = [Convert]::ToInt64($temp)		
+								
 		# Default value for PI Data Archive prior to 3.4.390.16 was 0
 		# Check if the timeout setting is between 60 and 300.
-		if(($valueFound -eq $false) -and ($installVersionInt64 -lt 3439016)) 
+		if(($null -eq $Archive_MaxQueryExecutionSec) -and ($installVersionInt64 -lt 3439016)) 
 		{ 
 			$result = $false 
 			$msg = "Using the non-compliant default of 0."
 		}
-		elseif(($valueFound -eq $false) -and ($installVersionInt64 -ge 3439016)) 
+		elseif(($null -eq $Archive_MaxQueryExecutionSec) -and ($installVersionInt64 -ge 3439016)) 
 		{ 
 			$result = $true 
 			$msg = "Using the compliant default of 260."
 		}				
-		elseif($valueFound -and ($timeout -ge 60) -and ($timeout -le 300)) 
+		elseif(($null -ne $Archive_MaxQueryExecutionSec) -and ($Archive_MaxQueryExecutionSec -ge 60) -and ($Archive_MaxQueryExecutionSec -le 300)) 
 		{ 
 			$result = $true 
 			$msg = "Using a compliant value of {0}."
-			$msg = [string]::Format($msg, $timeout)
+			$msg = [string]::Format($msg, $Archive_MaxQueryExecutionSec)
 		}
 		else 
 		{ 
 			$result = $false 
 			$msg = "Using a non-compliant value of {0}."
-			$msg = [string]::Format($msg, $timeout)
+			$msg = [string]::Format($msg, $Archive_MaxQueryExecutionSec)
 		}	
 	}
 	catch
@@ -892,16 +946,24 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	$Severity = "Unknown"
+	$piadminExplicitLoginDisabled = $false
 	try
 	{		
-		# Execute the PIConfig script.
-		$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAuthPolicy.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel						
+		if($global:ArePowerShellToolsAvailable)
+		{
+			$Server_AuthenticationPolicy = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value
+		}
+		else
+		{
+			# Execute the PIConfig script.
+			$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAuthPolicy.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel						
 		
-		# Validate rules
-		$ServerAuthPolicy = $outputFileContent.ToInt32($null)
-		
-		switch ($ServerAuthPolicy)
+			# Validate rules
+			$Server_AuthenticationPolicy = [convert]::ToInt32($outputFileContent, 10)
+		}
+
+		switch ($Server_AuthenticationPolicy)
 				{
 					0   { $description = "All authentication options enabled. "; break; }
 					2   { $description = "Explicit logins for users with blank passwords disabled. "; break; }
@@ -913,42 +975,53 @@ PROCESS
 				}
 		
 		$msgPolicy =""
-		if($ServerAuthPolicy -lt 3)
+		if($Server_AuthenticationPolicy -lt 3)
 		{
 			$result = $false
 			$msgPolicy = "Using non-compliant policy:"
 			$Severity = "severe"
 
-			# Check whether piadmin user can use explicit login
-			$piadminExplicitLoginGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
-																-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-			# Validate rules
-		
-			# Example of output.
-			# piadmin,24		
-		
-			# Read each line to find the one containing the token to replace.
-			foreach($line in $piadminExplicitLoginGlobalSetting)
-			{								
-				# First line only.
-				$tokens = $line.Split(",")
-				$securityBits = [int16]$tokens[1]
-				break
+			if($global:ArePowerShellToolsAvailable)
+			{
+				$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowExplicitLogin)
 			}
+			else
+			{
+				# Check whether piadmin user can use explicit login
+				$piadminExplicitLoginGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
+																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				# Validate rules
 		
-			#Look for piadmin with identid=1
-			# Requires:
-			#	- explicit login disabled (bit5=16) 
-			#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
-			#	- trust login disabled (bit3=4) <- Covered in AU20002
-			if(-not($securityBits -band 16))
+				# Example of output.
+				# piadmin,24		
+		
+				# Read each line to find the one containing the token to replace.
+				foreach($line in $piadminExplicitLoginGlobalSetting)
+				{								
+					# First line only.
+					$tokens = $line.Split(",")
+					$securityBits = [int16]$tokens[1]
+					#Look for piadmin with identid=1
+					# Requires:
+					#	- explicit login disabled (bit5=16) 
+					#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
+					#	- trust login disabled (bit3=4) <- Covered in AU20002
+					$piadminExplicitLoginDisabled = $securityBits -band 16
+					break
+				}
+			}
+			if($piadminExplicitLoginDisabled)
+			{
+				$description += "Explicit login disabled for piadmin."
+				$Severity = "severe"
+			}
+			else
 			{
 				$description += "Explicit login allowed for piadmin."
 				$Severity = "severe"
 			}
-
-		} 
-		else 
+		}
+		else
 		{
 			$result = $true
 			$msgPolicy = "Using compliant policy:"
@@ -1042,7 +1115,7 @@ PROCESS
 	
 	# Define the results in the audit table	
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
-										-at $AuditTable "AU20009" `
+										-at $AuditTable "AU20008" `
 										-ain "PI Data Archive SPN Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
