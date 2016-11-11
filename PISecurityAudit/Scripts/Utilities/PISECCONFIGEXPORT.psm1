@@ -39,11 +39,13 @@ Convert the table of data into a PSObject so that it can be exported or manipula
 native PowerShell Cmdlets.
 #>
 param(
-	[Parameter(Mandatory=$True,Position=1)]
+	[Parameter(Mandatory=$True,Position=1,ValueFromPipeline=$True)]
 	[object] $outputFileContentRaw
 )
-    $outputFileContent = @()
-    foreach($row in $outputFileContentRaw)
+BEGIN { $outputFileContent = @() }
+PROCESS
+{    
+	foreach($row in $outputFileContentRaw)
 	{
 			$entry = New-Object PSObject
 			$rowNoteProperties = $row | Get-Member -MemberType NoteProperty | Select-Object Name
@@ -55,7 +57,8 @@ param(
 			}
 			$outputFileContent += $entry
 	}
-	return $outputFileContent 
+}
+END { return $outputFileContent }
 }	
 
 function Get-PISecConfig_FunctionsFromLibrary
@@ -91,12 +94,11 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIDatabaseSecurity -Connection $PIDataArchiveConnection `
-										| Select-Object TableName, Security | Sort-Object -Property Tablename 
-		# Need to convert security attribute to a string so that it is not a comma delimited object.
-		foreach ($row in $outputFileContentRaw) { $row.Security = $row.Security.ToString() }
-
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw			 																	
+		$outputFileContent = Get-PIDatabaseSecurity -Connection $PIDataArchiveConnection `
+										| Select-Object TableName, Security | Sort-Object -Property Tablename `
+										| Foreach-Object { $_.Security = $_.Security.ToString(); Write-Output $_ } `
+										| ConvertSelectionToPSObject		 																	
+		
 		return (NewConfigDataItem "PIDatabaseSecurity" $outputFileContent)	
 	}
 	catch
@@ -119,10 +121,9 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIFirewall -Connection $PIDataArchiveConnection `
-									| Select-Object Hostmask, Access
-		
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw														
+		$outputFileContent = Get-PIFirewall -Connection $PIDataArchiveConnection `
+									| Select-Object Hostmask, Access | ConvertSelectionToPSObject
+															
 		return (NewConfigDataItem "PIFirewall" $outputFileContent)	
 	}
 	catch
@@ -145,10 +146,9 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIUser -Connection $PIDataArchiveConnection `
-									| Select-Object Name, Groups 
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw						
-												
+		$outputFileContent = Get-PIUser -Connection $PIDataArchiveConnection `
+									| Select-Object Name, Groups | ConvertSelectionToPSObject
+																	
 		return (NewConfigDataItem "PIUser" $outputFileContent)	
 	}
 	catch
@@ -172,9 +172,8 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIGroup -Connection $PIDataArchiveConnection `
-									| Select-Object Name, Users 
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw
+		$outputFileContent = Get-PIGroup -Connection $PIDataArchiveConnection `
+									| Select-Object Name, Users | ConvertSelectionToPSObject
 																		
 		return (NewConfigDataItem "PIGroups" $outputFileContent)	
 	}
@@ -199,12 +198,11 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIIdentity -Connection $PIDataArchiveConnection  `
-                            | Select-Object Name, ReadOnlyFlags
-		# Replace comma delimiter in ReadOnlyFlags with semicolon
-		foreach ($row in $outputFileContentRaw) { $row.ReadOnlyFlags = $row.ReadOnlyFlags.ToString().Replace(',',';') }
-		
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw															
+		$outputFileContent = Get-PIIdentity -Connection $PIDataArchiveConnection  `
+                            | Select-Object Name, ReadOnlyFlags `
+                            | Foreach-Object { $_.ReadOnlyFlags = $_.ReadOnlyFlags.ToString().Replace(',',';'); Write-Output $_ } `
+							| ConvertSelectionToPSObject
+																	
 		return (NewConfigDataItem "PIIdentities" $outputFileContent)	
 	}
 	catch
@@ -228,10 +226,9 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIMapping -Connection $PIDataArchiveConnection  `
-                            | Select-Object Identity, PrincipalName 
-		
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw															
+		$outputFileContent = Get-PIMapping -Connection $PIDataArchiveConnection  `
+                            | Select-Object Identity, PrincipalName | ConvertSelectionToPSObject
+																	
 		return (NewConfigDataItem "PIMappings" $outputFileContent)	
 	}
 	catch
@@ -255,10 +252,10 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PITrust -Connection $PIDataArchiveConnection  `
-                            | Select-Object Name, Identity, Domain, OSUser, ApplicationName, NetworkHost, IPAddress, NetMask, IsEnabled 
+		$outputFileContent = Get-PITrust -Connection $PIDataArchiveConnection  `
+                            | Select-Object Name, Identity, Domain, OSUser, ApplicationName, NetworkHost, IPAddress, NetMask, IsEnabled `
+							| ConvertSelectionToPSObject
 		
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw
 		return (NewConfigDataItem "PITrusts" $outputFileContent)	
 	}
 	catch
@@ -318,9 +315,9 @@ param(
 	$fn = GetFunctionName
 	try
 	{		
-		$outputFileContentRaw = Get-PIMessage -Connection $PIDataArchiveConnection -Starttime $(Get-Date).AddMonths(-1) -Endtime $(Get-Date) -SeverityType Warning | Select *
-
-		$outputFileContent = ConvertSelectionToPSObject $outputFileContentRaw														
+		$outputFileContent = Get-PIMessage -Connection $PIDataArchiveConnection -Starttime $(Get-Date).AddMonths(-1) -Endtime $(Get-Date) -SeverityType Warning `
+									| Select * | ConvertSelectionToPSObject
+														
 		return (NewConfigDataItem "PIMessages" $outputFileContent)	
 	}
 	catch
