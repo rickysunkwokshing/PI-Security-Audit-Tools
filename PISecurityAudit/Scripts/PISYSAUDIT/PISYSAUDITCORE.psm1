@@ -1145,7 +1145,7 @@ param(
 	}	
 }
 
-function ValidatePowerShellToolsAvailable
+function Test-PowerShellToolsForPISystemAvailable
 {
     # Check for availability of PowerShell Tools for the PI System
     if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
@@ -1303,7 +1303,7 @@ param(
 		}
 
 		# Check for availability of PowerShell Tools for the PI System
-		ValidatePowerShellToolsAvailable
+		Test-PowerShellToolsForPISystemAvailable
 
 		if($global:ArePowerShellToolsAvailable)
 		{
@@ -1465,7 +1465,7 @@ param(
 		}						
 		
 		# Check for availability of PowerShell Tools for the PI System
-		ValidatePowerShellToolsAvailable
+		Test-PowerShellToolsForPISystemAvailable
 
 		if($global:ArePowerShellToolsAvailable)
 		{
@@ -1579,6 +1579,11 @@ param(
 		{
 			try
 			{
+				# Push and Pop are to prevent a context switch to the SQL shell from persisting after invocation of SQL commands.
+				Push-Location
+				Import-Module SQLPS -DisableNameChecking
+				Pop-Location
+				# Simplest query to return a response to ensure we can query the SQL server
 				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -RemoteComputerName $ComputerParams.ComputerName -InstanceName $ComputerParams.InstanceName -ScalarValue 'TEST' | Out-Null
 			}
 			catch
@@ -5179,6 +5184,7 @@ Export-ModuleMember -Alias piauditparams
 Export-ModuleMember -Alias pisysauditparams
 Export-ModuleMember -Alias piaudit
 Export-ModuleMember -Alias pwdondisk
+Export-ModuleMember Test-PowerShellToolsForPISystemAvailable
 # </Do not remove>
 
 # ........................................................................
