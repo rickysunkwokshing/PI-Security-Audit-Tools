@@ -189,7 +189,7 @@ PROCESS
 		$QueryAdmUser = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.username.value"
 		$CSUserAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmUser -DBGLevel $DBGLevel
 
-		# Both Coresight AppPools must run under the same identity (as both appPools need to access the SQL back-end).
+		# Both Coresight AppPools must run under the same identity.
 		If ( $global:CSAppPoolSvc -eq $CSAppPoolAdm -and $global:CSUserSvc -eq $CSUserAdm ) 
 		{ 
 
@@ -716,7 +716,6 @@ Export-ModuleMember Get-PISysAudit_CheckCoresightVersion
 Export-ModuleMember Get-PISysAudit_CheckCoresightAppPools
 Export-ModuleMember Get-PISysAudit_CoresightSSLcheck
 Export-ModuleMember Get-PISysAudit_CoresightSPNcheck
-
 # </Do not remove>
 
 # ........................................................................
