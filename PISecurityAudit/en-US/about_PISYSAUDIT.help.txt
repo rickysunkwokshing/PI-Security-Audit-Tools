@@ -88,15 +88,13 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		PI System relies on Windows Integrated Security and AD to automatically enable higher 
 		strength ciphers.
 
-		AU10002 - Operating System SKU
-		VALIDATION: verifies that the OS Stock Keeping Unit (SKU) is appropriate for 
-		production use.
-		COMPLIANCE: SKU should match one of the following: 12, 13, 14, 29, 39, 40, 41 or 42.
-		All SKU values are viewable here: 
+		AU10002 - Operating System Installation Type
+		VALIDATION: verifies that the OS installation type is server core for the 
+		reduced surface area.
+		COMPLIANCE: Installation Type should be Server Core. Different SKUs are
+		available at the link below:
 		http://msdn.microsoft.com/en-us/library/ms724358.aspx  
-		These SKUs were chosen to highlight the reduced attack surface area of a core 
-		installation of Windows Server.  For more on the advantages of Windows Server Core, 
-		please see:
+		For more on the advantages of Windows Server Core, please see:
 		https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx 
 
 		AU10003 - Firewall Enabled
@@ -341,25 +339,3 @@ CONTRIBUTE
 	If you encounter a bug, please submit it as an issue on the GitHub repo
 	or fix the bug and submit a pull request!
         https://github.com/osisoft/PI-System-Audit-Tools/issues
-        
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
