@@ -2588,6 +2588,62 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_OSSKU
+{
+<#  
+.SYNOPSIS
+(Core functionality) Get operating system sku.
+.DESCRIPTION
+Get operating system sku.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{					
+	$fn = GetFunctionName
+	
+	try
+	{
+		$className = "Win32_OperatingSystem"
+		$namespace = "root\CIMV2"
+		$filterExpression = ""
+		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
+		return $WMIObject.OperatingSystemSKU								
+	}	
+	catch
+	{		
+		# Return the error message.
+		$msgTemplate1 = "Query the WMI classes from local computer has failed"
+		$msgTemplate2 = "Query the WMI classes from {0} has failed"
+		if($LocalComputer)
+		{ $msg = $msgTemplate1 }
+		else
+		{ $msg = [string]::Format($msgTemplate2, $RemoteComputerName) }		
+		Write-LogMessage $msg "Error" $fn -eo $_
+		return $null				
+	}	
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_InstalledComponents
 {
 <#
@@ -5104,6 +5160,7 @@ Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ServiceLogOnAccount
 Export-ModuleMember Get-PISysAudit_ServiceState
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
+Export-ModuleMember Get-PISysAudit_OSSKU
 Export-ModuleMember Get-PISysAudit_InstalledComponents
 Export-ModuleMember Get-PISysAudit_InstalledKBs
 Export-ModuleMember Get-PISysAudit_InstalledWin32Feature
