@@ -10,7 +10,7 @@ function SetRootExportFolder
 	# Establish the root path that configurations will be exported to.
 	$scriptsPath = Split-Path $PSScriptRoot
 	$rootPath = Split-Path $scriptsPath				
-	$exportFolderPathRoot = PathConcat -ParentPath $rootPath -ChildPath "Export"
+	$exportFolderPathRoot = Join-Path -Path $rootPath -ChildPath "Export"
 	# Create the root export folder if it doesn't exist.
 	if (!(Test-Path $exportFolderPathRoot)){ New-Item $exportFolderPathRoot -type directory }
 
@@ -379,7 +379,7 @@ PROCESS
 		$PIDataArchiveConnection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchiveComputerName
 		# Set export folder
 		$exportFolderPathRoot = SetRootExportFolder
-		$exportFolderPath = PathConcat -ParentPath $exportFolderPathRoot -ChildPath $PIDataArchiveComputerName
+		$exportFolderPath = Join-Path -Path $exportFolderPathRoot -ChildPath $PIDataArchiveComputerName
 		if (!(Test-Path $exportFolderPath)){ New-Item $exportFolderPath -type directory }
 		
 		foreach($function in $listOfFunctions.GetEnumerator())
