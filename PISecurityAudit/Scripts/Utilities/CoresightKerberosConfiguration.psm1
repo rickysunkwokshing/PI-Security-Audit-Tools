@@ -3,7 +3,7 @@
 PI Dog must be run locally. Import PISYSAUDIT module to make the function available.
 #>
 
-Function Test-PI_KerberosConfiguration {
+Function Test-CoresightKerberosConfiguration {
 
 $title = "PI DOG - Please run it locally on the PI Coresight server machine."
 $message = "PI Dog always fetches information about Coresight IIS settings and SPNs. Would you like to check Kerberos Delegation configuration as well?"
@@ -68,13 +68,15 @@ $resultRSAT = $host.ui.PromptForChoice($titleRSAT, $messageRSAT, $optionsRSAT, 0
 
 }
 
-# To be sure, reset sonme of the variables
+# Initialize variables
 $strSPNs = $null
+$strBackEndSPNS = $null
 $global:strIssues = $null
 $global:issueCount = 0
 $global:strRecommendations = $null
 $global:strClassicDelegation = $null
 $global:RBKCDstring = $null
+$CoresightDelegation = $null
 
 # Get CoreSight Web Site Name
 $RegKeyPath = "HKLM:\Software\PISystem\Coresight"
@@ -115,22 +117,25 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
     # Check whether a custom account is used to run the Coresight Service AppPool
 	# This doesn't take into account edge cases like LocalSystem as it's handled in the main Coresight module
-    if ($CSAppPoolSvc -ne "NetworkService" -and $CSAppPoolSvc -ne "ApplicationPoolIdentity")
+    If ($CSAppPoolSvc -ne "NetworkService" -and $CSAppPoolSvc -ne "ApplicationPoolIdentity")
     {   # Custom account is used
-        $blnCustomAccount = $true 
-
+        $blnCustomAccount = $true
+		$CSAppPoolSvc = $CSUserSvc
         # Custom account, but is it a gMSA?
-        If ($CSUserSvc.contains('$')) { $blngMSA = $True } Else 
-        {   $blngMSA = $false 
+        If ($CSUserSvc.contains('$')) { $blngMSA = $True } 
+		Else {   
+			$blngMSA = $false 
             $global:strRecommendations += "`n Use a (group) Managed Service Account. For more information, please read - LINK."
         }
-        }
-        else # Custom account is not used (so it cannot be a gMSA)
-        {
+
+    }
+    Else # Custom account is not used (so it cannot be a gMSA)
+    {
             $blnCustomAccount = $false
             $blngMSA = $false
             $global:strRecommendations += "`n Use a (group) Managed Service Account. For more information, please read - LINK."
-         }
+			$CSAppPoolIdentity = $CSAppPoolSvc
+    }
 
 
     # Get Windows Authentication Property
@@ -195,6 +200,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 				# Custom Host header used for the Coresight Web Site is a CNAME
 				If ($AliasTypeCheck -match "CNAME") { 
 				$CNAME = $true 
+				$CScustomHeaderType = "CNAME DNS Alias"
 				# Host (A) DNS entry is preferred
 				$global:strRecommendations += "`n Do NOT use CNAME aliases as Custom Host Headers. Use custom HOST (A) DNS entry instead."
 				} 
@@ -202,6 +208,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 				# Custom Host header used for the Coresight Web Sire is a Host (A) DNS record
 				Else { 
 				$CNAME = $false 
+				$CScustomHeaderType = "HOST (A) DNS record"
 				}
 
 				# Find out whether the custom host header is using short or fully qualified domain name.
@@ -418,11 +425,12 @@ $CSUserGMSA = $CSUserSvc | Out-String
 				   }
 
 
-				   Else {
+						Else {
 						#$global:strRecommendations += "`n Use Custom Domain Account to run Coresight AppPools. Ideally, use a (Group) Managed Service Account."
 						If (!$blnKernelMode) {
 						$global:strRecommendations += "`n ENABLE Kernel-mode Authentication."
 						}
+						
 
 						$spnCheck = $(setspn -l $CSWebServerName).ToLower()
 						$spnCounter = 0
@@ -439,16 +447,19 @@ $CSUserGMSA = $CSUserSvc | Out-String
 										default {break}
 									}
 								}
-
-									If ($spnCounter -eq 2) { 
-									$strSPNs = "Service Principal Names are configured correctly: $hostnameSPN and $fqdnSPN"                            
-									}
-									Else {
-									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $hostnameSPN and $fqdnSPN SPNs are created. See this link for more information."
-									$global:issueCount += 1
-									}
+								
+								# Both SPNs must exist
+								If ($spnCounter -eq 2) { 
+								$strSPNs = "Service Principal Names are configured correctly: $hostnameSPN and $fqdnSPN"                            
+								}
+								
+								# Some SPN(s) is (are) missing
+								Else {
+								$strSPNs = "Unable to find all required HTTP SPNs."
+								$global:strIssues += "`n Unable to find all required HTTP SPNs. 
+								Please make sure $hostnameSPN and $fqdnSPN SPNs are created. See this link for more information."
+								$global:issueCount += 1
+								}
 
 				   }
 
@@ -472,46 +483,46 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 								foreach ($AFServerTemp in $AFServers) { 
 									$AFServer = $AFServerTemp.Groups[1].Captures[0].Value
-									$value = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
+									$AFSvcAccount = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
 									#Write-Host "DEBUG $value"
-									If ($value -ne $null ) { 
-									If ($value -eq "LocalSystem" -or $value -eq "NetworkService") { $value = $AFServer }
-									$RBKCDpos = $value.IndexOf("\")
-									$value = $value.Substring($RBKCDpos+1)
-									$value = $value.TrimEnd('$')
+									If ($AFSvcAccount -ne $null ) { 
+									If ($AFSvcAccount -eq "LocalSystem" -or $AFSvcAccount -eq "NetworkService") { $AFSvcAccount = $AFServer }
+									$RBKCDpos = $AFSvcAccount.IndexOf("\")
+									$AFSvcAccount = $AFSvcAccount.Substring($RBKCDpos+1)
+									$AFSvcAccount = $AFSvcAccount.TrimEnd('$')
 
-									$DomainObjectType = Get-ADObject -Filter { Name -like $value } -Properties ObjectCategory | Select -ExpandProperty objectclass
-									If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate ADObject $DomainObjectType." }
+									$DomainObjectType = Get-ADObject -Filter { Name -like $AFSvcAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
+									If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate ADObject $DomainObjectType." }
 
 									If ($AccType -eq 1) { 
-									$RBKCDPrincipal = Get-ADUser $value -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
+									$RBKCDPrincipal = Get-ADUser $AFSvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
 										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $AFSvcAccount"
 										} 
 										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $AFSvcAccount"
 										}
 									}
 
 
 									If ($AccType -eq 2) { 
-									$RBKCDPrincipal = Get-ADComputer $value -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
+									$RBKCDPrincipal = Get-ADComputer $AFSvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
 										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $AFSvcAccount"
 										} 
 										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $AFSvcAccount"
 										}
 									}
 
 
 									If ($AccType -eq 3) { 
-									$RBKCDPrincipal = Get-ADServiceAccount $value -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
+									$RBKCDPrincipal = Get-ADServiceAccount $AFSvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
 										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $AFSvcAccount"
 										} 
 										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $AFSvcAccount"
 										}
 									}
 
@@ -526,43 +537,43 @@ $CSUserGMSA = $CSUserSvc | Out-String
 						$regpath = 'HKLM:\SOFTWARE\PISystem\PI-SDK\1.0\ServerHandles'
 						$PIServers = Get-ChildItem $regpath | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}
 								foreach ($PIServer in $PIServers) { 
-									$value = Get-PISysAudit_ServiceLogOnAccount "pinetmgr" -lc $false -rcn $PIServer -ErrorAction SilentlyContinue
-									If ($value -ne $null ) { 
-									If ($value -eq "LocalSystem" -or $value -eq "NetworkService") { $value = $PIServer }
-									$RBKCDpos = $value.IndexOf("\")
-									$value = $value.Substring($RBKCDpos+1)
-									$value = $value.TrimEnd('$')
+									$PISvcAccount = Get-PISysAudit_ServiceLogOnAccount "pinetmgr" -lc $false -rcn $PIServer -ErrorAction SilentlyContinue
+									If ($PISvcAccount -ne $null ) { 
+									If ($PISvcAccount -eq "LocalSystem" -or $PISvcAccount -eq "NetworkService") { $PISvcAccount = $PIServer }
+									$RBKCDpos = $PISvcAccount.IndexOf("\")
+									$PISvcAccount = $PISvcAccount.Substring($RBKCDpos+1)
+									$PISvcAccount = $PISvcAccount.TrimEnd('$')
 
-									$DomainObjectType = Get-ADObject -Filter { Name -like $value } -Properties ObjectCategory | Select -ExpandProperty objectclass
-									If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } 
-									ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount") {  $AccType = 3 } Else { "I DUNNO" }
+									$DomainObjectType = Get-ADObject -Filter { Name -like $PISvcAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
+									If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate ADObject $DomainObjectType." }
+
 
 									If ($AccType -eq 1) { 
-									$RBKCDPrincipal = Get-ADUser $value -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
+									$RBKCDPrincipal = Get-ADUser $PISvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
 										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $PISvcAccount"
 										} 
 										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to PI Server $PIServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to PI Server $PIServer running under $PISvcAccount"
 										}
 									}
 
 
 									If ($AccType -eq 2) { 
-									$RBKCDPrincipal = Get-ADComputer $value -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
+									$RBKCDPrincipal = Get-ADComputer $PISvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
 									If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $PISvcAccount"
 										} 
 										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to PI Server $PIServer running under $value"
+										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to PI Server $PIServer running under $PISvcAccount"
 										}
 									}
 
 
 									If ($AccType -eq 3) { 
-									$RBKCDPrincipal = Get-ADServiceAccount $value -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
+									$RBKCDPrincipal = Get-ADServiceAccount $PISvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
 									If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-									$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $value" }
+									$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $PISvcAccount" }
 									}
 
 									}
@@ -573,8 +584,8 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 
 								}
-
-
+						# New variable for easy output
+						$CoresightDelegation = $global:RBKCDstring
 						}
 
 				   # CLASSIC KERBEROS DELEGATION
@@ -590,8 +601,8 @@ $CSUserGMSA = $CSUserSvc | Out-String
 					$AFServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)') 
             
 					$global:strRecommendations += "`n ENABLE Kerberos Resource Based Constrained Delegation. 
-					For more information, please check OSIsoft KB01222 - Types of Kerberos Delegation
-					`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222 "
+					`n For more information, please check OSIsoft KB01222 - Types of Kerberos Delegation
+					   http://techsupport.osisoft.com/Troubleshooting/KB/KB01222 `n"
 
 					If ($CSAppPoolSvc -eq "NetworkService") { $CSUserSvc = $CSWebServerName  }
 						If ($blnCustomAccount) { 
@@ -607,8 +618,8 @@ $CSUserGMSA = $CSUserSvc | Out-String
 						}
             
 								$AppAccType = Get-ADObject -Filter { Name -like $CSUserSvc } -Properties ObjectCategory | Select -ExpandProperty objectclass
-								If ($AppAccType -eq "user") { $AccType = 1 } ElseIf ($AppAccType -eq "computer") { $AccType = 2 } ElseIf ($AppAccType -eq "msDS-GroupManagedServiceAccount") {  $AccType = 3 } 
-								Else { "Unable to locate ADObject $DomainObjectType." 
+								If ($AppAccType -eq "user") { $AccType = 1 } ElseIf ($AppAccType -eq "computer") { $AccType = 2 } ElseIf ($AppAccType -eq "msDS-GroupManagedServiceAccount" -or $AppAccType -eq "msDS-ManagedServiceAccount"  ) {  $AccType = 3 } 
+								Else { "Unable to locate ADObject $AppAccType." 
 								break
 								}
             
@@ -717,8 +728,11 @@ $CSUserGMSA = $CSUserSvc | Out-String
 												} 
 								Else { Write-Output "Kerberos Deleagation is not configured.
 													`n Enable Constrained Kerberos Delegation instead. Please check OSIsoft KB01222 - Types of Kerberos Delegation
-													`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222   " }
+													`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222" 
 								}
+
+						$CoresightDelegation = $global:strClassicDelegation
+						}
 
 
 				## BACK-END SERVICES SERVICE PRINCIPAL NAME CHECK
@@ -743,57 +757,42 @@ $CSUserGMSA = $CSUserSvc | Out-String
 			}
 
 
-Write-Output "`nIIS AUTHENTICATION SETTINGS SUMMARY:"
-Write-Output "Windows Authentication Providers: $strProviders"
-Write-Output "Kernel-mode Auth?: $blnKernelMode"
-Write-Output "UseAppPool Credentials?: $blnUseAppPoolCredentials"
-Write-Output "`n"
-Write-Output "CORESIGHT SERVICE ACCOUNT SUMMARY:"
+#### Summary
+$LogFile="CoresightKerberosConfig.log"
+$strSummaryReport = @"
+    Coresight Authentication Settings:
+        Is Windows Authentication Enabled: {0}
+        Windows Authentication Providers: {1}
+        Kernel-mode Authentication Enabled: {2}
+        UseAppPoolCredentials property: {3}
+        `n
+    Coresight Web Site Bindings:
+        Is Custom Host Header used: {4}
+		Custom Host Header name: {5}
+		Custom Host Header type: {6}
+        `n
+    Coresight AppPool Identity: {7}
+        (group) Managed Service Account used: {8}
+        `n
+    Coresight - Service Principal Names: {9}
+        `n
+	PI/AF - Service Principal Names: {10}
+       `n
+    Coresight - Kerberos Delegation: {11}
+        `n
+	RECOMMENDATIONS: {12}
+        `n
+	NUMBER OF ISSUES FOUND: {13}
+        `n
+	ISSUES - DETAILS: {14}
+        `n
+"@ -f $blnWindowsAuth, $strProviders, $blnKernelMode, $blnUseAppPoolCredentials, $blnCustomHeader, $CScustomHeader, $CScustomHeaderType, $CSAppPoolIdentity, $blngMSA, $strSPNs, $strBackEndSPNS, $CoresightDelegation, $global:strRecommendations, $global:issueCount, $global:strIssues  
 
-If (!$blngMSA) {                
-If ($blnCustomAccount) { Write-Output "CS AppPool identity type is: $AppAccType and its name is: $CSUserSvc" }
-Else { Write-Output "CS AppPool identity is: $CSAppPoolSvc" }
-}
-
-If ($blngMSA) { Write-Output "CS AppPool identity type is group Managed Service Account and its name is: $CSUserSvc" }
-
-Write-Output "`n"
-Write-Output "CORESIGHT WEB SITE BINDINGS SUMMARY"
-Write-Output "Is Custom Header used?: $blnCustomHeader"
-
-If ($blnCustomHeader) {
-Write-Output "Custom Header Name: $CScustomHeader"
-If ($CNAME) {
-Write-Output "Custom Header Type: CNAME" }
-Else {
-Write-Output "Custom Header Type: HOST (A)" }
-}
-
-Write-Output "`n"
-
-Write-Output "KERBEROS AUTHENTICATION and DELEGATION SUMMARY"
-Write-Output "SPNs: $strSPNs"
-If ($blnDelegationCheckConfirmed) {
-If (!$rbkcd) {
-Write-Output "The Coresight Service account can delegate to: $AppPoolDelegation"
-Write-Output "`n"
-Write-Output "Comparing that to the list of PI and AF Servers currently allowed on this machine (assuming the default service accounts are used): $global:strClassicDelegation"
-Write-Output "Kerberos Delegation Protocol Transition: $ProtocolTransition" }
-
-If ($rbkcd) { Write-Output "Coresight Application Pool: $global:RBKCDstring" }
-
-Write-Output "PI SERVER AND AF SERVER SERVICE PRINCIPALS CHECK: $strBackEndSPNS"
-}
-Write-Output "`n"
-Write-Output "RECOMMENDATIONS: " $global:strRecommendations
-Write-Output "`n"
-Write-Output "ISSUES: " 
-Write-Output "Number of issues found: " $global:issueCount
-Write-Output "`n"
-Write-Output $global:strIssues             
+Write-Output $strSummaryReport
+$strSummaryReport | Out-File $LogFile
 }
 
 
-Export-ModuleMember -Function Test-PI_KerberosConfiguration
-Set-Alias -Name Unleash-PI_Dog -Value Test-PI_KerberosConfiguration -Description “Sniff out Kerberos issues.”
+Export-ModuleMember -Function Test-CoresightKerberosConfiguration
+Set-Alias -Name Unleash-PI_Dog -Value Test-CoresightKerberosConfiguration -Description “Sniff out Kerberos issues.”
 Export-ModuleMember -Alias Unleash-PI_Dog
