@@ -32,18 +32,16 @@ switch ($result)
 
 		# Basic IIS checks + classic Kerberos delegation check (unconstrained delegation not supported!)
         1 {"Classic Kerberos Delegation configuration will be checked."
-        $ADM = Get-Module -Name ActiveDirectory
+        $ADMtemp = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -eq 'Installed'
         $blnDelegationCheckConfirmed = $true
         $rbkcd = $false
-        If ($ADM) { $ADMtemp = $false } Else { $ADMtemp = $true }
         }
 
 		# Basic IIS checks + resource based Kerberos constrained delegation check
         2 {"Resource-Based Kerberos Delegation configuration will be checked."
-        $ADM = Get-Module -Name ActiveDirectory
+        $ADMtemp = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -eq 'Installed'
         $blnDelegationCheckConfirmed = $true
         $rbkcd = $true
-        If ($ADM) { $ADMtemp = $false } Else { $ADMtemp = $true }
         }
     }
 
