@@ -120,12 +120,12 @@ $CSUserGMSA = $CSUserSvc | Out-String
     If ($CSAppPoolSvc -ne "NetworkService" -and $CSAppPoolSvc -ne "ApplicationPoolIdentity")
     {   # Custom account is used
         $blnCustomAccount = $true
-		$CSAppPoolSvc = $CSUserSvc
         # Custom account, but is it a gMSA?
         If ($CSUserSvc.contains('$')) { $blngMSA = $True } 
 		Else {   
 			$blngMSA = $false 
-            $global:strRecommendations += "`n Use a (group) Managed Service Account. For more information, please read - LINK."
+            $global:strRecommendations += "`n Use a Group Managed Service Account. 
+			For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts."
         }
 
     }
@@ -133,7 +133,8 @@ $CSUserGMSA = $CSUserSvc | Out-String
     {
             $blnCustomAccount = $false
             $blngMSA = $false
-            $global:strRecommendations += "`n Use a (group) Managed Service Account. For more information, please read - LINK."
+            $global:strRecommendations += "`n Use a Group Managed Service Account. 
+			For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts."
 			$CSAppPoolIdentity = $CSAppPoolSvc
     }
 
@@ -231,8 +232,9 @@ $CSUserGMSA = $CSUserSvc | Out-String
        
 				   # Kernel-mode Authentication is enabled, but UseAppPoolCredentials property is FALSE.
 				   If ($blnKernelMode -eq $True -and $blnUseAppPoolCredentials -eq $false) {
-				   $global:strIssues += "`n Kernel-mode Authentication is enabled AND Custom Account is running Coresight, BUT UseAppPoolCredentials property is FALSE! Change it to TRUE."
-				   $global:issueCount += 1
+					$global:strIssues += "`n Kerberos Authentication will fail because Kernel-mode Authentication is enabled AND Custom Account is running Coresight, 
+					BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper"
+					$global:issueCount += 1
 				   }
                 
 				   # Kernel-mdoe Authentication is disabled.
@@ -267,7 +269,9 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									}
 									Else {
 									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. Please make sure $hostnameSPN and $fqdnSPN SPNs are created. See this link for more information."
+									$global:strIssues += "`n Unable to find all required HTTP SPNs. Please make sure $hostnameSPN and $fqdnSPN SPNs are created.
+									For more information, see:
+									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752 "
 									$global:issueCount += 1
 									}
 
@@ -294,7 +298,10 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									}
 									Else {
 									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created. See this link for more information."
+									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
+									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created.
+									For more information, see:
+									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
 									$global:issueCount += 1
 									}
 
@@ -335,7 +342,9 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									Else {
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $hostnameSPN and $fqdnSPN SPNs are created. See this link for more information."
+									Please make sure $hostnameSPN and $fqdnSPN SPNs are created.
+									For more information, see:
+									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
 									$global:issueCount += 1
 									}
 
@@ -363,7 +372,9 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									Else {
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created. See this link for more information."
+									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created. 
+									For more information, see:
+									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752 "
 									$global:issueCount += 1
 									}
 
@@ -380,12 +391,13 @@ $CSUserGMSA = $CSUserSvc | Out-String
 				   If ($blnCustomAccount) {
 						# Kernel-mode Authentication is enabled, but UseAppPoolCredentials property is FALSE.
 						If ($blnKernelMode -eq $True -and $blnUseAppPoolCredentials -eq $false) {
-						$global:strIssues += "`n Kernel-mode Authentication is enabled AND Custom Account is running Coresight, BUT UseAppPoolCredentials property is FALSE! Change it to TRUE."
+						$global:strIssues += "`n Kerberos Authentication will fail because Kernel-mode Authentication is enabled AND Custom Account is running Coresight, 
+						BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper"
 						$global:issueCount += 1
 						}
 						# Kernel-mdoe Authentication is disabled.
 						ElseIf ($blnKernelMode -eq $false) {
-						$global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE."
+						$global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE. For more information, see http://aka.ms/kcdpaper"
 						}
 						# Kernel-mode Authentication is enabled, and UseAppPoolCredentials property is TRUE. Great!
 						Else {
@@ -415,7 +427,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									Else {
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $hostnameSPN and $fqdnSPN SPNs are created. See this link for more information."
+									Please make sure $hostnameSPN and $fqdnSPN SPNs are created. For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
 									$global:issueCount += 1
 									}
 
@@ -457,7 +469,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 								Else {
 								$strSPNs = "Unable to find all required HTTP SPNs."
 								$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-								Please make sure $hostnameSPN and $fqdnSPN SPNs are created. See this link for more information."
+								Please make sure $hostnameSPN and $fqdnSPN SPNs are created. For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
 								$global:issueCount += 1
 								}
 
@@ -600,9 +612,9 @@ $CSUserGMSA = $CSUserSvc | Out-String
 					$AFSDK = Get-Content "$env:ProgramData\OSIsoft\AF\AFSDK.config" | Out-String
 					$AFServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)') 
             
-					$global:strRecommendations += "`n ENABLE Kerberos Resource Based Constrained Delegation. 
+					<#$global:strRecommendations += "`n ENABLE Kerberos Resource Based Constrained Delegation. 
 					`n For more information, please check OSIsoft KB01222 - Types of Kerberos Delegation
-					   http://techsupport.osisoft.com/Troubleshooting/KB/KB01222 `n"
+					   http://techsupport.osisoft.com/Troubleshooting/KB/KB01222 `n"#>
 
 					If ($CSAppPoolSvc -eq "NetworkService") { $CSUserSvc = $CSWebServerName  }
 						If ($blnCustomAccount) { 
@@ -646,7 +658,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 							   If ($UnconstrainedKerberos -eq $true) { 
 							   $global:strIssues += "`n Unconstrained Kerberos Delegation is enabled on $CSUserSvc. This is neither secure nor supported. 
-							   `n Enable Constrained Kerberos Delegation instead. Please check OSIsoft KB01222 - Types of Kerberos Delegation
+							   `n Enable Constrained Kerberos Delegation instead. See OSIsoft KB01222 - Types of Kerberos Delegation
 							   `n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222           
 							   `n Aborting."
 							   $global:issueCount += 1
@@ -727,7 +739,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 												} 
 								Else { Write-Output "Kerberos Deleagation is not configured.
-													`n Enable Constrained Kerberos Delegation instead. Please check OSIsoft KB01222 - Types of Kerberos Delegation
+													`n Enable Constrained Kerberos Delegation instead. See OSIsoft KB01222 - Types of Kerberos Delegation
 													`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222" 
 								}
 
@@ -772,7 +784,7 @@ $strSummaryReport = @"
 		Custom Host Header type: {6}
         `n
     Coresight AppPool Identity: {7}
-        (group) Managed Service Account used: {8}
+        Group Managed Service Account used: {8}
         `n
     Coresight - Service Principal Names: {9}
         `n
