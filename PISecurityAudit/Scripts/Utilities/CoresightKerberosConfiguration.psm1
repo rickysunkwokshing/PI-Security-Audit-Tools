@@ -393,6 +393,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 						If ($blnKernelMode -eq $True -and $blnUseAppPoolCredentials -eq $false) {
 						$global:strIssues += "`n Kerberos Authentication will fail because Kernel-mode Authentication is enabled AND Custom Account is running Coresight, 
 						BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper"
+						$global:issueCount += 1
 						}
 						# Kernel-mdoe Authentication is disabled.
 						ElseIf ($blnKernelMode -eq $false) {
