@@ -120,8 +120,12 @@ $CSUserGMSA = $CSUserSvc | Out-String
     If ($CSAppPoolSvc -ne "NetworkService" -and $CSAppPoolSvc -ne "ApplicationPoolIdentity")
     {   # Custom account is used
         $blnCustomAccount = $true
-        # Custom account, but is it a gMSA?
-        If ($CSUserSvc.contains('$')) { $blngMSA = $True } 
+
+		# Variable just for output.
+		$CSAppPoolIdentity = $CSUserSvc
+        
+		# Custom account, but is it a gMSA?
+        If ($CSUserGMSA.contains('$')) { $blngMSA = $True } 
 		Else {   
 			$blngMSA = $false 
             $global:strRecommendations += "`n Use a Group Managed Service Account. 
@@ -135,6 +139,8 @@ $CSUserGMSA = $CSUserSvc | Out-String
             $blngMSA = $false
             $global:strRecommendations += "`n Use a Group Managed Service Account. 
 			For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts."
+			
+			# Variable just for output.
 			$CSAppPoolIdentity = $CSAppPoolSvc
     }
 
@@ -270,8 +276,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									Else {
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. Please make sure $hostnameSPN and $fqdnSPN SPNs are created.
-									For more information, see:
-									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752 "
+									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
 									$global:issueCount += 1
 									}
 
@@ -300,8 +305,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
 									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created.
-									For more information, see:
-									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
+									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
 									$global:issueCount += 1
 									}
 
@@ -343,8 +347,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
 									Please make sure $hostnameSPN and $fqdnSPN SPNs are created.
-									For more information, see:
-									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
+									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
 									$global:issueCount += 1
 									}
 
@@ -373,8 +376,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									$strSPNs = "Unable to find all required HTTP SPNs."
 									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
 									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created. 
-									For more information, see:
-									https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752 "
+									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752 "
 									$global:issueCount += 1
 									}
 
