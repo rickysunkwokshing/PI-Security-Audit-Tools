@@ -3652,7 +3652,7 @@ PROCESS
 			{ 
 			# Dealing with Alias (CNAME). 
 
-			$spnCheck = $(setspn -l $svcaccMod | Out-String).ToLower() 
+			$spnCheck = $(setspn -l $svcaccMod)
 
 			# Verify hostnane AND FQDN SPNs are assigned to the service account.
 			#
@@ -3693,12 +3693,13 @@ PROCESS
 			{ 
 			# Host (A) 
 
-			$spnCheck = $(setspn -l $svcaccMod | Out-String).ToLower() 
+			$spnCheck = $(setspn -l $svcaccMod) 
 
 			# Verify hostnane AND FQDN SPNs are assigned to the service account.
 			$spnCounter = 0
 			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeaderShort.ToLower())
 			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
+			# Loop through SPNs, trimming and ensure all lower for comparison
 			foreach($line in $spnCheck)
 			{
 				switch($line.ToLower().Trim())
@@ -3750,13 +3751,14 @@ PROCESS
 			$svcaccMod = $hostname 
 		}
 
-		# Run setspn and convert it to a string (no capital letters).
-		$spnCheck = $(setspn -l $svcaccMod | Out-String).ToLower() 
+		# Run setspn
+		$spnCheck = $(setspn -l $svcaccMod)
 
 		# Verify hostnane AND FQDN SPNs are assigned to the service account.
 		$spnCounter = 0
 		$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 		$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+		# Loop through SPNs, trimming and ensure all lower for comparison
 		foreach($line in $spnCheck)
 		{
 			switch($line.ToLower().Trim())
