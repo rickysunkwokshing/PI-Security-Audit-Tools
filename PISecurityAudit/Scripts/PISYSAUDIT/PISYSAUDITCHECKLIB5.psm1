@@ -607,14 +607,22 @@ PROCESS
 		
 		$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $LocalComputer -rcn $RemoteComputerName -appPool $csappPool -CustomHeader $CSheader -dbgl $DBGLevel
 
-		If ($result) 
-		{ 
-			$msg = "The Service Principal Name exists and it is assigned to the correct Service Account."
-		} 
-		Else 
-		{ 			
-			$msg = "The Service Principal Name does NOT exist or is NOT assigned to the correct Service Account."
-		}				
+		if($null -eq $result)
+		{
+			$msg = "Processing failed to parse setspn utility output."
+			$result = "N/A"
+		}
+		Else
+		{
+			If ($result) 
+			{ 
+				$msg = "The Service Principal Name exists and it is assigned to the correct Service Account."
+			} 
+			Else 
+			{ 			
+				$msg = "The Service Principal Name does NOT exist or is NOT assigned to the correct Service Account."
+			}	
+		}			
 	}
 	catch
 	{
