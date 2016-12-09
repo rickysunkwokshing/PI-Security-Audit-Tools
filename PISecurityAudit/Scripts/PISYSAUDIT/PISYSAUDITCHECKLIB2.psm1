@@ -397,7 +397,7 @@ AU20003 - PI Data Archive SubSystem Version Check
 .DESCRIPTION
 VALIDATION: verifies that the PI Data Archive is using the most recent release. <br/>  
 COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
-2016 (3.4.400.1162).  For more information, see the "Upgrade a PI Data Archive Server" 
+2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
 section of the PI Data Archive Installation and Upgrade Guide, Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a>
 #>
@@ -472,8 +472,8 @@ PROCESS
 		# Not compliant if under 3.4.380.36 version
 		# Warn if 3.4.380.36 or 3.4.385.59 version	
 		$result = $true
-		$upgradeMessage = "Upgrading to 3.4.400.1162 is recommended."
-		if ($installVersionInt64 -ge 344001162) { $result = $true; $msg = "Version is compliant"; $Severity = "severe" }
+		$upgradeMessage = "Upgrading to 3.4.405.1198 is recommended."
+		if ($installVersionInt64 -ge 344051198) { $result = $true; $msg = "Version is compliant"; $Severity = "severe" }
 		elseif ($installVersionInt64 -ge 3438036 -and $installVersionInt64 -lt 344001162 ) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }	
 		elseif ($installVersionInt64 -lt 3438036) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }
 	}
