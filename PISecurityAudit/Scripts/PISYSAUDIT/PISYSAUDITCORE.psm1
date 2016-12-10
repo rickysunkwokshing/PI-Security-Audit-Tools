@@ -5129,6 +5129,7 @@ Set-Alias pwdondisk New-PISysAudit_PasswordOnDisk
 # Export Module Member
 # ........................................................................
 # <Do not remove>
+Export-ModuleMember PathConcat
 Export-ModuleMember Initialize-PISysAudit
 Export-ModuleMember Set-PISysAudit_SaltKey
 Export-ModuleMember Get-PISysAudit_EnvVariable
