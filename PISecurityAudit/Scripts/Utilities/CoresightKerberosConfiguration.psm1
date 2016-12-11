@@ -25,9 +25,222 @@ function SetFolders
 	$logFile = PathConcat -ParentPath $exportPath -ChildPath "PISystemAudit.log"		
 	
 	# Store at the global scope range.	
-	New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+	if($null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
+	}
+	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+	}
 }
 
+Function Get-KnownServers
+{
+	param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]		
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("st")]
+		[ValidateSet('PIServer','AFServer')]
+		[string] $ServerType,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+	$fn = GetFunctionName
+
+	If($ServerType -eq 'PIServer')
+	{
+		# Get PI Servers
+		$regpathKST = 'HKLM:\SOFTWARE\PISystem\PI-SDK\1.0\ServerHandles'
+		if($LocalComputer)
+		{
+			$KnownServers = Get-ChildItem $regpathKST | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}
+		}
+		Else
+		{
+			$scriptBlockCmdTemplate = "Get-ChildItem `"{0}`" | ForEach-Object [ Get-ItemProperty `$_.pspath ] | where-object [ `$_.path ] | Foreach-Object [ `$_.path ]"
+			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $regpathKST)
+			$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")			
+			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )													
+			$KnownServers = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
+		}
+	}
+	Else
+	{
+		# Get AF Servers
+		$programDataWebServer = Get-PISysAudit_EnvVariable "ProgramData" -lc $LocalComputer -rcn $RemoteComputerName  -Target Process
+		$afsdkConfigPathWebServer = "$programDataWebServer\OSIsoft\AF\AFSDK.config"
+		if($LocalComputer)
+		{
+			$AFSDK = Get-Content -Path $afsdkConfigPathWebServer | Out-String
+		}
+		Else
+		{
+			$scriptBlockCmdTemplate = "Get-Content -Path ""{0}"" | Out-String"
+			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $afsdkConfigPathWebServer)									
+			
+			# Verbose only if Debug Level is 2+
+			$msgTemplate = "Remote command to send to {0} is: {1}"
+			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
+			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+			
+			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
+			$AFSDK = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
+		}
+		$KnownServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)')
+	}
+	return $KnownServers
+}
+
+function Get-ServiceLogonAccountType 
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("sa")]
+		[string]
+		$ServiceAccount,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("sad")]
+		[string]
+		$ServiceAccountDomain = $null,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("cn")]
+		[string]
+		$ComputerName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+	$fn = GetFunctionName
+
+	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccount = $ComputerName }
+	$RBKCDpos = $ServiceAccount.IndexOf("\")
+	$ServiceAccount = $ServiceAccount.Substring($RBKCDpos+1)
+	$ServiceAccount = $ServiceAccount.TrimEnd('$')
+
+	If($null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq '.' -or $ServiceAccountDomain -eq '')
+	{
+		$DomainObjectType = Get-ADObject -Filter { Name -like $ServiceAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
+	}
+	Else
+	{
+		$DomainObjectType = Get-ADObject -Filter { Name -like $ServiceAccount } -Properties ObjectCategory -Server $ServiceAccountDomain | Select -ExpandProperty objectclass
+	}
+
+	If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate type of ADObject $ServiceAccount." }
+
+	return $AccType
+}
+
+Function Get-ServiceLogonAccountDomain
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("sa")]
+		[string]
+		$ServiceAccount,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+	$fn = GetFunctionName
+
+	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccountDomain = $null}
+	Else{
+		$RBKCDpos = $ServiceAccount.IndexOf("\")
+		If($RBKCDpos -eq -1){ $ServiceAccountDomain = $null }
+		Else{ $ServiceAccountDomain = $ServiceAccount.Substring(0,$RBKCDpos) }
+	}
+	return $ServiceAccountDomain
+}
+
+Function Check-ResourceBasedConstrainedDelegationPrincipals 
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("sa")]
+		[string]
+		$ServiceAccount,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("sad")]
+		[string]
+		$ServiceAccountDomain = $null,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("sat")]
+		[string]
+		$ServiceAccountType = $null,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("api")]
+		[string]
+		$ApplicationPoolIdentity,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("cn")]
+		[string]
+		$ComputerName,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("rt")]
+		[string]
+		$ResourceType,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccount = $ComputerName }
+	Else
+	{
+		$RBKCDpos = $ServiceAccount.IndexOf("\")
+		$ServiceAccount = $ServiceAccount.Substring($RBKCDpos+1)
+		$ServiceAccount = $ServiceAccount.TrimEnd('$')
+	}
+
+	$msgCanDelegateTo = "`n $RBKCDAppPoolIdentity can delegate to $ResourceType $ComputerName running under $ServiceAccount"
+	$msgCanNotDelegateTo = "`n $RBKCDAppPoolIdentity CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
+	$RBKCDPrincipal = ""
+	$blnResolveDomain = $null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq ""
+
+	If ($AccType -eq 1) 
+	{ 
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+	}
+	If ($AccType -eq 2) { 
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+	}
+	If ($AccType -eq 3) { 
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+	}
+
+	# Check the Principals for a match
+	If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
+		$global:RBKCDstring += $msgCanDelegateTo
+	} 
+	Else { 
+		$global:RBKCDstring += $msgCanNotDelegateTo
+	}
+
+}
+
+# ........................................................................
+# Exported Functions
+# ........................................................................
 Function Test-CoresightKerberosConfiguration {
 <#  
 .SYNOPSIS
@@ -35,16 +248,25 @@ Designed to check Coresight configuration to ensure Kerberos authentication and 
 are configured correctly.  
 
 .DESCRIPTION
-Dubbed 'PI Dog' after Kerberos, the three-headed guardian of Hades.  PI Dog
-has best support when run locally due to complications with WS-Man, SPN resolution or 
-cross domain complications.
+Dubbed 'PI Dog' after Kerberos, the three-headed guardian of Hades. This utility is designed to
+examine the configuration of a PI Coresight web application related to Kerberos delegation and 
+provide actionable information if any issues or deviation from best practices are detected.
 	
-Import the PISYSAUDIT module to make this function available.
+PI Dog has best support when run locally due to complications with WS-Man, SPN resolution or 
+cross domain complications.  If there is an HTTP/hostname or HTTP/fqdn SPN for the web server
+assigned to a custom account, the scripts may need to be run locally.  For more information, 
+see - https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS).
 
 The syntax is...				 
 Test-CoresightKerberosConfiguration [[-ComputerName | -cn] <string>]
+
+Import the PISYSAUDIT module to make this function available.
+
 .PARAMETER cn
-The computer hosting the PI Coresight web application.
+The computer hosting the target PI Coresight web application.
+.PARAMETER kc
+The type of kerberos delegation configuration check to perform.  Supported values
+are None, Classic, ResourceBased and Menu (select interactively).
 .EXAMPLE
 Test-CoresightKerberosConfiguration -ComputerName piomnibox -KerberosCheck ResourceBased
 .LINK
@@ -61,8 +283,7 @@ param(
 		[string] $KerberosCheck = "Menu"		
 	)	
 
-# Read from the global constant bag.
-if($null -ne (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value){ SetFolders }
+if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value -or $null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value){ SetFolders }
 
 $fn = GetFunctionName
 
@@ -89,7 +310,7 @@ else
 	{
 		'None' {$result = 0}
 		'Classic' {$result = 1}
-		'ResoureBased' {$result = 2}
+		'ResourceBased' {$result = 2}
 	}
 }
 
@@ -108,7 +329,12 @@ else
 		$resultWinRMTest = Test-WSMan -authentication default -ComputerName $ComputerName
 		if($null -eq $resultWinRMTest)
 		{
-			$msgTemplate = "The server: {0} has a problem with WinRM communication"
+			$msgTemplate = @"
+The server: {0} has a problem with WinRM communication. 
+This issue will occur if there is an HTTP/hostname or HTTP/fqdn SPN assigned to a 
+custom account.  In this situation the scripts may need to be run locally.  
+For more information, see - https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS).
+"@
 			$msg = [string]::Format($msgTemplate, $ComputerName)
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
@@ -132,25 +358,28 @@ switch ($result)
 
 		# Basic IIS checks + classic Kerberos delegation check (unconstrained delegation not supported!)
         1 {"Classic Kerberos Delegation configuration will be checked."
-			$ADMtemp = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -eq 'Installed'
+			$ADMtemp = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -ne 'Installed'
 			$blnDelegationCheckConfirmed = $true
 			$rbkcd = $false
         }
 
 		# Basic IIS checks + resource based Kerberos constrained delegation check
         2 {"Resource-Based Kerberos Delegation configuration will be checked."
-			$ADMtemp = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -eq 'Installed'
+			$ADMtemp = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -ne 'Installed'
 			$blnDelegationCheckConfirmed = $true
 			$rbkcd = $true
         }
     }
 
-# If needed, install 'Remote Active Directory Administration' PS Module.
+# If needed, give user option to install 'Remote Active Directory Administration' PS Module.
 If ($ADMtemp) {
 
 	$titleRSAT = "RSAT-AD-PowerShell required"
-	$messageRSAT = "'Remote Active Directory Administration' Module is required to proceed."
-
+	$messageRSAT = @"
+'Remote Active Directory Administration' Module is required on the machine running Test-CoresightKerberosConfiguration.
+Installing this module does not require a reboot.  If it is desired to uninstall the module afterward, a reboot will be
+required to complete the removal.
+"@
 	$yesRSAT = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes, install the module."
 	$noRSAT = New-Object System.Management.Automation.Host.ChoiceDescription "&No, don't install the module and abort."
 	$optionsRSAT = [System.Management.Automation.Host.ChoiceDescription[]]($yesRSAT,$noRSAT)
@@ -591,50 +820,15 @@ $CSUserGMSA = $CSUserSvc | Out-String
 						}
 						
 								foreach ($AFServerTemp in $AFServers) { 
+									$AccType = $null
 									$AFServer = $AFServerTemp.Groups[1].Captures[0].Value
 									$AFSvcAccount = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
-									#Write-Host "DEBUG $value"
+									
 									If ($AFSvcAccount -ne $null ) { 
-									If ($AFSvcAccount -eq "LocalSystem" -or $AFSvcAccount -eq "NetworkService") { $AFSvcAccount = $AFServer }
-									$RBKCDpos = $AFSvcAccount.IndexOf("\")
-									$AFSvcAccount = $AFSvcAccount.Substring($RBKCDpos+1)
-									$AFSvcAccount = $AFSvcAccount.TrimEnd('$')
-
-									$DomainObjectType = Get-ADObject -Filter { Name -like $AFSvcAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
-									If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate ADObject $DomainObjectType." }
-
-									If ($AccType -eq 1) { 
-									$RBKCDPrincipal = Get-ADUser $AFSvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
-										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $AFSvcAccount"
-										} 
-										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $AFSvcAccount"
-										}
-									}
-
-
-									If ($AccType -eq 2) { 
-									$RBKCDPrincipal = Get-ADComputer $AFSvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
-										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $AFSvcAccount"
-										} 
-										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $AFSvcAccount"
-										}
-									}
-
-
-									If ($AccType -eq 3) { 
-									$RBKCDPrincipal = Get-ADServiceAccount $AFSvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
-										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to AF Server $AFServer running under $AFSvcAccount"
-										} 
-										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to AF Server $AFServer running under $AFSvcAccount"
-										}
-									}
-
+									$AFSvcAccountDomain = Get-ServiceLogonAccountDomain -sa $AFSvcAccount
+									$AccType = Get-ServiceLogonAccountType -sa $AFSvcAccount -sad $AFSvcAccountDomain -cn $AFServer 
+									if($null -eq $AccType){continue}
+									Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccount -sad $AFSvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $AFServer -rt "AF Server"
 									}
 									Else { 
 									$global:RBKCDstring += "`n Could not get the service account running AF Server. Please make sure AF Server $AFServer is configured for PSRemoting.
@@ -643,54 +837,24 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 								}
 
-								foreach ($PIServer in $PIServers) { 
+								foreach ( $PIServer in $PIServers ) { 
+									$AccType = $null
 									$PISvcAccount = Get-PISysAudit_ServiceLogOnAccount "pinetmgr" -lc $false -rcn $PIServer -ErrorAction SilentlyContinue
-									If ($PISvcAccount -ne $null ) { 
-									If ($PISvcAccount -eq "LocalSystem" -or $PISvcAccount -eq "NetworkService") { $PISvcAccount = $PIServer }
-									$RBKCDpos = $PISvcAccount.IndexOf("\")
-									$PISvcAccount = $PISvcAccount.Substring($RBKCDpos+1)
-									$PISvcAccount = $PISvcAccount.TrimEnd('$')
-
-									$DomainObjectType = Get-ADObject -Filter { Name -like $PISvcAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
-									If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate ADObject $DomainObjectType." }
-
-
-									If ($AccType -eq 1) { 
-									$RBKCDPrincipal = Get-ADUser $PISvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
-										If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $PISvcAccount"
-										} 
-										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to PI Server $PIServer running under $PISvcAccount"
-										}
+									
+									If ( $PISvcAccount -ne $null ) 
+									{ 
+										$PISvcAccountDomain = Get-ServiceLogonAccountDomain -sa $PISvcAccount
+										$AccType = Get-ServiceLogonAccountType -sa $PISvcAccount -sad $PISvcAccountDomain -cn $PIServer
+										if($null -eq $AccType){continue}
+										Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccount -sad $PISvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $PIServer -rt "PI Server"
 									}
-
-
-									If ($AccType -eq 2) { 
-									$RBKCDPrincipal = Get-ADComputer $PISvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
-									If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $PISvcAccount"
-										} 
-										Else { 
-										$global:RBKCDstring += "`n $RBKCDAppPoolIdentity CAN'T delegate to PI Server $PIServer running under $PISvcAccount"
-										}
+									Else 
+									{ 
+										$global:RBKCDstring += "`n Could not get the service account running PI Server. Please make sure PI Server $PIServer is configured for PSRemoting.
+										https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS) `n "
 									}
-
-
-									If ($AccType -eq 3) { 
-									$RBKCDPrincipal = Get-ADServiceAccount $PISvcAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount
-									If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
-									$global:RBKCDstring += "`n $RBKCDAppPoolIdentity can delegate to PI Server $PIServer running under $PISvcAccount" }
-									}
-
-									}
-									Else { 
-									$global:RBKCDstring += "`n Could not get the service account running AF Server. Please make sure PI Server $PIServer is configured for PSRemoting.
-									https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS) `n "
-									}
-
-
 								}
+
 						# New variable for easy output
 						$CoresightDelegation = $global:RBKCDstring
 						}
@@ -758,7 +922,6 @@ $CSUserGMSA = $CSUserSvc | Out-String
 								# Get Domain info.
 								$CSWebServerDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -dbgl $DBGLevel
 
-
 								# Delegation
 								If ($AppPoolDelegation -ne $null) { 
 								$DelegationSPNList = $AppPoolDelegation.ToLower().Trim() 
@@ -768,7 +931,6 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									# DELEGATION TO PI
 									foreach ($PIServer in $PIServers) {
 
-        
 										If ($PIServer -match [regex]::Escape($dot)) { 
 										# FQDN
 										$fqdnPI = $PIServer.ToLower() 
@@ -791,7 +953,6 @@ $CSUserGMSA = $CSUserSvc | Out-String
 									   Else { 
 									   $global:strClassicDelegation += "`n Coresight can't delegate to PI Server: $PIServer" 
 									   }
-
 
 									}
 
@@ -823,8 +984,6 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 
 									}
-
-
 												} 
 								Else { Write-Output "Kerberos Deleagation is not configured.
 													`n Enable Constrained Kerberos Delegation instead. See OSIsoft KB01222 - Types of Kerberos Delegation
@@ -856,105 +1015,69 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 
 #### Summary
-$LogFile="CoresightKerberosConfig.log"
+$exportPath = (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value
+$LogFile = $exportPath + "\CoresightKerberosConfig.log"
+
+# Compose Authentication section 
+If($blnWindowsAuth)
+{
+	$strCoresightAuthenticationSection=@"
+		Is Windows Authentication Enabled: $blnWindowsAuth
+        Windows Authentication Providers: $strProviders
+        Kernel-mode Authentication Enabled: $blnKernelMode
+        UseAppPoolCredentials property: $blnUseAppPoolCredentials
+"@
+}
+Else
+{
+	$strCoresightAuthenticationSection=@"
+		Is Windows Authentication Enabled: $blnWindowsAuth
+"@
+}
+
+# Compose Customer Header section 
+If($blnCustomHeader)
+{
+	$strCoresightWebSiteBindingsSection=@"
+        Is Custom Host Header used: $blnCustomHeader
+		Custom Host Header name: $CScustomHeader
+		Custom Host Header type: $CScustomHeaderType
+"@
+}
+Else
+{
+	$strCoresightWebSiteBindingsSection=@"
+        Is Custom Host Header used: $blnCustomHeader
+"@ -f $blnCustomHeader
+}
+
 $strSummaryReport = @"
     Coresight Authentication Settings:
-        Is Windows Authentication Enabled: {0}
-        Windows Authentication Providers: {1}
-        Kernel-mode Authentication Enabled: {2}
-        UseAppPoolCredentials property: {3}
+$strCoresightAuthenticationSection
         `n
     Coresight Web Site Bindings:
-        Is Custom Host Header used: {4}
-		Custom Host Header name: {5}
-		Custom Host Header type: {6}
+$strCoresightWebSiteBindingsSection
         `n
-    Coresight AppPool Identity: {7}
-        Group Managed Service Account used: {8}
+    Coresight AppPool Identity: $CSAppPoolIdentity
+        Group Managed Service Account used: $blngMSA
         `n
-    Coresight - Service Principal Names: {9}
+    Coresight - Service Principal Names: $strSPNs
         `n
-	PI/AF - Service Principal Names: {10}
+	PI/AF - Service Principal Names: $strBackEndSPNS
        `n
-    Coresight - Kerberos Delegation: {11}
+    Coresight - Kerberos Delegation: $CoresightDelegation
         `n
-	RECOMMENDATIONS: {12}
+	RECOMMENDATIONS: $global:strRecommendations
         `n
-	NUMBER OF ISSUES FOUND: {13}
+	NUMBER OF ISSUES FOUND: $global:issueCount
         `n
-	ISSUES - DETAILS: {14}
+	ISSUES - DETAILS: $global:strIssues 
         `n
-"@ -f $blnWindowsAuth, $strProviders, $blnKernelMode, $blnUseAppPoolCredentials, $blnCustomHeader, $CScustomHeader, $CScustomHeaderType, $CSAppPoolIdentity, $blngMSA, $strSPNs, $strBackEndSPNS, $CoresightDelegation, $global:strRecommendations, $global:issueCount, $global:strIssues  
+	Report recorded to the log file: $LogFile 
+"@
 
 Write-Output $strSummaryReport
 $strSummaryReport | Out-File $LogFile
-}
-
-Function Get-KnownServers
-{
-	param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer,
-		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]		
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("st")]
-		[ValidateSet('PIServer','AFServer')]
-		[string] $ServerType,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0	
-	)	
-
-	$fn = GetFunctionName
-
-	If($ServerType -eq 'PIServer')
-	{
-		# Get PI Servers
-		$regpathKST = 'HKLM:\SOFTWARE\PISystem\PI-SDK\1.0\ServerHandles'
-		if($LocalComputer)
-		{
-			$KnownServers = Get-ChildItem $regpathKST | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}
-		}
-		Else
-		{
-			$scriptBlockCmdTemplate = "Get-ChildItem `"{0}`" | ForEach-Object [ Get-ItemProperty `$_.pspath ] | where-object [ `$_.path ] | Foreach-Object [ `$_.path ]"
-			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $regpathKST)
-			$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")			
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )													
-			$KnownServers = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
-		}
-	}
-	Else
-	{
-		# Get AF Servers
-		$programDataWebServer = Get-PISysAudit_EnvVariable "ProgramData" -lc $LocalComputer -rcn $RemoteComputerName
-		$afsdkConfigPathWebServer = "$programDataWebServer\OSIsoft\AF\AFSDK.config"
-		if($LocalComputer)
-		{
-			$AFSDK = Get-Content -Path $afsdkConfigPathWebServer | Out-String
-		}
-		Else
-		{
-			$scriptBlockCmdTemplate = "Get-Content -Path ""{0}"" | Out-String"
-			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $afsdkConfigPathWebServer)									
-			
-			# Verbose only if Debug Level is 2+
-			$msgTemplate = "Remote command to send to {0} is: {1}"
-			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$AFSDK = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}
-		$KnownServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)')
-	}
-	return $KnownServers
 }
 
 Export-ModuleMember -Function Test-CoresightKerberosConfiguration

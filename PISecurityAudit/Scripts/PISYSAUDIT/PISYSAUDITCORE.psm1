@@ -81,9 +81,15 @@ function SetFolders
 	New-Variable -Name "ScriptsPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $scriptsPath
 	New-Variable -Name "ScriptsPathTemp" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $scriptsPathTemp			
 	New-Variable -Name "PasswordPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $pwdPath
-	New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
+	if($null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
+	}
 	New-Variable -Name "PIConfigScriptPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $picnfgPath
-	New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+	}
 }
 
 function NewObfuscateValue
