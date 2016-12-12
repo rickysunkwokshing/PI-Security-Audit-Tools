@@ -81,9 +81,15 @@ function SetFolders
 	New-Variable -Name "ScriptsPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $scriptsPath
 	New-Variable -Name "ScriptsPathTemp" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $scriptsPathTemp			
 	New-Variable -Name "PasswordPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $pwdPath
-	New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
+	if($null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
+	}
 	New-Variable -Name "PIConfigScriptPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $picnfgPath
-	New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+	}
 }
 
 function NewObfuscateValue
@@ -2833,7 +2839,7 @@ PROCESS
 			# Get the PIHome folder.
 			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName											           
 			# Set the log folder.
-			$scriptTempFileLocation = PathConcat -ParentPath $PIHome_path -ChildPath "log"                          			                                						
+			$scriptTempFileLocation = PathConcat -ParentPath $PIHome_path -ChildPath "dat"                          			                                						
 			# Set the arguments of netsh.exe
 			$argList = "'advfirewall show allprofiles state'"
 		}
@@ -3108,7 +3114,7 @@ PROCESS
 		{																		
 			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName
 			# Set the PIPC\log folder (64 bit).
-			$scriptTempFilesPath = PathConcat -ParentPath $PIHome_path -ChildPath "log"		                                       						                                   					                                      
+			$scriptTempFilesPath = PathConcat -ParentPath $PIHome_path -ChildPath "dat"		                                       						                                   					                                      
 			# Define the arguments required by the afdiag.exe command						
 			$argListTemplate = "'/ExeFile:`"{0}`"'"	
 		}
@@ -3512,7 +3518,7 @@ PROCESS
 			# Get the PIHome folder.
 			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName
 			# Set the ADM folder.
-			$PIHome_log_path = PathConcat -ParentPath $PIHome_path -ChildPath "log"
+			$PIHome_log_path = PathConcat -ParentPath $PIHome_path -ChildPath "dat"
 			# Set the output for the CLU.
 			$outputFilePath = PathConcat -ParentPath $PIHome_log_path -ChildPath "piversion_output.txt"								
 		}
@@ -3652,7 +3658,7 @@ PROCESS
 			{ 
 			# Dealing with Alias (CNAME). 
 
-			$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+			$spnCheck = $(setspn -l $svcaccMod)
 
 			# Verify hostnane AND FQDN SPNs are assigned to the service account.
 			#
@@ -3693,12 +3699,13 @@ PROCESS
 			{ 
 			# Host (A) 
 
-			$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+			$spnCheck = $(setspn -l $svcaccMod) 
 
 			# Verify hostnane AND FQDN SPNs are assigned to the service account.
 			$spnCounter = 0
 			$csCHeaderSPN = $($serviceType.ToLower() + "/" + $csCHeaderShort.ToLower())
 			$csCHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCHeaderLong.ToLower())
+			# Loop through SPNs, trimming and ensure all lower for comparison
 			foreach($line in $spnCheck)
 			{
 				switch($line.ToLower().Trim())
@@ -3750,13 +3757,14 @@ PROCESS
 			$svcaccMod = $hostname 
 		}
 
-		# Run setspn and convert it to a string (no capital letters).
-		$spnCheck = $(setspn -l $svcaccMod).ToLower() 
+		# Run setspn
+		$spnCheck = $(setspn -l $svcaccMod)
 
 		# Verify hostnane AND FQDN SPNs are assigned to the service account.
 		$spnCounter = 0
 		$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 		$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+		# Loop through SPNs, trimming and ensure all lower for comparison
 		foreach($line in $spnCheck)
 		{
 			switch($line.ToLower().Trim())
@@ -5127,6 +5135,7 @@ Set-Alias pwdondisk New-PISysAudit_PasswordOnDisk
 # Export Module Member
 # ........................................................................
 # <Do not remove>
+Export-ModuleMember PathConcat
 Export-ModuleMember Initialize-PISysAudit
 Export-ModuleMember Set-PISysAudit_SaltKey
 Export-ModuleMember Get-PISysAudit_EnvVariable
