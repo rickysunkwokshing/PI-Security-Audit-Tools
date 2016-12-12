@@ -99,6 +99,11 @@ Function Get-KnownServers
 		}
 		$KnownServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)')
 	}
+
+	$msgTemplate = "Known servers found: {0}"
+	$msg = [string]::Format($msgTemplate, $KnownServers)
+	Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 	return $KnownServers
 }
 
@@ -125,7 +130,9 @@ function Get-ServiceLogonAccountType
 
 	$fn = GetFunctionName
 
-	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccount = $ComputerName }
+	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
+		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
+		-or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccount = $ComputerName }
 	$RBKCDpos = $ServiceAccount.IndexOf("\")
 	$ServiceAccount = $ServiceAccount.Substring($RBKCDpos+1)
 	$ServiceAccount = $ServiceAccount.TrimEnd('$')
@@ -133,13 +140,19 @@ function Get-ServiceLogonAccountType
 	If($null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq '.' -or $ServiceAccountDomain -eq '')
 	{
 		$DomainObjectType = Get-ADObject -Filter { Name -like $ServiceAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
+		$msgTemplate = "Querying AD for {0}"
+		$msg = [string]::Format($msgTemplate, $ServiceAccount)
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 	}
 	Else
 	{
 		$DomainObjectType = Get-ADObject -Filter { Name -like $ServiceAccount } -Properties ObjectCategory -Server $ServiceAccountDomain | Select -ExpandProperty objectclass
+		$msgTemplate = "Querying AD for {0} in domain {1}"
+		$msg = [string]::Format($msgTemplate, $ServiceAccount, $ServiceAccountDomain)
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 	}
 
-	If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { "Unable to locate type of ADObject $ServiceAccount." }
+	If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { $AccType = 0 }
 
 	return $AccType
 }
@@ -159,7 +172,9 @@ Function Get-ServiceLogonAccountDomain
 
 	$fn = GetFunctionName
 
-	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccountDomain = $null}
+	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
+		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
+		-or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccountDomain = $null}
 	Else{
 		$RBKCDpos = $ServiceAccount.IndexOf("\")
 		If($RBKCDpos -eq -1){ $ServiceAccountDomain = $null }
@@ -181,8 +196,8 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		$ServiceAccountDomain = $null,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[alias("sat")]
-		[string]
-		$ServiceAccountType = $null,
+		[int]
+		$ServiceAccountType = 0,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("api")]
 		[string]
@@ -201,7 +216,9 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		$DBGLevel = 0	
 	)	
 
-	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccount = $ComputerName }
+	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
+		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
+		-or $ServiceAccount -eq "NT SERVICE\AFService")  { $ServiceAccount = $ComputerName }
 	Else
 	{
 		$RBKCDpos = $ServiceAccount.IndexOf("\")
@@ -228,6 +245,10 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		Else{ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 
+	$msgTemplate = "Principals for Account {0} (Type:{1}): {2}"
+	$msg = [string]::Format($msgTemplate, $ServiceAccount, $AccType, $RBKCDPrincipal)
+	Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 	# Check the Principals for a match
 	If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
 		$global:RBKCDstring += $msgCanDelegateTo
@@ -236,6 +257,89 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		$global:RBKCDstring += $msgCanNotDelegateTo
 	}
 
+}
+
+Function Initialize-CoresightKerberosConfigurationTest
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("cn")]
+		[string] $ComputerName,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("kc")]
+		[ValidateSet('None','Classic','ResourceBased','Menu')]
+		[string] $KerberosCheck,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+	# Initialize Global Paths if not set
+	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value -or $null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value){ SetFolders }
+	
+	# Test non-local computer to validate if WSMan is working.
+	if($ComputerName -eq "")
+	{							
+		$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
+		$msg = [string]::Format($msgTemplate, $ComputerName)
+		Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
+	}
+	else
+	{								
+		try
+		{
+			$resultWinRMTest = $null
+			$resultWinRMTest = Test-WSMan -authentication default -ComputerName $ComputerName
+			if($null -eq $resultWinRMTest)
+			{
+				$msgTemplate = @"
+	The server: {0} has a problem with WinRM communication. 
+	This issue will occur if there is an HTTP/hostname or HTTP/fqdn SPN assigned to a 
+	custom account.  In this situation the scripts may need to be run locally.  
+	For more information, see - https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS).
+"@
+				$msg = [string]::Format($msgTemplate, $ComputerName)
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
+		}
+		catch
+		{
+			# Return the error message.
+			$msg = "A problem has occurred during the validation with WSMan"						
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		}						
+	}
+
+	# Resolve KerberosCheck selection
+	if($KerberosCheck -eq 'Menu')
+	{
+		$title = "PI DOG - Please run it locally on the PI Coresight server machine."
+		$message = "PI Dog always fetches information about Coresight IIS settings and SPNs. Would you like to check Kerberos Delegation configuration as well?"
+
+		$NoKerberos = New-Object System.Management.Automation.Host.ChoiceDescription "&No Kerberos delegation check", `
+			"Doesn't check Kerberos Delegation Configuration."
+		$ClassicKerberos = New-Object System.Management.Automation.Host.ChoiceDescription "&Classic Kerberos delegation check", `
+			"Checks Classic Kerberos Configuration."
+		$RBKerberos = New-Object System.Management.Automation.Host.ChoiceDescription "&Resource-Based Kerberos delegation check", `
+			"Checks Resource-Based Kerberos Configuration."
+
+		$options = [System.Management.Automation.Host.ChoiceDescription[]]($NoKerberos,$ClassicKerberos,$RBKerberos)
+
+		$result = $host.ui.PromptForChoice($title, $message, $options, 0) 
+	}
+	else
+	{
+		# Assign compatible result from friendly name
+		switch($KerberosCheck)
+		{
+			'None' {$result = 0}
+			'Classic' {$result = 1}
+			'ResourceBased' {$result = 2}
+		}
+	}
+
+	return $result
 }
 
 # ........................................................................
@@ -280,72 +384,16 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("kc")]
 		[ValidateSet('None','Classic','ResourceBased','Menu')]
-		[string] $KerberosCheck = "Menu"		
+		[string] $KerberosCheck = "Menu",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0		
 	)	
 
-if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value -or $null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value){ SetFolders }
-
-$fn = GetFunctionName
-
-if($KerberosCheck -eq 'Menu')
-{
-	$title = "PI DOG - Please run it locally on the PI Coresight server machine."
-	$message = "PI Dog always fetches information about Coresight IIS settings and SPNs. Would you like to check Kerberos Delegation configuration as well?"
-
-	$NoKerberos = New-Object System.Management.Automation.Host.ChoiceDescription "&No Kerberos delegation check", `
-		"Doesn't check Kerberos Delegation Configuration."
-	$ClassicKerberos = New-Object System.Management.Automation.Host.ChoiceDescription "&Classic Kerberos delegation check", `
-		"Checks Classic Kerberos Configuration."
-	$RBKerberos = New-Object System.Management.Automation.Host.ChoiceDescription "&Resource-Based Kerberos delegation check", `
-		"Checks Resource-Based Kerberos Configuration."
-
-	$options = [System.Management.Automation.Host.ChoiceDescription[]]($NoKerberos,$ClassicKerberos,$RBKerberos)
-
-	$result = $host.ui.PromptForChoice($title, $message, $options, 0) 
-}
-else
-{
-	# Assign compatible result from friendly name
-	switch($KerberosCheck)
-	{
-		'None' {$result = 0}
-		'Classic' {$result = 1}
-		'ResourceBased' {$result = 2}
-	}
-}
-
-# Test non-local computer to validate if WSMan is working.
-if($ComputerName -eq "")
-{							
-	$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
-	$msg = [string]::Format($msgTemplate, $ComputerName)
-	Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
-}
-else
-{								
-	try
-	{
-		$resultWinRMTest = $null
-		$resultWinRMTest = Test-WSMan -authentication default -ComputerName $ComputerName
-		if($null -eq $resultWinRMTest)
-		{
-			$msgTemplate = @"
-The server: {0} has a problem with WinRM communication. 
-This issue will occur if there is an HTTP/hostname or HTTP/fqdn SPN assigned to a 
-custom account.  In this situation the scripts may need to be run locally.  
-For more information, see - https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS).
-"@
-			$msg = [string]::Format($msgTemplate, $ComputerName)
-			Write-PISysAudit_LogMessage $msg "Error" $fn
-		}
-	}
-	catch
-	{
-		# Return the error message.
-		$msg = "A problem has occurred during the validation with WSMan"						
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-	}						
-}
+	$fn = GetFunctionName
+	
+	$result = Initialize-CoresightKerberosConfigurationTest -cn $ComputerName -kc $KerberosCheck
 
 switch ($result)
     {
@@ -373,27 +421,41 @@ switch ($result)
 
 # If needed, give user option to install 'Remote Active Directory Administration' PS Module.
 If ($ADMtemp) {
+	$localOS = (Get-CimInstance Win32_OperatingSystem).Caption
+	If($localOS -like "*Windows 10*" -or $localOS -like "*Windows 8*" -or $localOS -like "*Windows 7*"){
+		$messageRSAT = @"
+		'Remote Active Directory Administration' Module is not installed.  This module is required on the 
+		machine running Test-CoresightKerberosConfiguration.  A client operating system was detected, so 
+		ServerManager is not available; the tool must be downloaded and installed.  
+		For more information, see - https://support.microsoft.com/en-us/kb/2693643
 
-	$titleRSAT = "RSAT-AD-PowerShell required"
-	$messageRSAT = @"
-'Remote Active Directory Administration' Module is required on the machine running Test-CoresightKerberosConfiguration.
-Installing this module does not require a reboot.  If it is desired to uninstall the module afterward, a reboot will be
-required to complete the removal.
+		'Remote Active Directory Administration' is required to check Kerberos Delegation settings. Aborting.
 "@
-	$yesRSAT = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes, install the module."
-	$noRSAT = New-Object System.Management.Automation.Host.ChoiceDescription "&No, don't install the module and abort."
-	$optionsRSAT = [System.Management.Automation.Host.ChoiceDescription[]]($yesRSAT,$noRSAT)
-
-	$resultRSAT = $host.ui.PromptForChoice($titleRSAT, $messageRSAT, $optionsRSAT, 0) 
-
-    If ($resultRSAT -eq 0) {
-		Write-Output "Installation of 'Remote Active Directory Administration' module is about to start.."
-		Add-WindowsFeature RSAT-AD-PowerShell
-    }
-		Else { Write-Output "'Remote Active Directory Administration' is required to check Kerberos Delegation settings. Aborting." 
+		Write-Output $messageRSAT
 		break
-    }
+	}
+	Else
+	{
+		$titleRSAT = "RSAT-AD-PowerShell required"
+		$messageRSAT = @"
+	'Remote Active Directory Administration' Module is required on the machine running Test-CoresightKerberosConfiguration.
+	Installing this module does not require a reboot.  If it is desired to uninstall the module afterward, a reboot will be
+	required to complete the removal.
+"@
+		$yesRSAT = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes, install the module."
+		$noRSAT = New-Object System.Management.Automation.Host.ChoiceDescription "&No, don't install the module and abort."
+		$optionsRSAT = [System.Management.Automation.Host.ChoiceDescription[]]($yesRSAT,$noRSAT)
 
+		$resultRSAT = $host.ui.PromptForChoice($titleRSAT, $messageRSAT, $optionsRSAT, 0) 
+
+		If ($resultRSAT -eq 0) {
+			Write-Output "Installation of 'Remote Active Directory Administration' module is about to start.."
+			Add-WindowsFeature RSAT-AD-PowerShell
+		}
+			Else { Write-Output "'Remote Active Directory Administration' is required to check Kerberos Delegation settings. Aborting." 
+			break
+		}
+	}
 }
 
 # Initialize variables
@@ -820,15 +882,24 @@ $CSUserGMSA = $CSUserSvc | Out-String
 						}
 						
 								foreach ($AFServerTemp in $AFServers) { 
-									$AccType = $null
+									$AccType = 0
 									$AFServer = $AFServerTemp.Groups[1].Captures[0].Value
+
+									$msgTemplate = "Processing RBCD check for AF Server {0}"
+									$msg = [string]::Format($msgTemplate, $AFServer)
+									Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 									$AFSvcAccount = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
 									
 									If ($AFSvcAccount -ne $null ) { 
 									$AFSvcAccountDomain = Get-ServiceLogonAccountDomain -sa $AFSvcAccount
-									$AccType = Get-ServiceLogonAccountType -sa $AFSvcAccount -sad $AFSvcAccountDomain -cn $AFServer 
-									if($null -eq $AccType){continue}
-									Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccount -sad $AFSvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $AFServer -rt "AF Server"
+									$AccType = Get-ServiceLogonAccountType -sa $AFSvcAccount -sad $AFSvcAccountDomain -cn $AFServer -DBGLevel $DBGLevel
+									if($AccType -eq 0)
+										{
+											Write-Output "Unable to locate type of ADObject $AFSvcAccount."
+											continue
+										}
+									Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccount -sad $AFSvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $AFServer -rt "AF Server" -DBGLevel $DBGLevel
 									}
 									Else { 
 									$global:RBKCDstring += "`n Could not get the service account running AF Server. Please make sure AF Server $AFServer is configured for PSRemoting.
@@ -838,15 +909,23 @@ $CSUserGMSA = $CSUserSvc | Out-String
 								}
 
 								foreach ( $PIServer in $PIServers ) { 
-									$AccType = $null
+									$AccType = 0
 									$PISvcAccount = Get-PISysAudit_ServiceLogOnAccount "pinetmgr" -lc $false -rcn $PIServer -ErrorAction SilentlyContinue
 									
+									$msgTemplate = "Processing RBCD check for PI Server {0}"
+									$msg = [string]::Format($msgTemplate, $PIServer)
+									Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 									If ( $PISvcAccount -ne $null ) 
 									{ 
-										$PISvcAccountDomain = Get-ServiceLogonAccountDomain -sa $PISvcAccount
-										$AccType = Get-ServiceLogonAccountType -sa $PISvcAccount -sad $PISvcAccountDomain -cn $PIServer
-										if($null -eq $AccType){continue}
-										Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccount -sad $PISvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $PIServer -rt "PI Server"
+										$PISvcAccountDomain = Get-ServiceLogonAccountDomain -sa $PISvcAccount -DBGLevel $DBGLevel
+										$AccType = Get-ServiceLogonAccountType -sa $PISvcAccount -sad $PISvcAccountDomain -cn $PIServer -DBGLevel $DBGLevel
+										if($AccType -eq 0)
+										{
+											Write-Output "Unable to locate type of ADObject $PISvcAccount."
+											continue
+										}
+										Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccount -sad $PISvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $PIServer -rt "PI Server" -DBGLevel $DBGLevel
 									}
 									Else 
 									{ 
@@ -1001,7 +1080,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 					$serviceName = "afservice"
 					$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $false -rcn $AFServer -dbgl $DBGLevel
 					If ($result) { $strBackEndSPNS += "`n Service Principal Names for AF Server $AFServer are set up correctly." }
-					Else { $strBackEndSPNS += "`n Service Principal Names for AF Server $AFServer are NOT set up correctly." }
+					Else { $strBackEndSPNS += "`n *Service Principal Names for AF Server $AFServer are NOT set up correctly." }
 				}
 
 				foreach ($PIServerBEC in $PIServers) {
@@ -1009,7 +1088,7 @@ $CSUserGMSA = $CSUserSvc | Out-String
 					$serviceName = "pinetmgr"
 					$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $false -rcn $PIServerBEC -dbgl $DBGLevel
 					If ($result) { $strBackEndSPNS += "`n Service Principal Names for PI Server $PIServerBEC are set up correctly." }
-					Else { $strBackEndSPNS += "`n Service Principal Names for PI Server $PIServerBEC are NOT set up correctly." }
+					Else { $strBackEndSPNS += "`n *Service Principal Names for PI Server $PIServerBEC are NOT set up correctly." }
 				}
 			}
 
