@@ -1035,8 +1035,8 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 									}
 
-										# DELEGATION TO AF
-										foreach ($AFServerTemp in $AFServers) {
+									# DELEGATION TO AF
+									foreach ($AFServerTemp in $AFServers) {
 										$AFServer = $AFServerTemp.Groups[1].Captures[0].Value
 										If ($AFServer -match [regex]::Escape($dot)) { 
 										# FQDN
@@ -1063,8 +1063,9 @@ $CSUserGMSA = $CSUserSvc | Out-String
 
 
 									}
-												} 
-								Else { Write-Output "Kerberos Deleagation is not configured.
+								} 
+								Else { Write-Output "AppPool Delegation is $AppPoolDelegation.
+													`n Kerberos Delegation is not configured.
 													`n Enable Constrained Kerberos Delegation instead. See OSIsoft KB01222 - Types of Kerberos Delegation
 													`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222" 
 								}
