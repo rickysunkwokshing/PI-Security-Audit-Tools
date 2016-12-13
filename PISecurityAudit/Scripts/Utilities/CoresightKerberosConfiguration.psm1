@@ -292,10 +292,7 @@ Function Check-ClassicDelegation
 		$DBGLevel = 0	
 	)	
 
-	$msgCanDelegateToClassic = "`n $ClassicAppPoolDelegation Coresight AppPool Identity $ClassicAppPool can delegate to $ClassicResourceType $ClassicServer"
-	$msgCanNotDelegateToClassic = "`n $ClassicAppPoolDelegation Coresight AppPool Identity $ClassicAppPool CAN'T delegate to $ClassicResourceType $ClassicServer"
-
-	# The list of SPNs Coresight AppPool can delegate to needs to be retrieved only once.
+	# The list of SPNs Coresight AppPool can delegate to AND Protocol Transition property need to be retrieved only once.
 	If ($ClassicAppPoolDelegation -eq $null) {
 		If ($ClassicAccType -eq 1) {
 		$ClassicAppPoolDelegation = Get-ADUser $ClassicAppPool -Properties msDS-AllowedToDelegateTo | Select -ExpandProperty msDS-AllowedToDelegateTo
@@ -314,6 +311,12 @@ Function Check-ClassicDelegation
 		$ClassicProtocolTransition = Get-ADServiceAccount $ClassicAppPool -Properties TrustedToAuthForDelegation | Select -ExpandProperty TrustedToAuthForDelegation
 		$ClassicUnconstrainedKerberos = Get-ADServiceAccount $ClassicAppPool -Properties TrustedForDelegation | Select -ExpandProperty TrustedForDelegation
 		}
+		# Protocol transition messaging.
+		If ($ClassicProtocolTransition -eq $true) { $KerbProtocolTransition = "ENABLED" }
+		Else { $KerbProtocolTransition = "DISABLED" 
+		$global:strClassicDelegation += "`n Protocol Transition is Disabled - Kerberos Delegation may fail. For details, see:
+										`n https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46"
+		}
 	}
 
 	# Unconstrained Kerberos Delegation is not supported (and rather insecure) > break.
@@ -323,17 +326,15 @@ Function Check-ClassicDelegation
 	`n Enable Constrained Kerberos Delegation as per OSIsoft KB01222 - Types of Kerberos Delegation
 	`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222           
 	`n Aborting."
-	 #$global:issueCount += 1
 	 break
 	 }
 
-	# If the Constrained Kerberos Delegation list of SPN is STILL empty, no delehgation is configured.			
+	# If the Constrained Kerberos Delegation list of SPN is STILL empty, no delegation is configured.			
 	If ($ClassicAppPoolDelegation -eq $null ) {
 	$global:strClassicDelegation = "`n Coresight AppPool Identity $ClassicAppPool is not trusted for Constrained Kerberos Delegation. 
 	`n Enable Constrained Kerberos Delegation as per OSIsoft KB01222 - Types of Kerberos Delegation
 	`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222           
 	`n Aborting."
-	 #$global:strIssueCount += 1
 	 break
 	}
 	
@@ -345,7 +346,12 @@ Function Check-ClassicDelegation
 	$msg = [string]::Format($msgTemplate, $CSUserSvc, $ClassicDelegationList)
 	Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
-	# Check the list of SPNs Coresight can delegate to for a match
+
+
+	$msgCanDelegateToClassic = "`n Coresight AppPool Identity $ClassicAppPool can delegate to $ClassicResourceType $ClassicServer."
+	$msgCanNotDelegateToClassic = "`n Coresight AppPool Identity $ClassicAppPool CAN'T delegate to $ClassicResourceType $ClassicServer"
+
+	# Check the list of SPNs Coresight can delegate to for a match.
 	If ($ClassicDelegationList -match $ClassicShortSPN -and $ClassicDelegationList -match $ClassicLongSPN) { 
 		$global:strClassicDelegation += $msgCanDelegateToClassic
 	} 
@@ -1050,7 +1056,7 @@ If ($ADMtemp) {
 					$CSUserSvc = $CSUserSvc.Substring($posAppPool+1)
 					$CSUserSvc = $CSUserSvc.TrimEnd('$')
 
-						If ($blngMSA) { $ClassicAccType = 3 } # AppPool is gMSA
+						If ($blngMSA) { $ClassicAccType = 3 } # AppPool is a gMSA
 						Else { $ClassicAccType = 1 } # AppPool is standard domain user
 					}
 
@@ -1059,35 +1065,38 @@ If ($ADMtemp) {
 					$CSUserSvc = $CSWebServerName  
 					$ClassicAccType = 2 
 					}
-				
+					
+					# Initializing variables needed to construct an SPN
 					$dot = '.'
 					$PISPNClass = "piserver/"
 					$AFSPNClass = "afserver/"
 
 
 					foreach ($PIServer in $PIServers) {
-
+							
+							# Debug option
 							$msgTemplate = "Processing Classic Delegation check for PI Server {0}"
 							$msg = [string]::Format($msgTemplate, $PIServer)
 							Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
+							# PI Server is specified as FQDN
 							If ($PIServer -match [regex]::Escape($dot)) { 
-					
-							# FQDN
 							$fqdnPI = $PIServer.ToLower() 
 							$pos = $fqdnPI.IndexOf(".")
 							$shortPI = $fqdnPI.Substring(0, $pos)
 							}
+
+							# PI Server is specified as short host name
          					Else { 
-							#SHORT
 							$shortPI = $PIServer.ToLower() 
 							$fqdnPI = ($PIServer.ToLower() + "." + $CSWebServerDomain.ToLower()).ToString()
 							}
 						
-							# Check if delegation is enabled.
+							# Construct SPNs
 							$shortPISPN = ($PISPNClass + $shortPI).ToString()
 							$longPISPN = ($PISPNClass + $fqdnPI).ToString()
 
+					# Check if the SPN is on the list the Coresight AppPool can delegate to
 					Check-ClassicDelegation -sspn $shortPISPN -lspn $longPISPN -cap $CSUserSvc -crt "PI Data Server" -cse $PIServer -cat $ClassicAccType
 					}
 
@@ -1095,27 +1104,29 @@ If ($ADMtemp) {
 					foreach ($AFServerTemp in $AFServers) {
 							$AFServer = $AFServerTemp.Groups[1].Captures[0].Value
 
+							# Debug option
 							$msgTemplate = "Processing Classic Delegation check for AF Server {0}"
 							$msg = [string]::Format($msgTemplate, $AFServer)
 							Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
 							If ($AFServer -match [regex]::Escape($dot)) { 
 					
-							# FQDN
+							# AF Server is specified as FQDN
 							$fqdnAF = $AFServer.ToLower() 
 							$pos = $fqdnAF.IndexOf(".")
 							$shortAF = $fqdnAF.Substring(0, $pos)
 							}
+							# AF Server is specified as short host name
          					Else { 
-							#SHORT
 							$shortAF = $AFServer.ToLower() 
 							$fqdnAF = ($AFServer.ToLower() + "." + $CSWebServerDomain.ToLower()).ToString()
 							}
 						
-							# Check if delegation is enabled.
+							# Construct SPNs
 							$shortAFSPN = ($AFSPNClass + $shortAF).ToString()
 							$longAFSPN = ($AFSPNClass + $fqdnAF).ToString()
 
+					# Check if the SPN is on the list the Coresight AppPool can delegate to
 					Check-ClassicDelegation -sspn $shortAFSPN -lspn $longAFSPN -cap $CSUserSvc -crt "AF Server" -cse $AFServer -cat $ClassicAccType
 					}
 								
