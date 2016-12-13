@@ -361,6 +361,124 @@ Function Check-ClassicDelegation
 
 }
 
+Function Check-KernelModeAuth
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("capp")]
+		[boolean]
+		$blnCustomAppPoolAccount,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("ktd")]
+		[boolean]
+		$blnUAppPoolPwdKerbTicketDecrypt,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("kma")]
+		[boolean]
+		$blnUseKernelModeAuth,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+		# Kernel Mode Authentication should ALWAYS be enabled as per Microsoft's recommendation
+
+		# Kernel Mode Authentication is disabled.
+		If ($blnUseKernelModeAuth -ne $True) {
+
+			# Coresight AppPools are running under a custom domain account (or gMSA)
+			If ($blnCustomAppPoolAccount -eq $True) {
+				$global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE. For more information, see http://aka.ms/kcdpaper."
+			}
+
+			# Coresight AppPools are running under a virtual or built-in account
+			Else {
+				$global:strRecommendations += "`n ENABLE Kernel-mode Authentication. For more information, see http://aka.ms/kcdpaper."
+			}
+		}
+		
+		# Kernel-mode Authentication is enabled
+		Else {
+			# Kernel-mode Auth + Custom AppPool Account + UseAppPoolCredentials -eq FALSE >> ISSUE DETECTED
+			If ($blnCustomAppPoolAccount -eq $True -and $blnUAppPoolPwdKerbTicketDecrypt -eq $false){
+			$global:strIssues += "`n Kerberos Authentication will fail, because Kernel-mode Authentication is enabled AND a Custom Account is running Coresight AppPools, 
+									 BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper."
+			$global:issueCount += 1
+			}
+
+		}
+}
+
+Function Check-CoresightSPNconfig
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("bchh")]
+		[boolean]
+		$blnCoresightCustomHostHeader,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("cta")]
+		[boolean]
+		$blnCustomTargetAccount,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+		# Custom account is used to run Coresight AppPools
+		If ($blnCustomTargetAccount) {
+		$CoresightSPNclass = "http/"
+		$CoresightSPNtargetAccount = $CSUserSvc.ToLower()
+		$CoresightSPNtargetAccountPos = $CSUserSvc.IndexOf("\")
+		$CoresightSPNtargetAccount = $CSUserSvc.Substring($CoresightSPNtargetAccountPos+1)
+		$CoresightSPNtargetAccount = $CoresightSPNtargetAccount.TrimEnd('$')
+		}
+		Else {
+		$CoresightSPNclass = "host/"
+		$CoresightSPNtargetAccount = $CSWebServerName.ToLower()
+		}
+			
+		# HOST (A) DNS record is used as a custom Host Header
+		If ($blnCoresightCustomHostHeader -eq $True -and $CNAME -eq $False) {
+
+			# Only one SPN is needed in this case
+			$SPN1 = ($CoresightSPNclass + $CScustomHeader).ToLower()
+
+			$SPNCheck = $(setspn -q $SPN1).ToLower() | Out-String
+			If ($SPNCheck -match $SPN1 -and $SPNCheck -match $CoresightSPNtargetAccount) { 
+				$global:strSPNs = "Service Principal Name $SPN1 exists and is assigned to the service identity - $CoresightSPNtargetAccount." 			
+			}
+			Else { 
+				$global:strSPNs = "Required Service Principal Name could not be found. See ISSUES section for further details."
+				$global:strIssues += "Kerberos authentication will fail. Please make sure $SPN1 Service Principal Name is assigned to the correct service identity - $CoresightSPNtargetAccount
+				`n For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 
+				$global:issueCount += 1"			
+			}
+		}
+		# Custome Host Header is not used , or it's a CNAME
+		Else {
+			
+			# Two SPNs are needed
+			$SPN1 = ($CoresightSPNclass + $CSWebServerName).ToLower()
+			$SPN2 = ($CoresightSPNclass + $CSWebServerFQDN).ToLower()
+
+			$SPNCheck = $(setspn -q $SPN1).ToLower() | Out-String
+			If ($SPNCheck -match $SPN1 -and $SPNCheck -match $SPN2 -and $SPNCheck -match $CoresightSPNtargetAccount) { 
+				$global:strSPNs = "Service Principal Names $SPN1 and $SPN2 exist and are assigned to the service identity - $CoresightSPNtargetAccount."   
+			}
+			Else { 
+				$global:strSPNs = "Required Service Principal Names could not be found. See ISSUES section for further details."
+				$global:strIssues += "Kerberos authentication will fail. Please make sure $SPN1 and $SPN2 Service Principal Names are assigned to the correct service identity - $CoresightSPNtargetAccount
+				`n For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
+				$global:issueCount += 1
+				
+			}
+		}
+		
+}
+
 Function Initialize-CoresightKerberosConfigurationTest
 {
 	param(
@@ -561,8 +679,6 @@ If ($ADMtemp) {
 }
 
 	# Initialize variables
-	$strSPNs = $null
-	$strBackEndSPNS = $null
 	$global:strIssues = $null
 	$global:issueCount = 0
 	$global:strRecommendations = $null
@@ -675,306 +791,52 @@ If ($ADMtemp) {
     $CSWebServerDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
     $CSWebServerFQDN = $CSWebServerName + "." + $CSWebServerDomain 
 
-	# By default, assume custom header is not used.
-	$blnCustomHeader = $false
-
-	# Convert WebBindings to string and look for custom headers.
-	$BindingsToString = $($CSWebBindings) | Out-String
-	$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
-		foreach ($match in $matches) { 
-			$CSheader = $match.Groups[1].Captures[0].Value 
-				If ($CSheader) { 
-				# A custom host header is used! The first result is taken.
-				$CScustomHeader = $CSheader
-				$blnCustomHeader = $true
-				break 
-				}
-		}
-
-          
-              
-		# Custom Host Header is used.
-		If ($blnCustomHeader) {
-
-				# Check whether the custom host header is a CNAME Alias or Host (A) DNS entry
-				$AliasTypeCheck = Resolve-DnsName $CScustomHeader | Select -ExpandProperty Type
-
-				# Custom Host header used for the Coresight Web Site is a CNAME
-				If ($AliasTypeCheck -match "CNAME") { 
-				$CNAME = $true 
-				$CScustomHeaderType = "CNAME DNS Alias"
-				# Host (A) DNS entry is preferred
-				$global:strRecommendations += "`n Do NOT use CNAME aliases as Custom Host Headers. Use custom HOST (A) DNS entry instead."
-				} 
-
-				# Custom Host header used for the Coresight Web Sire is a Host (A) DNS record
-				Else { 
-				$CNAME = $false 
-				$CScustomHeaderType = "HOST (A) DNS record"
-				}
-
-				# Find out whether the custom host header is using short or fully qualified domain name.
-				If ($CScustomHeader -match "\.") 
-				{
-				# The specified custom host header is an FQDN
-				$csCHeaderLong = $CScustomHeader
-				$pos = $CScustomHeader.IndexOf(".")
-				$csCHeaderShort = $CScustomHeader.Substring(0, $pos)
-				} 
+		#
+    	# KKERNEL-MODE AUTHENTICATION CHECK
+		#
+		Check-KernelModeAuth -capp $blnCustomAccount -ktd $blnUseAppPoolCredentials -kma $blnKernelMode -DBGLevel $DBGLevel      
 		
-				Else { 
-				# The specified custom host header is a short domain name.
-				$csCHeaderShort = $CScustomHeader
-				$csCHeaderLong = $CScustomHeader + "." + $CSWebServerDomain
-				}
+		#	
+		# CORESIGHT SERVICE PRINCIPAL NAMES CHECK
+		#
 
-			   # Custom Account is running Coresight AppPools.
-			   If ($blnCustomAccount) {
-       
-				   # Kernel-mode Authentication is enabled, but UseAppPoolCredentials property is FALSE.
-				   If ($blnKernelMode -eq $True -and $blnUseAppPoolCredentials -eq $false) {
-					$global:strIssues += "`n Kerberos Authentication will fail because Kernel-mode Authentication is enabled AND Custom Account is running Coresight, 
-					BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper"
-					$global:issueCount += 1
-				   }
-                
-				   # Kernel-mdoe Authentication is disabled.
-				   ElseIf ($blnKernelMode -eq $false) {
-				   $global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE."
-				   }
+		# By default, assume custom header is not used.
+		$blnCustomHeader = $false
 
-				   # Kernel-mode Authentication is enabled, and UseAppPoolCredentials property is TRUE. Great!
-				   Else { }
-
-						# SPN check
-						$spnCheck = $(setspn -l $CSUserSvc).ToLower()
-						$spnCounter = 0
-
-							# CNAME is used.
-							If ($CNAME) {
-							$hostnameSPN = $("http/" + $CSWebServerName.ToLower())
-							$fqdnSPN = $("http/" + $CSWebServerFQDN.ToLower())
-			
-								foreach($line in $spnCheck)
-								{
-									switch($line.ToLower().Trim())
-									{
-										$hostnameSPN {$spnCounter++; break}
-										$fqdnSPN {$spnCounter++; break}
-										default {break}
-									}
-								}
-
-									If ($spnCounter -eq 2) { 
-									$strSPNs = "Service Principal Names are configured correctly: $hostnameSPN and $fqdnSPN"                            
-									}
-									Else {
-									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. Please make sure $hostnameSPN and $fqdnSPN SPNs are created.
-									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
-									$global:issueCount += 1
-									}
-
-							}
-                    
-							# Host (A)
-							Else {
-
-
-							$csCHeaderSPN = $("http/" + $csCHeaderShort.ToLower())
-							$csCHeaderLongSPN = $("http/" + $csCHeaderLong.ToLower())
-								foreach($line in $spnCheck)
-								{
-									switch($line.ToLower().Trim())
-									{
-										$csCHeaderSPN {$spnCounter++; break}
-										$csCHeaderLongSPN {$spnCounter++; break}
-										default {break}
-									}
-								}
-
-									If ($spnCounter -eq 2) { 
-									$strSPNs = "Service Principal Names are configured correctly: $csCHeaderSPN and $csCHeaderLongSPN"                            
-									}
-									Else {
-									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created.
-									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
-									$global:issueCount += 1
-									}
-
-							}
-
-
-                
-					}
-
-					# Machine Account is running Coresight AppPools.
-					Else {
-					If ($blnKernelMode -ne $True) {
-					$global:strRecommendations += "`n ENABLE Kernel-mode Authentication."
-					}
-            
-						# SPN check
-						$spnCheck = $(setspn -l $CSWebServerName).ToLower()
-						$spnCounter = 0
-
-							# CNAME is used.
-							If ($CNAME) {
-							$hostnameSPN = $("host/" + $CSWebServerName.ToLower())
-							$fqdnSPN = $("host/" + $CSWebServerFQDN.ToLower())
-			
-								foreach($line in $spnCheck)
-								{
-									switch($line.ToLower().Trim())
-									{
-										$hostnameSPN {$spnCounter++; break}
-										$fqdnSPN {$spnCounter++; break}
-										default {break}
-									}
-								}
-
-									If ($spnCounter -eq 2) { 
-									$strSPNs = "Service Principal Names are configured correctly: $hostnameSPN and $fqdnSPN"                            
-									}
-									Else {
-									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $hostnameSPN and $fqdnSPN SPNs are created.
-									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752"
-									$global:issueCount += 1
-									}
-
-							}
-                    
-							# Host (A)
-							Else {
-
-
-							$csCHeaderSPN = $("http/" + $csCHeaderShort.ToLower())
-							$csCHeaderLongSPN = $("http/" + $csCHeaderLong.ToLower())
-								foreach($line in $spnCheck)
-								{
-									switch($line.ToLower().Trim())
-									{
-										$csCHeaderSPN {$spnCounter++; break}
-										$csCHeaderLongSPN {$spnCounter++; break}
-										default {break}
-									}
-								}
-
-									If ($spnCounter -eq 2) { 
-									$strSPNs = "Service Principal Names are configured correctly: $csCHeaderSPN and $csCHeaderLongSPN"                            
-									}
-									Else {
-									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $csCHeaderSPN and $csCHeaderLongSPN SPNs are created. 
-									For more information, see: https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-799220A0-4967-45CE-A592-45E3FC10C752 "
-									$global:issueCount += 1
-									}
-
-							}
-
-					}
-
-			   }
-		# Custom Host Header is NOT used.
-		Else {
-			   $global:strRecommendations += "`n Use Custom Host Header (Name) in $CSWebSiteName web site bindings."
-
-
-				   If ($blnCustomAccount) {
-						# Kernel-mode Authentication is enabled, but UseAppPoolCredentials property is FALSE.
-						If ($blnKernelMode -eq $True -and $blnUseAppPoolCredentials -eq $false) {
-						$global:strIssues += "`n Kerberos Authentication will fail because Kernel-mode Authentication is enabled AND Custom Account is running Coresight, 
-						BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper"
-						$global:issueCount += 1
-						}
-						# Kernel-mdoe Authentication is disabled.
-						ElseIf ($blnKernelMode -eq $false) {
-						$global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE. For more information, see http://aka.ms/kcdpaper"
-						}
-						# Kernel-mode Authentication is enabled, and UseAppPoolCredentials property is TRUE. Great!
-						Else {
-						# All good.
-						}
-
-						#SPN check
-						$spnCheck = $(setspn -l $CSUserSvc).ToLower()
-						$spnCounter = 0
-                    
-							$hostnameSPN = $("http/" + $CSWebServerName.ToLower())
-							$fqdnSPN = $("http/" + $CSWebServerFQDN.ToLower())
-			
-								foreach($line in $spnCheck)
-								{
-									switch($line.ToLower().Trim())
-									{
-										$hostnameSPN {$spnCounter++; break}
-										$fqdnSPN {$spnCounter++; break}
-										default {break}
-									}
-								}
-
-									If ($spnCounter -eq 2) { 
-									$strSPNs = "Service Principal Names are configured correctly: $hostnameSPN and $fqdnSPN"                            
-									}
-									Else {
-									$strSPNs = "Unable to find all required HTTP SPNs."
-									$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-									Please make sure $hostnameSPN and $fqdnSPN SPNs are created. For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
-									$global:issueCount += 1
-									}
+		# Convert WebBindings to string and look for custom headers.
+		$BindingsToString = $($CSWebBindings) | Out-String
+		$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
+			foreach ($match in $matches) { 
+				$CSheader = $match.Groups[1].Captures[0].Value 
+					If ($CSheader) { 
+					# A custom host header is used! The first result is taken.
+					$blnCustomHeader = $true
+					$CScustomHeader = $CSheader
+					# Check whether the custom host header is a CNAME Alias or Host (A) DNS entry
+					$AliasTypeCheck = Resolve-DnsName $CSheader | Select -ExpandProperty Type
+					If ($AliasTypeCheck -match "CNAME") { 
+						$CNAME = $true 
+						$CScustomHeaderType = "CNAME DNS Alias"
 					}
 					Else {
-						#$global:strRecommendations += "`n Use Custom Domain Account to run Coresight AppPools. Ideally, use a (Group) Managed Service Account."
-						If (!$blnKernelMode) {
-							$global:strRecommendations += "`n ENABLE Kernel-mode Authentication."
-						}
-						
+						$CNAME = $false
+						$CScustomHeaderType = "HOST (A) DNS Record"
+					}
+					break 
+					}
+			}
 
-						$spnCheck = $(setspn -l $CSWebServerName).ToLower()
-						$spnCounter = 0
-                    
-							$hostnameSPN = $("host/" + $CSWebServerName.ToLower())
-							$fqdnSPN = $("host/" + $CSWebServerFQDN.ToLower())
-			
-								foreach($line in $spnCheck)
-								{
-									switch($line.ToLower().Trim())
-									{
-										$hostnameSPN {$spnCounter++; break}
-										$fqdnSPN {$spnCounter++; break}
-										default {break}
-									}
-								}
-								
-								# Both SPNs must exist
-								If ($spnCounter -eq 2) { 
-								$strSPNs = "Service Principal Names are configured correctly: $hostnameSPN and $fqdnSPN"                            
-								}
-								
-								# Some SPN(s) is (are) missing
-								Else {
-								$strSPNs = "Unable to find all required HTTP SPNs."
-								$global:strIssues += "`n Unable to find all required HTTP SPNs. 
-								Please make sure $hostnameSPN and $fqdnSPN SPNs are created. For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
-								$global:issueCount += 1
-								}
-
-				   }
-			   }
-
-		# KERBEROS DELEGATION CHECK IS CONFIRMED
+		Check-CoresightSPNconfig -bchh $blnCustomHeader -cta $blnCustomAccount -DBGLevel $DBGLevel
+		#
+		# KERBEROS DELEGATION CHECK CONFIRMED
+		#
 		If ($blnDelegationCheckConfirmed) {
 				   
 			# Get PI and AF Servers from the web server KST
 			$AFServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer 
 			$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
 			
-				# RESOURCE BASED KERBEROS DELEGATION
+				#### RESOURCE BASED KERBEROS DELEGATION
 				If ($rbkcd) {
 
 						If (!$blnCustomAccount) { $RBKCDAppPoolIdentity = $CSWebServerName }
@@ -1045,7 +907,7 @@ If ($ADMtemp) {
 				}
 
 				
-				# CLASSIC KERBEROS DELEGATION
+				#### CLASSIC KERBEROS DELEGATION
 				Else {
 					$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
 					$AFServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer
@@ -1134,7 +996,7 @@ If ($ADMtemp) {
 				}
 
 
-				# BACK-END SERVICES SERVICE PRINCIPAL NAME CHECK
+				#### BACK-END SERVICES SERVICE PRINCIPAL NAME CHECK
 				foreach ($AFServerBEC in $AFServers) {
 					$AFServer = $AFServerBEC.Groups[1].Captures[0].Value
 					$serviceType = "afserver"
@@ -1170,7 +1032,7 @@ If ($ADMtemp) {
 #### Summary
 $exportPath = (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value
 $LogFile = $exportPath + "\CoresightKerberosConfig.log"
-
+####
 # Compose Authentication section 
 If($blnWindowsAuth)
 {
@@ -1187,7 +1049,7 @@ Else
 		Is Windows Authentication Enabled: $blnWindowsAuth
 "@
 }
-
+####
 # Compose Customer Header section 
 If($blnCustomHeader)
 {
@@ -1203,7 +1065,27 @@ Else
         Is Custom Host Header used: $blnCustomHeader
 "@ -f $blnCustomHeader
 }
-
+####
+# Compose Kerberos Check section 
+If($blnDelegationCheckConfirmed)
+{
+	$strCoresightKerberosDelegationsSection=@"
+		Coresight - Service Principal Names: $global:strSPNs
+		`n
+		PI/AF - Service Principal Names: $strBackEndSPNS
+		`n
+		Coresight AppPool - Kerberos Delegation: $CoresightDelegation
+		`n
+"@
+}
+Else
+{
+	$strCoresightKerberosDelegationsSection=@"
+        Coresight - Service Principal Names: $global:strSPNs
+		`n
+"@ -f $blnCustomHeader
+}
+####
 $strSummaryReport = @"
     Coresight Authentication Settings:
 $strCoresightAuthenticationSection
@@ -1214,12 +1096,8 @@ $strCoresightWebSiteBindingsSection
     Coresight AppPool Identity: $CSAppPoolIdentity
         Group Managed Service Account used: $blngMSA
         `n
-    Coresight - Service Principal Names: $strSPNs
-        `n
-	PI/AF - Service Principal Names: $strBackEndSPNS
-       `n
-    Coresight - Kerberos Delegation: $CoresightDelegation
-        `n
+$strCoresightKerberosDelegationsSection
+		`n
 	RECOMMENDATIONS: $global:strRecommendations
         `n
 	NUMBER OF ISSUES FOUND: $global:issueCount
