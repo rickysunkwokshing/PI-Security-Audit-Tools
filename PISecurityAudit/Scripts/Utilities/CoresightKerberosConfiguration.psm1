@@ -226,8 +226,8 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		$ServiceAccount = $ServiceAccount.TrimEnd('$')
 	}
 
-	$msgCanDelegateTo = "$global:CoresightAppPoolAccountPretty can delegate to $ResourceType $ComputerName running under $ServiceAccount"
-	$msgCanNotDelegateTo = "$global:CoresightAppPoolAccountPretty CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
+	$msgCanDelegateTo = "`n $global:CoresightAppPoolAccountPretty can delegate to $ResourceType $ComputerName running under $ServiceAccount"
+	$msgCanNotDelegateTo = "`n $global:CoresightAppPoolAccountPretty CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
 	$RBKCDPrincipal = ""
 	$blnResolveDomain = $null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq ""
 
@@ -766,7 +766,7 @@ If ($ADMtemp) {
     $blnWindowsAuth = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $blnWindowsAuthQuery -DBGLevel $DBGLevel
     # Windows Authentication must be enabled - if it isn't, exit.
     if (!$blnWindowsAuth) { 
-    Write-Output "Windows Authentication must be enabled!"
+    Write-Warning "Windows Authentication must be enabled! Aborting."
     break }
 
     # Get Windows Authentication Providers
