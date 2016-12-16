@@ -226,8 +226,8 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		$ServiceAccount = $ServiceAccount.TrimEnd('$')
 	}
 
-	$msgCanDelegateTo = "`n $RBKCDAppPoolIdentity can delegate to $ResourceType $ComputerName running under $ServiceAccount"
-	$msgCanNotDelegateTo = "`n $RBKCDAppPoolIdentity CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
+	$msgCanDelegateTo = "$global:CoresightAppPoolAccountPretty can delegate to $ResourceType $ComputerName running under $ServiceAccount"
+	$msgCanNotDelegateTo = "$global:CoresightAppPoolAccountPretty CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
 	$RBKCDPrincipal = ""
 	$blnResolveDomain = $null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq ""
 
@@ -250,7 +250,7 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 	Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
 	# Check the Principals for a match
-	If ($RBKCDPrincipal -match $RBKCDAppPoolIdentity) { 
+	If ($RBKCDPrincipal -match $global:CoresightAppPoolAccount) { 
 		$global:RBKCDstring += $msgCanDelegateTo
 	} 
 	Else { 
@@ -331,8 +331,9 @@ Function Check-ClassicDelegation
 
 	# If the Constrained Kerberos Delegation list of SPN is STILL empty, no delegation is configured.			
 	If ($ClassicAppPoolDelegation -eq $null ) {
-	$global:strClassicDelegation = "`n Coresight AppPool Identity $ClassicAppPool is not trusted for Constrained Kerberos Delegation. 
-	`n Enable Constrained Kerberos Delegation as per OSIsoft KB01222 - Types of Kerberos Delegation
+	$global:strClassicDelegation = "`n Coresight AppPool Identity $ClassicAppPool is not trusted for Classic Constrained Kerberos Delegation. 
+	`n Perhaps Resource Based Kerberos Delegation is enabled?
+	`n Otherwise enable Constrained Kerberos Delegation as per OSIsoft KB01222 - Types of Kerberos Delegation
 	`n http://techsupport.osisoft.com/Troubleshooting/KB/KB01222           
 	`n Aborting."
 	 break
@@ -365,15 +366,15 @@ Function Check-KernelModeAuth
 {
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("capp")]
+		[alias("CustomAppPool")]
 		[boolean]
 		$blnCustomAppPoolAccount,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("ktd")]
+		[alias("UseAppPoolCreds")]
 		[boolean]
 		$blnUAppPoolPwdKerbTicketDecrypt,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("kma")]
+		[alias("UseKernelModeAuth")]
 		[boolean]
 		$blnUseKernelModeAuth,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
@@ -382,95 +383,130 @@ Function Check-KernelModeAuth
 		$DBGLevel = 0	
 	)	
 
-		# Kernel Mode Authentication should ALWAYS be enabled as per Microsoft's recommendation
-
-		# Kernel Mode Authentication is disabled.
 		If ($blnUseKernelModeAuth -ne $True) {
 
-			# Coresight AppPools are running under a custom domain account (or gMSA)
 			If ($blnCustomAppPoolAccount -eq $True) {
-				$global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE. For more information, see http://aka.ms/kcdpaper."
+				$global:strRecommendations += "`n ENABLE Kernel-mode Authentication and set UseAppPoolCredentials property to TRUE. 
+				`n For more information, see http://aka.ms/kcdpaper. `n "
 			}
 
-			# Coresight AppPools are running under a virtual or built-in account
 			Else {
-				$global:strRecommendations += "`n ENABLE Kernel-mode Authentication. For more information, see http://aka.ms/kcdpaper."
+				$global:strRecommendations += "`n ENABLE Kernel-mode Authentication. 
+				`n For more information, see http://aka.ms/kcdpaper. `n "
 			}
 		}
-		
-		# Kernel-mode Authentication is enabled
+
 		Else {
-			# Kernel-mode Auth + Custom AppPool Account + UseAppPoolCredentials -eq FALSE >> ISSUE DETECTED
 			If ($blnCustomAppPoolAccount -eq $True -and $blnUAppPoolPwdKerbTicketDecrypt -eq $false){
-			$global:strIssues += "`n Kerberos Authentication will fail, because Kernel-mode Authentication is enabled AND a Custom Account is running Coresight AppPools, 
-									 BUT UseAppPoolCredentials property is set to FALSE. Change it to TRUE. For more information, see http://aka.ms/kcdpaper."
+			$global:strIssues += "`n Kerberos Authentication will fail. `n Kernel-mode Authentication is enabled AND a Custom Account is running Coresight AppPools, BUT UseAppPoolCredentials property is set to FALSE. `n Change it to TRUE. For more information, see http://aka.ms/kcdpaper. `n "
 			$global:issueCount += 1
 			}
 
 		}
 }
 
-Function Check-CoresightSPNconfig
+Function Get-CoresightAppPoolIdentityName
 {
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("bchh")]
-		[boolean]
-		$blnCoresightCustomHostHeader,
+		[alias("AppPoolIDType")]
+		[string]
+		$AppPoolIdentityType,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("cta")]
-		[boolean]
-		$blnCustomTargetAccount,
+		[alias("AppPoolUserString")]
+		[string]
+		$AppPoolUsernameValue,
+		[alias("ServerName")]
+		[string]
+		$IISserverName,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0	
 	)	
 
-		# Custom account is used to run Coresight AppPools
-		If ($blnCustomTargetAccount) {
-		$CoresightSPNclass = "http/"
-		$CoresightSPNtargetAccount = $CSUserSvc.ToLower()
-		$CoresightSPNtargetAccountPos = $CSUserSvc.IndexOf("\")
-		$CoresightSPNtargetAccount = $CSUserSvc.Substring($CoresightSPNtargetAccountPos+1)
-		$CoresightSPNtargetAccount = $CoresightSPNtargetAccount.TrimEnd('$')
-		}
-		Else {
-		$CoresightSPNclass = "host/"
-		$CoresightSPNtargetAccount = $CSWebServerName.ToLower()
-		}
+	$CSUserGMSA = $AppPoolUsernameValue | Out-String
+
+    If ($AppPoolIdentityType -ne "NetworkService" -and $AppPoolIdentityType -ne "ApplicationPoolIdentity" -and $AppPoolIdentityType -ne "LocalSystem")
+    { 
+        $global:blnCustomAccount = $true
+
+		$global:CSAppPoolIdentity = $AppPoolUsernameValue
+        
+        If ($CSUserGMSA.contains('$')) { $global:blngMSA = $True } 
+		Else {   
+			$global:blngMSA = $false 
+            $global:strRecommendations += "`n Use a Group Managed Service Account. For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts. `n "
+        }
+
+		$CSAppPoolPosition = $AppPoolUsernameValue.IndexOf("\")
+		$global:CoresightAppPoolAccount = $AppPoolUsernameValue.Substring($CSAppPoolPosition+1)
+		$global:CoresightAppPoolAccount = $global:CoresightAppPoolAccount.TrimEnd('$')
+		$global:CoresightAppPoolAccount = $global:CoresightAppPoolAccount.ToLower()
+		
+		$global:CoresightAppPoolAccountPretty = $AppPoolUsernameValue
+    }
+    Else
+    {
+            $global:blnCustomAccount = $false
+            $global:blngMSA = $false
+            $global:strRecommendations += "`n Use a Group Managed Service Account. For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts. `n "
 			
-		# HOST (A) DNS record is used as a custom Host Header
-		If ($blnCoresightCustomHostHeader -eq $True -and $CNAME -eq $False) {
+			$global:CSAppPoolIdentity = $AppPoolIdentityType
+			$global:CoresightAppPoolAccount = $IISserverName.ToLower()
+			
+			$global:CoresightAppPoolAccountPretty =$AppPoolIdentityType
+    }
 
-			# Only one SPN is needed in this case
-			$SPN1 = ($CoresightSPNclass + $CScustomHeader).ToLower()
+}
 
-			$SPNCheck = $(setspn -q $SPN1).ToLower() | Out-String
-			If ($SPNCheck -match $SPN1 -and $SPNCheck -match $CoresightSPNtargetAccount) { 
-				$global:strSPNs = "Service Principal Name $SPN1 exists and is assigned to the service identity - $CoresightSPNtargetAccount." 			
+Function Check-ServicePrincipalName
+{
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("chh")]
+		[boolean]
+		$HostA,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("SPN1")]
+		[string]
+		$SPNstring1,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("SPN2")]
+		[string]
+		$SPNstring2,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("TargetAccountName")]
+		[string]
+		$strSPNtargetAccount,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+		If ($HostA) {
+
+			$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String
+			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $strSPNtargetAccount) { 
+				$global:strSPNs = "Service Principal Name $SPNstring1 exists and is assigned to the service identity: $global:CoresightAppPoolAccountPretty." 			
 			}
 			Else { 
 				$global:strSPNs = "Required Service Principal Name could not be found. See ISSUES section for further details."
-				$global:strIssues += "Kerberos authentication will fail. Please make sure $SPN1 Service Principal Name is assigned to the correct service identity - $CoresightSPNtargetAccount
-				`n For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 
-				$global:issueCount += 1"			
+				$global:strIssues += "Kerberos authentication will fail. Please make sure $SPNstring1 Service Principal Name is assigned to the correct service identity: $global:CoresightAppPoolAccountPretty.
+				`n For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
+				$global:issueCount += 1			
 			}
 		}
-		# Custome Host Header is not used , or it's a CNAME
-		Else {
-			
-			# Two SPNs are needed
-			$SPN1 = ($CoresightSPNclass + $CSWebServerName).ToLower()
-			$SPN2 = ($CoresightSPNclass + $CSWebServerFQDN).ToLower()
 
-			$SPNCheck = $(setspn -q $SPN1).ToLower() | Out-String
-			If ($SPNCheck -match $SPN1 -and $SPNCheck -match $SPN2 -and $SPNCheck -match $CoresightSPNtargetAccount) { 
-				$global:strSPNs = "Service Principal Names $SPN1 and $SPN2 exist and are assigned to the service identity - $CoresightSPNtargetAccount."   
+		Else {
+			$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String
+			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2 -and $SPNCheck -match $strSPNtargetAccount) { 
+				$global:strSPNs = "Service Principal Names $SPNstring1 and $SPNstring2 exist and are assigned to the service identity: $global:CoresightAppPoolAccountPretty."   
 			}
 			Else { 
 				$global:strSPNs = "Required Service Principal Names could not be found. See ISSUES section for further details."
-				$global:strIssues += "Kerberos authentication will fail. Please make sure $SPN1 and $SPN2 Service Principal Names are assigned to the correct service identity - $CoresightSPNtargetAccount
+				$global:strIssues += "Kerberos authentication will fail. Please make sure $SPNstring1 and $SPNstring2 Service Principal Names are assigned to the correct service identity: $global:CoresightAppPoolAccountPretty.
 				`n For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 "
 				$global:issueCount += 1
 				
@@ -723,39 +759,7 @@ If ($ADMtemp) {
 	# Get CoreSight Service AppPool Username
 	$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
 	$CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
-	# Output to string for gMSA check
-	$CSUserGMSA = $CSUserSvc | Out-String
-
-    # Check whether a custom account is used to run the Coresight Service AppPool
-	# This doesn't take into account edge cases like LocalSystem as it's handled in the main Coresight module
-    If ($CSAppPoolSvc -ne "NetworkService" -and $CSAppPoolSvc -ne "ApplicationPoolIdentity")
-    {   # Custom account is used
-        $blnCustomAccount = $true
-
-		# Variable just for output.
-		$CSAppPoolIdentity = $CSUserSvc
-        
-		# Custom account, but is it a gMSA?
-        If ($CSUserGMSA.contains('$')) { $blngMSA = $True } 
-		Else {   
-			$blngMSA = $false 
-            $global:strRecommendations += "`n Use a Group Managed Service Account. 
-			For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts."
-        }
-
-    }
-    Else # Custom account is not used (so it cannot be a gMSA)
-    {
-            $blnCustomAccount = $false
-            $blngMSA = $false
-            $global:strRecommendations += "`n Use a Group Managed Service Account. 
-			For more information, see - https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts."
-			
-			# Variable just for output.
-			$CSAppPoolIdentity = $CSAppPoolSvc
-    }
-
-
+	
     # Get Windows Authentication Property
     $blnWindowsAuthQueryTemplate = "Get-WebConfigurationProperty -PSPath `"{0}`" -Filter '/system.webServer/security/authentication/windowsAuthentication' -name enabled | select -expand Value"
     $blnWindowsAuthQuery = [string]::Format($blnWindowsAuthQueryTemplate, $csAppPSPath)
@@ -791,61 +795,70 @@ If ($ADMtemp) {
     $CSWebServerDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
     $CSWebServerFQDN = $CSWebServerName + "." + $CSWebServerDomain 
 
-		#
-    	# KKERNEL-MODE AUTHENTICATION CHECK
-		#
-		Check-KernelModeAuth -capp $blnCustomAccount -ktd $blnUseAppPoolCredentials -kma $blnKernelMode -DBGLevel $DBGLevel      
-		
-		#	
-		# CORESIGHT SERVICE PRINCIPAL NAMES CHECK
-		#
+		# GET CORESIGHT APPPOOL IDENTITY
+		Get-CoresightAppPoolIdentityName -AppPoolIDType $CSAppPoolSvc -AppPoolUserString $CSUserSvc -ServerName $CSWebServerName
 
-		# By default, assume custom header is not used.
-		$blnCustomHeader = $false
 
-		# Convert WebBindings to string and look for custom headers.
-		$BindingsToString = $($CSWebBindings) | Out-String
-		$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
-			foreach ($match in $matches) { 
-				$CSheader = $match.Groups[1].Captures[0].Value 
-					If ($CSheader) { 
-					# A custom host header is used! The first result is taken.
-					$blnCustomHeader = $true
-					$CScustomHeader = $CSheader
-					# Check whether the custom host header is a CNAME Alias or Host (A) DNS entry
-					$AliasTypeCheck = Resolve-DnsName $CSheader | Select -ExpandProperty Type
-					If ($AliasTypeCheck -match "CNAME") { 
-						$CNAME = $true 
-						$CScustomHeaderType = "CNAME DNS Alias"
-					}
-					Else {
-						$CNAME = $false
-						$CScustomHeaderType = "HOST (A) DNS Record"
-					}
-					break 
-					}
+		# KKERNEL-MODE AUTHENTICATION CHECK
+		Check-KernelModeAuth -CustomAppPool $global:blnCustomAccount -UseAppPoolCreds $blnUseAppPoolCredentials -UseKernelModeAuth $blnKernelMode -DBGLevel $DBGLevel      
+	
+
+		# CHECK BINDINGS, CHECK IF CUSTOM HOST HEADER IS USED
+
+			$blnCustomHeader = $false
+			$HostA = $False 
+
+			$BindingsToString = $($CSWebBindings) | Out-String
+			$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
+						foreach ($match in $matches) { 
+							$CSheader = $match.Groups[1].Captures[0].Value 
+								If ($CSheader) { 
+									$blnCustomHeader = $true
+									$CScustomHeader = $CSheader
+								break 
+								}
+						}
+			
+			If ($blnCustomHeader -eq $True) {								
+				$AliasTypeCheck = Resolve-DnsName $CScustomHeader | Select -ExpandProperty Type
+
+				If ($AliasTypeCheck -match "CNAME") { 
+					$HostA = $False 
+					$CScustomHeaderType = "CNAME DNS Alias"
+				}
+				Else {
+					$HostA = $True
+					$CScustomHeaderType = "HOST (A) DNS Record"
+				}
 			}
 
-		Check-CoresightSPNconfig -bchh $blnCustomHeader -cta $blnCustomAccount -DBGLevel $DBGLevel
-		#
+		# CORESIGHT SERVICE PRINCIPAL NAMES CHECK
+				If ($global:blnCustomAccount -eq $true -and $HostA -eq $true) {
+					$SPNone = ("http/" + $CScustomHeader).ToLower()
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -TargetAccountName $global:CoresightAppPoolAccount
+				}
+
+				ElseIf ($global:blnCustomAccount -eq $true -and $HostA -eq $false) {
+					$SPNone = ("http/" + $CSWebServerName).ToLower()
+					$SPNtwo = ("http/" + $CSWebServerFQDN).ToLower()
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount
+				}
+				Else {
+					$SPNone = ("host/" + $CSWebServerName).ToLower()
+					$SPNtwo = ("host/" + $CSWebServerFQDN).ToLower()
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount
+				}
+
 		# KERBEROS DELEGATION CHECK CONFIRMED
-		#
 		If ($blnDelegationCheckConfirmed) {
 				   
 			# Get PI and AF Servers from the web server KST
 			$AFServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer 
 			$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
 			
-				#### RESOURCE BASED KERBEROS DELEGATION
+				# RESOURCE BASED KERBEROS DELEGATION
 				If ($rbkcd) {
-
-						If (!$blnCustomAccount) { $RBKCDAppPoolIdentity = $CSWebServerName }
-						Else {
-						$RBKCDAppPoolIdentityPos = $CSUserSvc.IndexOf("\")
-						$RBKCDAppPoolIdentity = $CSUserSvc.Substring($RBKCDAppPoolIdentityPos+1)
-						$RBKCDAppPoolIdentity = $RBKCDAppPoolIdentity.TrimEnd('$')
-						}
-						
+				
 							foreach ($AFServerTemp in $AFServers) { 
 								$AccType = 0
 								$AFServer = $AFServerTemp.Groups[1].Captures[0].Value
@@ -866,7 +879,7 @@ If ($ADMtemp) {
 												continue
 											}
 							
-											Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccount -sad $AFSvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $AFServer -rt "AF Server" -DBGLevel $DBGLevel
+											Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccount -sad $AFSvcAccountDomain -sat $AccType -api $global:CoresightAppPoolAccount -cn $AFServer -rt "AF Server" -DBGLevel $DBGLevel
 										}
 							
 										Else { 
@@ -893,7 +906,7 @@ If ($ADMtemp) {
 												Write-Output "Unable to locate type of ADObject $PISvcAccount."
 												continue
 											}
-											Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccount -sad $PISvcAccountDomain -sat $AccType -api $RBKCDAppPoolIdentity -cn $PIServer -rt "PI Server" -DBGLevel $DBGLevel
+											Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccount -sad $PISvcAccountDomain -sat $AccType -api $global:CoresightAppPoolAccount -cn $PIServer -rt "PI Server" -DBGLevel $DBGLevel
 										}
 										Else 
 										{ 
@@ -907,26 +920,16 @@ If ($ADMtemp) {
 				}
 
 				
-				#### CLASSIC KERBEROS DELEGATION
+				# CLASSIC KERBEROS DELEGATION
 				Else {
 					$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
 					$AFServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer
 
-					# AppPool is a custom account
-					If ($blnCustomAccount) { 
-					$posAppPool = $CSUserSvc.IndexOf("\")
-					$CSUserSvc = $CSUserSvc.Substring($posAppPool+1)
-					$CSUserSvc = $CSUserSvc.TrimEnd('$')
-
-						If ($blngMSA) { $ClassicAccType = 3 } # AppPool is a gMSA
-						Else { $ClassicAccType = 1 } # AppPool is standard domain user
-					}
-
-					# AppPool is a virtual account
-					Else {	
-					$CSUserSvc = $CSWebServerName  
-					$ClassicAccType = 2 
-					}
+						If ($global:blnCustomAccount -eq $True) {
+							If ($global:blngMSA -eq $True) { $ClassicAccType = 3 }
+							Else { $ClassicAccType = 1 }
+						}
+						Else {	$ClassicAccType = 2 }
 					
 					# Initializing variables needed to construct an SPN
 					$dot = '.'
@@ -959,7 +962,7 @@ If ($ADMtemp) {
 							$longPISPN = ($PISPNClass + $fqdnPI).ToString()
 
 					# Check if the SPN is on the list the Coresight AppPool can delegate to
-					Check-ClassicDelegation -sspn $shortPISPN -lspn $longPISPN -cap $CSUserSvc -crt "PI Data Server" -cse $PIServer -cat $ClassicAccType
+					Check-ClassicDelegation -sspn $shortPISPN -lspn $longPISPN -cap $global:CoresightAppPoolAccount -crt "PI Data Server" -cse $PIServer -cat $ClassicAccType
 					}
 
 					
@@ -989,14 +992,14 @@ If ($ADMtemp) {
 							$longAFSPN = ($AFSPNClass + $fqdnAF).ToString()
 
 					# Check if the SPN is on the list the Coresight AppPool can delegate to
-					Check-ClassicDelegation -sspn $shortAFSPN -lspn $longAFSPN -cap $CSUserSvc -crt "AF Server" -cse $AFServer -cat $ClassicAccType
+					Check-ClassicDelegation -sspn $shortAFSPN -lspn $longAFSPN -cap $global:CoresightAppPoolAccount -crt "AF Server" -cse $AFServer -cat $ClassicAccType
 					}
 								
 				$CoresightDelegation = $global:strClassicDelegation
 				}
 
 
-				#### BACK-END SERVICES SERVICE PRINCIPAL NAME CHECK
+				# BACK-END SERVICES SERVICE PRINCIPAL NAME CHECK
 				foreach ($AFServerBEC in $AFServers) {
 					$AFServer = $AFServerBEC.Groups[1].Captures[0].Value
 					$serviceType = "afserver"
@@ -1063,7 +1066,7 @@ Else
 {
 	$strCoresightWebSiteBindingsSection=@"
         Is Custom Host Header used: $blnCustomHeader
-"@ -f $blnCustomHeader
+"@
 }
 ####
 # Compose Kerberos Check section 
@@ -1083,7 +1086,7 @@ Else
 	$strCoresightKerberosDelegationsSection=@"
         Coresight - Service Principal Names: $global:strSPNs
 		`n
-"@ -f $blnCustomHeader
+"@
 }
 ####
 $strSummaryReport = @"
@@ -1093,8 +1096,8 @@ $strCoresightAuthenticationSection
     Coresight Web Site Bindings:
 $strCoresightWebSiteBindingsSection
         `n
-    Coresight AppPool Identity: $CSAppPoolIdentity
-        Group Managed Service Account used: $blngMSA
+    Coresight AppPool Identity: $global:CSAppPoolIdentity
+        Group Managed Service Account used: $global:blngMSA
         `n
 $strCoresightKerberosDelegationsSection
 		`n
