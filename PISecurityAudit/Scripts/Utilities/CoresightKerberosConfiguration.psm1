@@ -174,6 +174,7 @@ Function Get-ServiceLogonAccountDomain
 
 	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
 		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
+		-or $ServiceAccount -eq "ApplicationPoolIdentity" `
 		-or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccountDomain = $null}
 	Else{
 		$RBKCDpos = $ServiceAccount.IndexOf("\")
@@ -405,7 +406,7 @@ Function Check-KernelModeAuth
 		}
 }
 
-Function Get-CoresightAppPoolIdentityName
+Function Get-CoresightAppPoolNetworkIdentityName
 {
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
@@ -479,15 +480,19 @@ Function Check-ServicePrincipalName
 		[alias("TargetAccountName")]
 		[string]
 		$strSPNtargetAccount,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("TargetDomain")]
+		[string]
+		$strSPNtargetDomain="",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0	
 	)	
-
+		If ($strSPNtargetDomain -eq "") {	$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String }
+		Else { $SPNCheck = $(setspn -t $strSPNtargetDomain -q $SPNstring1).ToLower() | Out-String }
 		If ($HostA) {
 
-			$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String
 			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $strSPNtargetAccount) { 
 				$global:strSPNs = "Service Principal Name $SPNstring1 exists and is assigned to the service identity: $global:CoresightAppPoolAccountPretty." 			
 			}
@@ -500,7 +505,6 @@ Function Check-ServicePrincipalName
 		}
 
 		Else {
-			$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String
 			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2 -and $SPNCheck -match $strSPNtargetAccount) { 
 				$global:strSPNs = "Service Principal Names $SPNstring1 and $SPNstring2 exist and are assigned to the service identity: $global:CoresightAppPoolAccountPretty."   
 			}
@@ -725,6 +729,17 @@ If ($ADMtemp) {
 	If($ComputerName -eq ""){$LocalComputer = $true}
 	Else{$LocalComputer = $false}
 
+	if(Test-PISysAudit_IISModuleAvailable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel)
+	{
+		$msg = 'WebAdministration module loaded successfully.'
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+	}
+	else
+	{
+		Write-Warning 'Unable to load the WebAdministration module on target machine.  Exiting... `nEnsure the Web-Scripting-Tools are installed and you have sufficient privilege.'
+		break
+	}
+
 	# Get CoreSight Web Site Name
 	$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
 	$attribute = "WebSite"
@@ -745,20 +760,24 @@ If ($ADMtemp) {
 	$csAppPSPath = $csWebApp.pspath + "/" + $CSwebSite + $csWebApp.path
 
 	# Get CoreSight Service AppPool Identity Type
-	$QuerySvcAppPool = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
-	$CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
+	$QueryCSAppPoolSvcType = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
+	$CSAppPoolSvcType = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryCSAppPoolSvcType -DBGLevel $DBGLevel
 
 	# Get CoreSight Admin AppPool Identity Type
-	$QueryAdmAppPool = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.identitytype"
-	$CSAppPoolAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmAppPool -DBGLevel $DBGLevel
+	$QueryCSAppPoolAdmType = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.identitytype"
+	$CSAppPoolAdmType = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryCSAppPoolAdmType -DBGLevel $DBGLevel
 
-	# Get CoreSight Admin AppPool Username
-	$QueryAdmUser = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.username.value"
-	$CSUserAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmUser -DBGLevel $DBGLevel
-
-	# Get CoreSight Service AppPool Username
-	$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
-	$CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
+	# Get the username when a specific user is specified
+	if($CSAppPoolSvcType -eq 'SpecificUser'){
+		$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
+		$CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
+	}
+	else { $CSUserSvc = $CSAppPoolSvcType }
+	if($CSAppPoolAdmType -eq 'SpecificUser'){
+		$QueryAdmUser = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.username.value"
+		$CSUserAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmUser -DBGLevel $DBGLevel
+	}
+	else { $CSUserAdm = $CSAppPoolSvcType }
 	
     # Get Windows Authentication Property
     $blnWindowsAuthQueryTemplate = "Get-WebConfigurationProperty -PSPath `"{0}`" -Filter '/system.webServer/security/authentication/windowsAuthentication' -name enabled | select -expand Value"
@@ -770,7 +789,9 @@ If ($ADMtemp) {
     break }
 
     # Get Windows Authentication Providers
-    $authProviders = $(Get-WebConfigurationProperty -PSPath $csAppPSPath -Filter '/system.webServer/security/authentication/windowsAuthentication/providers' -Name *).Collection
+    $authProvidersCollectionQueryTemplate = "Get-WebConfigurationProperty -PSPath `"{0}`" -Filter '/system.webServer/security/authentication/windowsAuthentication/providers' -Name *"
+	$authProvidersCollectionQuery = [string]::Format($authProvidersCollectionQueryTemplate, $csAppPSPath)
+	$authProviders = $(Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $authProvidersCollectionQuery -DBGLevel $DBGLevel).Collection
     $strProviders = ""
     foreach($provider in $authProviders){$strProviders+="`r`n`t`t`t"+$provider.Value}
   
@@ -790,16 +811,15 @@ If ($ADMtemp) {
 	$CSWebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
 
     # Get the CoreSight web server hostname, domain name, and build the FQDN
-    # $CSWebServerName = (Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName).ComputerName
     $CSWebServerName = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
     $CSWebServerDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
     $CSWebServerFQDN = $CSWebServerName + "." + $CSWebServerDomain 
 
 		# GET CORESIGHT APPPOOL IDENTITY
-		Get-CoresightAppPoolIdentityName -AppPoolIDType $CSAppPoolSvc -AppPoolUserString $CSUserSvc -ServerName $CSWebServerName
+		Get-CoresightAppPoolNetworkIdentityName -AppPoolIDType $CSAppPoolSvcType -AppPoolUserString $CSUserSvc -ServerName $CSWebServerName
 
 
-		# KKERNEL-MODE AUTHENTICATION CHECK
+		# KERNEL-MODE AUTHENTICATION CHECK
 		Check-KernelModeAuth -CustomAppPool $global:blnCustomAccount -UseAppPoolCreds $blnUseAppPoolCredentials -UseKernelModeAuth $blnKernelMode -DBGLevel $DBGLevel      
 	
 
@@ -833,20 +853,21 @@ If ($ADMtemp) {
 			}
 
 		# CORESIGHT SERVICE PRINCIPAL NAMES CHECK
+				$CSUserSvcDomain = Get-ServiceLogonAccountDomain -ServiceAccount $CSUserSvc -DBGLevel $DBGLevel
 				If ($global:blnCustomAccount -eq $true -and $HostA -eq $true) {
 					$SPNone = ("http/" + $CScustomHeader).ToLower()
-					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -TargetAccountName $global:CoresightAppPoolAccount
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcDomain
 				}
 
 				ElseIf ($global:blnCustomAccount -eq $true -and $HostA -eq $false) {
 					$SPNone = ("http/" + $CSWebServerName).ToLower()
 					$SPNtwo = ("http/" + $CSWebServerFQDN).ToLower()
-					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcDomain
 				}
 				Else {
 					$SPNone = ("host/" + $CSWebServerName).ToLower()
 					$SPNtwo = ("host/" + $CSWebServerFQDN).ToLower()
-					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcDomain
 				}
 
 		# KERBEROS DELEGATION CHECK CONFIRMED
@@ -918,8 +939,6 @@ If ($ADMtemp) {
 						# New variable for easy output
 						$CoresightDelegation = $global:RBKCDstring
 				}
-
-				
 				# CLASSIC KERBEROS DELEGATION
 				Else {
 					$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
@@ -935,7 +954,6 @@ If ($ADMtemp) {
 					$dot = '.'
 					$PISPNClass = "piserver/"
 					$AFSPNClass = "afserver/"
-
 
 					foreach ($PIServer in $PIServers) {
 							
@@ -1035,8 +1053,7 @@ If ($ADMtemp) {
 #### Summary
 $exportPath = (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value
 $LogFile = $exportPath + "\CoresightKerberosConfig.log"
-####
-# Compose Authentication section 
+##### Compose Authentication section 
 If($blnWindowsAuth)
 {
 	$strCoresightAuthenticationSection=@"
@@ -1052,8 +1069,7 @@ Else
 		Is Windows Authentication Enabled: $blnWindowsAuth
 "@
 }
-####
-# Compose Customer Header section 
+##### Compose Customer Header section 
 If($blnCustomHeader)
 {
 	$strCoresightWebSiteBindingsSection=@"
@@ -1068,8 +1084,7 @@ Else
         Is Custom Host Header used: $blnCustomHeader
 "@
 }
-####
-# Compose Kerberos Check section 
+##### Compose Kerberos Check section 
 If($blnDelegationCheckConfirmed)
 {
 	$strCoresightKerberosDelegationsSection=@"
