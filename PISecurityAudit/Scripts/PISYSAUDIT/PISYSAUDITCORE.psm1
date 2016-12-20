@@ -2649,6 +2649,88 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_ParseDomainAndUserFromString
+{
+<#
+.SYNOPSIS
+(Core functionality) Parse the domain portion out of an account string.
+.DESCRIPTION
+Parse the domain portion out of an account string.  Supports UPN or Down-Level format
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("us")]
+		[string]
+		$UserString,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{
+	$fn = GetFunctionName
+	try
+	{
+		If ($UserString -eq "LocalSystem" -or $UserString -eq "NetworkService" `
+			-or $UserString -eq "NT AUTHORITY\LocalSystem" -or $UserString -eq "NT AUTHORITY\NetworkService" `
+			-or $UserString -eq "ApplicationPoolIdentity" `
+			-or $UserString -eq "NT SERVICE\AFService") 
+		{ 
+			$ServiceAccountDomain = '.'
+			$parsingPosDL = $UserString.IndexOf('\')
+			If($parsingPosDL -ne -1 ) 
+			{
+				$ServiceAccount = $UserString.Substring($parsingPosDL+1)
+			}
+			Else 
+			{
+				$ServiceAccount = $UserString
+			}
+		}
+		Else{
+			# Parse as UPN or Down-Level Logon format
+			$parsingPosDL = $UserString.IndexOf('\') # DL
+			$parsingPosUPN = $UserString.IndexOf('@') # UPN
+			If($parsingPosDL -ne -1 ) 
+			{
+				$ServiceAccountDomain = $UserString.Substring(0,$parsingPosDL)
+				$ServiceAccount = $UserString.Substring($parsingPosDL+1)
+			}
+			ElseIf($parsingPosUPN -ne -1)
+			{
+				$ServiceAccountDomain = $UserString.Substring($parsingPosUPN+1)
+				$ServiceAccount = $UserString.Substring(0,$parsingPosUPN)
+			}
+			Else
+			{
+				$ServiceAccountDomain = $null
+				$ServiceAccount = $UserString
+			}
+		}
+
+		$AccountObject = New-Object PSCustomObject					
+		Add-Member -InputObject $AccountObject -MemberType NoteProperty -Name "UserName" -Value $ServiceAccount
+		Add-Member -InputObject $AccountObject -MemberType NoteProperty -Name "Domain" -Value $ServiceAccountDomain	
+
+		return $AccountObject			
+	}
+	catch
+	{
+		# Return the error message.				
+		Write-PISysAudit_LogMessage "Unable to determine account domain." "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_ServiceState
 {
 <#
@@ -3003,6 +3085,85 @@ END {}
 #***************************
 #End of exported function
 #***************************
+}
+
+Function Get-PISysAudit_KnownServers
+{
+<#
+.SYNOPSIS
+(Core functionality) Get the servers in the PI Data Archive or PI AF Server KST.
+.DESCRIPTION
+Get the servers in the PI Data Archive or PI AF Server KST.
+#>
+	param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]		
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("st")]
+		[ValidateSet('PIServer','AFServer')]
+		[string] 
+		$ServerType,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0	
+	)	
+
+	$fn = GetFunctionName
+
+	If($ServerType -eq 'PIServer')
+	{
+		# Get PI Servers
+		$regpathKST = 'HKLM:\SOFTWARE\PISystem\PI-SDK\1.0\ServerHandles'
+		if($LocalComputer)
+		{
+			$KnownServers = Get-ChildItem $regpathKST | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}
+		}
+		Else
+		{
+			$scriptBlockCmdTemplate = "Get-ChildItem `"{0}`" | ForEach-Object [ Get-ItemProperty `$_.pspath ] | where-object [ `$_.path ] | Foreach-Object [ `$_.path ]"
+			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $regpathKST)
+			$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")			
+			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )													
+			$KnownServers = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
+		}
+	}
+	Else
+	{
+		# Get AF Servers
+		$programDataWebServer = Get-PISysAudit_EnvVariable "ProgramData" -lc $LocalComputer -rcn $RemoteComputerName  -Target Process
+		$afsdkConfigPathWebServer = "$programDataWebServer\OSIsoft\AF\AFSDK.config"
+		if($LocalComputer)
+		{
+			$AFSDK = Get-Content -Path $afsdkConfigPathWebServer | Out-String
+		}
+		Else
+		{
+			$scriptBlockCmdTemplate = "Get-Content -Path ""{0}"" | Out-String"
+			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $afsdkConfigPathWebServer)									
+			
+			# Verbose only if Debug Level is 2+
+			$msgTemplate = "Remote command to send to {0} is: {1}"
+			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
+			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+			
+			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
+			$AFSDK = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
+		}
+		$KnownServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)')
+	}
+
+	$msgTemplate = "Known servers found: {0}"
+	$msg = [string]::Format($msgTemplate, $KnownServers)
+	Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
+	return $KnownServers
 }
 
 function Get-PISysAudit_CheckPrivilege
@@ -5221,6 +5382,7 @@ Export-ModuleMember Get-PISysAudit_EnvVariable
 Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ServiceLogOnAccount
+Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceState
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
@@ -5228,6 +5390,7 @@ Export-ModuleMember Get-PISysAudit_InstalledKBs
 Export-ModuleMember Get-PISysAudit_InstalledWin32Feature
 Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
+Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_PIConfigScript
 Export-ModuleMember Invoke-PISysAudit_PIVersionCommand
