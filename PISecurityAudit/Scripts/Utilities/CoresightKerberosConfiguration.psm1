@@ -729,7 +729,7 @@ If ($ADMtemp) {
 	If($ComputerName -eq ""){$LocalComputer = $true}
 	Else{$LocalComputer = $false}
 
-	if(Test-PISysAudit_IISModuleAvailable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel)
+	if(Test-WebAdministrationModuleAvailable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel)
 	{
 		$msg = 'WebAdministration module loaded successfully.'
 		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2

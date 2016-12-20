@@ -1151,6 +1151,85 @@ param(
 	}	
 }
 
+function Test-WebAdministrationModuleAvailable
+{
+<#
+.SYNOPSIS
+(Core functionality) Checks for the WebAdministration module.
+.DESCRIPTION
+Validate that IIS module can be loaded and configuration data can be accessed.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{			
+	$fn = GetFunctionName
+	$value = $false
+	try
+	{
+		$query = 'Test-Path IIS:\'
+		$scriptBlock = [scriptblock]::create( $query )
+		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet
+		if($LocalComputer)		
+		{						
+			
+			# Import the WebAdministration module
+			Import-Module -Name "WebAdministration"		
+			
+			# Execute the command locally	
+			$value = Invoke-Command -ScriptBlock $scriptBlock			
+		}
+		else
+		{	
+					
+			# Establishing a new PS session on a remote computer		
+			$PSSession = New-PSSession -ComputerName $RemoteComputerName
+
+			# Importing WebAdministration module within the PS session
+			Invoke-Command -Session $PSSession -ScriptBlock {Import-Module WebAdministration}
+			
+			# Execute the command within a remote PS session
+			$value = Invoke-Command -Session $PSSession -ScriptBlock $scriptBlock
+			Remove-PSSession -ComputerName $RemoteComputerName
+		}
+	
+		# Return the value found.
+		return $value		
+	}
+	catch
+	{
+		# Return the error message.
+		$msgTemplate1 = "A problem occurred checking for IIS scripting tools: {0} from local machine."
+		$msgTemplate2 = "A problem occurred checking for IIS scripting tools: {0} from {1} machine."
+		if($LocalComputer)
+		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
+		else
+		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message) }
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Test-PowerShellToolsForPISystemAvailable
 {
     # Check for availability of PowerShell Tools for the PI System
@@ -2345,85 +2424,6 @@ PROCESS
 		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
 		else
 		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message, $RemoteComputerName) }
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
-		return $null
-	}
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
-
-function Test-PISysAudit_IISModuleAvailable
-{
-<#
-.SYNOPSIS
-(Core functionality) Enables use of the WebAdministration module.
-.DESCRIPTION
-Validate that IIS module can be loaded and configuration data can be accessed.
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)		
-BEGIN {}
-PROCESS
-{			
-	$fn = GetFunctionName
-	$value = $false
-	try
-	{
-		$query = 'Test-Path IIS:\'
-		$scriptBlock = [scriptblock]::create( $query )
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet
-		if($LocalComputer)		
-		{						
-			
-			# Import the WebAdministration module
-			Import-Module -Name "WebAdministration"		
-			
-			# Execute the command locally	
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
-		else
-		{	
-					
-			# Establishing a new PS session on a remote computer		
-			$PSSession = New-PSSession -ComputerName $RemoteComputerName
-
-			# Importing WebAdministration module within the PS session
-			Invoke-Command -Session $PSSession -ScriptBlock {Import-Module WebAdministration}
-			
-			# Execute the command within a remote PS session
-			$value = Invoke-Command -Session $PSSession -ScriptBlock $scriptBlock
-			Remove-PSSession -ComputerName $RemoteComputerName
-		}
-	
-		# Return the value found.
-		return $value		
-	}
-	catch
-	{
-		# Return the error message.
-		$msgTemplate1 = "A problem occurred checking for IIS scripting tools: {0} from local machine."
-		$msgTemplate2 = "A problem occurred checking for IIS scripting tools: {0} from {1} machine."
-		if($LocalComputer)
-		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
-		else
-		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message) }
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return $null
 	}
@@ -5235,7 +5235,6 @@ Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
-Export-ModuleMember Test-PISysAudit_IISModuleAvailable
 Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject
 Export-ModuleMember New-PISysAudit_PasswordOnDisk
@@ -5248,6 +5247,7 @@ Export-ModuleMember -Alias pisysauditparams
 Export-ModuleMember -Alias piaudit
 Export-ModuleMember -Alias pwdondisk
 Export-ModuleMember Test-PowerShellToolsForPISystemAvailable
+Export-ModuleMember Test-WebAdministrationModuleAvailable
 # </Do not remove>
 
 # ........................................................................
