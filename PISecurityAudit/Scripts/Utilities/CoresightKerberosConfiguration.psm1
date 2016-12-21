@@ -140,7 +140,16 @@ Query AD for the object type of the service account.  This function requires RSA
 	$blnDomainResolved = $null -ne $ServiceAccountDomain -and $ServiceAccountDomain -ne '.' -and $ServiceAccountDomain -ne 'MACHINEACCOUNT'
 	If (!$blnDomainResolved -and `
 	   ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "AFService")) 
-		{ $ServiceAccount = $ComputerName }
+		{ 
+			# Truncate to the hostname for processing of logon type
+			$pos = $ComputerName.IndexOf('.')
+			If($pos -eq -1){ $ServiceAccount = $ComputerName }
+			Else {
+				$ServiceAccount = $ComputerName.Substring(0,$pos)
+				$ServiceAccountDomain = $ComputerName.Substring($pos+1)
+				$blnDomainResolved = $true
+			}
+		}
 	
 	$ServiceAccount = $ServiceAccount.TrimEnd('$')
 
@@ -198,7 +207,17 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 	)	
 
 	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
-		-or $ServiceAccount -eq "AFService")  { $ServiceAccount = $ComputerName }
+		-or $ServiceAccount -eq "AFService")  
+	{ 
+		# Truncate to the hostname for processing of logon type
+		$pos = $ComputerName.IndexOf('.')
+		If($pos -eq -1){ $ServiceAccount = $ComputerName }
+		Else {
+			$ServiceAccount = $ComputerName.Substring(0,$pos)
+			$ServiceAccountDomain = $ComputerName.Substring($pos+1)
+			$blnDomainResolved = $true
+		}
+	}
 	Else { $ServiceAccount = $ServiceAccount.TrimEnd('$') }
 
 	$msgCanDelegateTo = "`n $global:CoresightAppPoolAccountPretty can delegate to $ResourceType $ComputerName running under $ServiceAccount"
@@ -463,11 +482,11 @@ Function Check-ServicePrincipalName
 		[int]
 		$DBGLevel = 0	
 	)	
-		If ($strSPNtargetDomain -eq "" -or $strSPNtargetDomain -eq "." -or $strSPNtargetDomain -eq "MACHINEACCOUNT") {	$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String }
-		Else { $SPNCheck = $(setspn -t $strSPNtargetDomain -q $SPNstring1).ToLower() | Out-String }
+		If ($strSPNtargetDomain -eq "" -or $strSPNtargetDomain -eq "." -or $strSPNtargetDomain -eq "MACHINEACCOUNT") {	$SPNCheck = $(setspn -l $strSPNtargetAccount).ToLower() | Out-String }
+		Else { $SPNCheck = $(setspn -l $($strSPNtargetDomain + '\' + $strSPNtargetAccount)).ToLower() | Out-String }
 		If ($HostA) {
 
-			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $strSPNtargetAccount) { 
+			If ($SPNCheck -match $SPNstring1) { 
 				$global:strSPNs = "Service Principal Name $SPNstring1 exists and is assigned to the service identity: $global:CoresightAppPoolAccountPretty." 			
 			}
 			Else { 
@@ -479,7 +498,7 @@ Function Check-ServicePrincipalName
 		}
 
 		Else {
-			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2 -and $SPNCheck -match $strSPNtargetAccount) { 
+			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2) { 
 				$global:strSPNs = "Service Principal Names $SPNstring1 and $SPNstring2 exist and are assigned to the service identity: $global:CoresightAppPoolAccountPretty."   
 			}
 			Else { 
