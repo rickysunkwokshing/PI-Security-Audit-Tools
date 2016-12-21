@@ -136,14 +136,15 @@ Query AD for the object type of the service account.  This function requires RSA
 	)	
 
 	$fn = GetFunctionName
-	$blnDomainResolved = $null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq '.' -or $ServiceAccountDomain -eq ''
-	If ($blnDomainResolved -and `
+	# Check for Local Account, Machine Account or Null value
+	$blnDomainResolved = $null -ne $ServiceAccountDomain -and $ServiceAccountDomain -ne '.' -and $ServiceAccountDomain -ne 'MACHINEACCOUNT'
+	If (!$blnDomainResolved -and `
 	   ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "AFService")) 
 		{ $ServiceAccount = $ComputerName }
 	
 	$ServiceAccount = $ServiceAccount.TrimEnd('$')
 
-	If($blnDomainResolved)
+	If(!$blnDomainResolved)
 	{
 		$DomainObjectType = Get-ADObject -Filter { Name -like $ServiceAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
 		$msgTemplate = "Querying AD for {0}"
@@ -203,20 +204,20 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 	$msgCanDelegateTo = "`n $global:CoresightAppPoolAccountPretty can delegate to $ResourceType $ComputerName running under $ServiceAccount"
 	$msgCanNotDelegateTo = "`n $global:CoresightAppPoolAccountPretty CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
 	$RBKCDPrincipal = ""
-	$blnResolveDomain = $null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq "" -or $ServiceAccountDomain -eq '.'
+	$blnResolveDomain = $null -ne $ServiceAccountDomain -and $ServiceAccountDomain -ne "MACHINEACCOUNT" -and $ServiceAccountDomain -ne '.'
 
 	If ($AccType -eq 1) 
 	{ 
-		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
-		Else{ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 	If ($AccType -eq 2) { 
-		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
-		Else{ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 	If ($AccType -eq 3) { 
-		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
-		Else{ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 
 	$msgTemplate = "Principals for Account {0} (Type:{1}): {2}"
@@ -462,7 +463,7 @@ Function Check-ServicePrincipalName
 		[int]
 		$DBGLevel = 0	
 	)	
-		If ($strSPNtargetDomain -eq "" -or $strSPNtargetDomain -eq ".") {	$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String }
+		If ($strSPNtargetDomain -eq "" -or $strSPNtargetDomain -eq "." -or $strSPNtargetDomain -eq "MACHINEACCOUNT") {	$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String }
 		Else { $SPNCheck = $(setspn -t $strSPNtargetDomain -q $SPNstring1).ToLower() | Out-String }
 		If ($HostA) {
 
@@ -1077,6 +1078,16 @@ Else
 "@
 }
 ####
+If($global:issueCount -gt 0){
+$strIssuesSection=@"
+	NUMBER OF ISSUES FOUND: $global:issueCount
+        `n
+	ISSUES - DETAILS: $global:strIssues 
+        `n	
+"@
+}
+Else { $strIssuesSection = "" }
+####
 $strSummaryReport = @"
     Coresight Authentication Settings:
 $strCoresightAuthenticationSection
@@ -1091,10 +1102,7 @@ $strCoresightKerberosDelegationsSection
 		`n
 	RECOMMENDATIONS: $global:strRecommendations
         `n
-	NUMBER OF ISSUES FOUND: $global:issueCount
-        `n
-	ISSUES - DETAILS: $global:strIssues 
-        `n
+$strIssuesSection
 	Report recorded to the log file: $LogFile 
 "@
 
