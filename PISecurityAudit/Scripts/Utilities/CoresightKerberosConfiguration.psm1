@@ -35,7 +35,7 @@ function SetFolders
 	}
 }
 
-Function Get-KnownServers
+Function Get-PISysAudit_KnownServers
 {
 	param(
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
@@ -49,7 +49,8 @@ Function Get-KnownServers
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("st")]
 		[ValidateSet('PIServer','AFServer')]
-		[string] $ServerType,
+		[string] 
+		$ServerType,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -109,6 +110,12 @@ Function Get-KnownServers
 
 function Get-ServiceLogonAccountType 
 {
+<#
+.SYNOPSIS
+Query the Service account object in AD for the object type.
+.DESCRIPTION
+Query AD for the object type of the service account.  This function requires RSAT-AD-Tools.
+#>
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("sa")]
@@ -129,15 +136,24 @@ function Get-ServiceLogonAccountType
 	)	
 
 	$fn = GetFunctionName
-
-	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
-		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
-		-or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccount = $ComputerName }
-	$RBKCDpos = $ServiceAccount.IndexOf("\")
-	$ServiceAccount = $ServiceAccount.Substring($RBKCDpos+1)
+	# Check for Local Account, Machine Account or Null value
+	$blnDomainResolved = $null -ne $ServiceAccountDomain -and $ServiceAccountDomain -ne '.' -and $ServiceAccountDomain -ne 'MACHINEACCOUNT'
+	If (!$blnDomainResolved -and `
+	   ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "AFService")) 
+		{ 
+			# Truncate to the hostname for processing of logon type
+			$pos = $ComputerName.IndexOf('.')
+			If($pos -eq -1){ $ServiceAccount = $ComputerName }
+			Else {
+				$ServiceAccount = $ComputerName.Substring(0,$pos)
+				$ServiceAccountDomain = $ComputerName.Substring($pos+1)
+				$blnDomainResolved = $true
+			}
+		}
+	
 	$ServiceAccount = $ServiceAccount.TrimEnd('$')
 
-	If($null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq '.' -or $ServiceAccountDomain -eq '')
+	If(!$blnDomainResolved)
 	{
 		$DomainObjectType = Get-ADObject -Filter { Name -like $ServiceAccount } -Properties ObjectCategory | Select -ExpandProperty objectclass
 		$msgTemplate = "Querying AD for {0}"
@@ -155,33 +171,6 @@ function Get-ServiceLogonAccountType
 	If ($DomainObjectType -eq "user") { $AccType = 1 } ElseIf ($DomainObjectType -eq "computer") { $AccType = 2 } ElseIf ($DomainObjectType -eq "msDS-GroupManagedServiceAccount" -or $DomainObjectType -eq "msDS-ManagedServiceAccount") {  $AccType = 3 } Else { $AccType = 0 }
 
 	return $AccType
-}
-
-Function Get-ServiceLogonAccountDomain
-{
-	param(
-		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("sa")]
-		[string]
-		$ServiceAccount,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0	
-	)	
-
-	$fn = GetFunctionName
-
-	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
-		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
-		-or $ServiceAccount -eq "ApplicationPoolIdentity" `
-		-or $ServiceAccount -eq "NT SERVICE\AFService") { $ServiceAccountDomain = $null}
-	Else{
-		$RBKCDpos = $ServiceAccount.IndexOf("\")
-		If($RBKCDpos -eq -1){ $ServiceAccountDomain = $null }
-		Else{ $ServiceAccountDomain = $ServiceAccount.Substring(0,$RBKCDpos) }
-	}
-	return $ServiceAccountDomain
 }
 
 Function Check-ResourceBasedConstrainedDelegationPrincipals 
@@ -218,32 +207,36 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 	)	
 
 	If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
-		-or $ServiceAccount -eq "NT AUTHORITY\LocalSystem" -or $ServiceAccount -eq "NT AUTHORITY\NetworkService" `
-		-or $ServiceAccount -eq "NT SERVICE\AFService")  { $ServiceAccount = $ComputerName }
-	Else
-	{
-		$RBKCDpos = $ServiceAccount.IndexOf("\")
-		$ServiceAccount = $ServiceAccount.Substring($RBKCDpos+1)
-		$ServiceAccount = $ServiceAccount.TrimEnd('$')
+		-or $ServiceAccount -eq "AFService")  
+	{ 
+		# Truncate to the hostname for processing of logon type
+		$pos = $ComputerName.IndexOf('.')
+		If($pos -eq -1){ $ServiceAccount = $ComputerName }
+		Else {
+			$ServiceAccount = $ComputerName.Substring(0,$pos)
+			$ServiceAccountDomain = $ComputerName.Substring($pos+1)
+			$blnDomainResolved = $true
+		}
 	}
+	Else { $ServiceAccount = $ServiceAccount.TrimEnd('$') }
 
 	$msgCanDelegateTo = "`n $global:CoresightAppPoolAccountPretty can delegate to $ResourceType $ComputerName running under $ServiceAccount"
 	$msgCanNotDelegateTo = "`n $global:CoresightAppPoolAccountPretty CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount"
 	$RBKCDPrincipal = ""
-	$blnResolveDomain = $null -eq $ServiceAccountDomain -or $ServiceAccountDomain -eq ""
+	$blnResolveDomain = $null -ne $ServiceAccountDomain -and $ServiceAccountDomain -ne "MACHINEACCOUNT" -and $ServiceAccountDomain -ne '.'
 
 	If ($AccType -eq 1) 
 	{ 
-		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
-		Else{ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADUser $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 	If ($AccType -eq 2) { 
-		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
-		Else{ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADComputer $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 	If ($AccType -eq 3) { 
-		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
-		Else{ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		if($blnResolveDomain){ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount -Server $ServiceAccountDomain | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
+		Else{ $RBKCDPrincipal = Get-ADServiceAccount $ServiceAccount -Properties PrincipalsAllowedToDelegateToAccount | Select -ExpandProperty PrincipalsAllowedToDelegateToAccount }
 	}
 
 	$msgTemplate = "Principals for Account {0} (Type:{1}): {2}"
@@ -489,11 +482,11 @@ Function Check-ServicePrincipalName
 		[int]
 		$DBGLevel = 0	
 	)	
-		If ($strSPNtargetDomain -eq "") {	$SPNCheck = $(setspn -q $SPNstring1).ToLower() | Out-String }
-		Else { $SPNCheck = $(setspn -t $strSPNtargetDomain -q $SPNstring1).ToLower() | Out-String }
+		If ($strSPNtargetDomain -eq "" -or $strSPNtargetDomain -eq "." -or $strSPNtargetDomain -eq "MACHINEACCOUNT") {	$SPNCheck = $(setspn -l $strSPNtargetAccount).ToLower() | Out-String }
+		Else { $SPNCheck = $(setspn -l $($strSPNtargetDomain + '\' + $strSPNtargetAccount)).ToLower() | Out-String }
 		If ($HostA) {
 
-			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $strSPNtargetAccount) { 
+			If ($SPNCheck -match $SPNstring1) { 
 				$global:strSPNs = "Service Principal Name $SPNstring1 exists and is assigned to the service identity: $global:CoresightAppPoolAccountPretty." 			
 			}
 			Else { 
@@ -505,7 +498,7 @@ Function Check-ServicePrincipalName
 		}
 
 		Else {
-			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2 -and $SPNCheck -match $strSPNtargetAccount) { 
+			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2) { 
 				$global:strSPNs = "Service Principal Names $SPNstring1 and $SPNstring2 exist and are assigned to the service identity: $global:CoresightAppPoolAccountPretty."   
 			}
 			Else { 
@@ -729,7 +722,7 @@ If ($ADMtemp) {
 	If($ComputerName -eq ""){$LocalComputer = $true}
 	Else{$LocalComputer = $false}
 
-	if(Test-PISysAudit_IISModuleAvailable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel)
+	if(Test-WebAdministrationModuleAvailable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel)
 	{
 		$msg = 'WebAdministration module loaded successfully.'
 		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
@@ -853,29 +846,29 @@ If ($ADMtemp) {
 			}
 
 		# CORESIGHT SERVICE PRINCIPAL NAMES CHECK
-				$CSUserSvcDomain = Get-ServiceLogonAccountDomain -ServiceAccount $CSUserSvc -DBGLevel $DBGLevel
+				$CSUserSvcObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $CSUserSvc -DBGLevel $DBGLevel
 				If ($global:blnCustomAccount -eq $true -and $HostA -eq $true) {
 					$SPNone = ("http/" + $CScustomHeader).ToLower()
-					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcDomain
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcObject.Domain
 				}
 
 				ElseIf ($global:blnCustomAccount -eq $true -and $HostA -eq $false) {
 					$SPNone = ("http/" + $CSWebServerName).ToLower()
 					$SPNtwo = ("http/" + $CSWebServerFQDN).ToLower()
-					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcDomain
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcObject.Domain
 				}
 				Else {
 					$SPNone = ("host/" + $CSWebServerName).ToLower()
 					$SPNtwo = ("host/" + $CSWebServerFQDN).ToLower()
-					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcDomain
+					Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:CoresightAppPoolAccount -TargetDomain $CSUserSvcObject.Domain
 				}
 
 		# KERBEROS DELEGATION CHECK CONFIRMED
 		If ($blnDelegationCheckConfirmed) {
 				   
 			# Get PI and AF Servers from the web server KST
-			$AFServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer 
-			$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
+			$AFServers = Get-PISysAudit_KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer 
+			$PIServers = Get-PISysAudit_KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
 			
 				# RESOURCE BASED KERBEROS DELEGATION
 				If ($rbkcd) {
@@ -891,8 +884,8 @@ If ($ADMtemp) {
 									$AFSvcAccount = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
 									
 										If ($AFSvcAccount -ne $null ) { 
-										$AFSvcAccountDomain = Get-ServiceLogonAccountDomain -sa $AFSvcAccount
-										$AccType = Get-ServiceLogonAccountType -sa $AFSvcAccount -sad $AFSvcAccountDomain -cn $AFServer -DBGLevel $DBGLevel
+										$AFSvcAccountObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $AFSvcAccount -DBGLevel $DBGLevel
+										$AccType = Get-ServiceLogonAccountType -sa $AFSvcAccountObject.UserName -sad $AFSvcAccountObject.Domain -cn $AFServer -DBGLevel $DBGLevel
 							
 											if($AccType -eq 0)
 											{
@@ -900,7 +893,7 @@ If ($ADMtemp) {
 												continue
 											}
 							
-											Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccount -sad $AFSvcAccountDomain -sat $AccType -api $global:CoresightAppPoolAccount -cn $AFServer -rt "AF Server" -DBGLevel $DBGLevel
+											Check-ResourceBasedConstrainedDelegationPrincipals -sa $AFSvcAccountObject.UserName -sad $AFSvcAccountObject.Domain -sat $AccType -api $global:CoresightAppPoolAccount -cn $AFServer -rt "AF Server" -DBGLevel $DBGLevel
 										}
 							
 										Else { 
@@ -920,14 +913,14 @@ If ($ADMtemp) {
 
 										If ( $PISvcAccount -ne $null ) 
 										{ 
-											$PISvcAccountDomain = Get-ServiceLogonAccountDomain -sa $PISvcAccount -DBGLevel $DBGLevel
-											$AccType = Get-ServiceLogonAccountType -sa $PISvcAccount -sad $PISvcAccountDomain -cn $PIServer -DBGLevel $DBGLevel
+											$PISvcAccountObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $PISvcAccount -DBGLevel $DBGLevel
+											$AccType = Get-ServiceLogonAccountType -sa $PISvcAccountObject.UserName -sad $PISvcAccountObject.Domain -cn $PIServer -DBGLevel $DBGLevel
 											if($AccType -eq 0)
 											{
 												Write-Output "Unable to locate type of ADObject $PISvcAccount."
 												continue
 											}
-											Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccount -sad $PISvcAccountDomain -sat $AccType -api $global:CoresightAppPoolAccount -cn $PIServer -rt "PI Server" -DBGLevel $DBGLevel
+											Check-ResourceBasedConstrainedDelegationPrincipals -sa $PISvcAccountObject.UserName -sad $PISvcAccountObject.Domain -sat $AccType -api $global:CoresightAppPoolAccount -cn $PIServer -rt "PI Server" -DBGLevel $DBGLevel
 										}
 										Else 
 										{ 
@@ -941,8 +934,8 @@ If ($ADMtemp) {
 				}
 				# CLASSIC KERBEROS DELEGATION
 				Else {
-					$PIServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
-					$AFServers = Get-KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer
+					$PIServers = Get-PISysAudit_KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st PIServer
+					$AFServers = Get-PISysAudit_KnownServers -lc $LocalComputer -rcn $RemoteComputerName -st AFServer
 
 						If ($global:blnCustomAccount -eq $True) {
 							If ($global:blngMSA -eq $True) { $ClassicAccType = 3 }
@@ -1104,6 +1097,16 @@ Else
 "@
 }
 ####
+If($global:issueCount -gt 0){
+$strIssuesSection=@"
+	NUMBER OF ISSUES FOUND: $global:issueCount
+        `n
+	ISSUES - DETAILS: $global:strIssues 
+        `n	
+"@
+}
+Else { $strIssuesSection = "" }
+####
 $strSummaryReport = @"
     Coresight Authentication Settings:
 $strCoresightAuthenticationSection
@@ -1118,10 +1121,7 @@ $strCoresightKerberosDelegationsSection
 		`n
 	RECOMMENDATIONS: $global:strRecommendations
         `n
-	NUMBER OF ISSUES FOUND: $global:issueCount
-        `n
-	ISSUES - DETAILS: $global:strIssues 
-        `n
+$strIssuesSection
 	Report recorded to the log file: $LogFile 
 "@
 
