@@ -528,9 +528,15 @@ Function Initialize-CoresightKerberosConfigurationTest
 		$DBGLevel = 0	
 	)	
 
-	# Initialize Global Paths if not set
+	# Initialize Globals if not set
 	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value -or $null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value){ SetFolders }
-	
+	if($null -eq (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value){New-Variable -Name "PISysAuditShowUI" -Scope "Global" -Visibility "Public" -Value $true}
+	$global:strIssues = $null
+	$global:issueCount = 0
+	$global:strRecommendations = $null
+	$global:strClassicDelegation = $null
+	$global:RBKCDstring = $null
+
 	# Test non-local computer to validate if WSMan is working.
 	if($ComputerName -eq "")
 	{							
@@ -547,21 +553,48 @@ Function Initialize-CoresightKerberosConfigurationTest
 			if($null -eq $resultWinRMTest)
 			{
 				$msgTemplate = @"
+	`n
 	The server: {0} has a problem with WinRM communication. 
 	This issue will occur if there is an HTTP/hostname or HTTP/fqdn SPN assigned to a 
 	custom account.  In this situation the scripts may need to be run locally.  
 	For more information, see - https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS).
+
+	Exiting...
 "@
 				$msg = [string]::Format($msgTemplate, $ComputerName)
 				Write-PISysAudit_LogMessage $msg "Error" $fn
+				$result = 999
+				break
 			}
 		}
 		catch
 		{
-			# Return the error message.
-			$msg = "A problem has occurred during the validation with WSMan"						
+			$msg = "A problem has occurred during the validation with WSMan.  Exiting..."						
 			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			$result = 999
+			break
 		}						
+	}
+
+	# Test for WebAdministration module
+	$LocalComputer = $ComputerName -eq ""
+	if(Test-WebAdministrationModuleAvailable -lc $LocalComputer -rcn $ComputerName -dbgl $DBGLevel)
+	{
+		$msg = 'WebAdministration module loaded successfully.'
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+	}
+	else
+	{
+		$msgTemplate=@"
+	`n    
+	Unable to load the WebAdministration module on {0}.  Exiting... 
+	Ensure the Web-Scripting-Tools feature is installed on the target server and 
+	you have sufficient privilege to load the module
+"@
+		$msg = [string]::Format($msgTemplate, $ComputerName)
+		Write-PISysAudit_LogMessage $msg "Error" $fn
+		$result = 999
+		break
 	}
 
 	# Resolve KerberosCheck selection
@@ -644,14 +677,21 @@ param(
 		$DBGLevel = 0		
 	)	
 
+	# Initialize local variables
 	$fn = GetFunctionName
-	
+	$CoresightDelegation = $null
+
+	# Determine whether execution of access calls will be local or remote
+	$RemoteComputerName = $ComputerName
+	If($ComputerName -eq ""){$LocalComputer = $true}
+	Else{$LocalComputer = $false}
+
 	$result = Initialize-CoresightKerberosConfigurationTest -cn $ComputerName -kc $KerberosCheck
 
 switch ($result)
     {
 		# Basic IIS Configuration checks only
-        0 {"Kerberos Delegation configuration will not be checked."
+        0 {"IIS configuration information will be gathered, but Kerberos Delegation configuration will not be checked."
 			$blnDelegationCheckConfirmed = $false
 			$rbkcd = $false
 			$ADMtemp = $false
@@ -670,6 +710,12 @@ switch ($result)
 			$blnDelegationCheckConfirmed = $true
 			$rbkcd = $true
         }
+
+		# Initialization failed
+		999 {
+			Write-Warning "Initialization failed."
+			break
+        }
     }
 
 # If needed, give user option to install 'Remote Active Directory Administration' PS Module.
@@ -684,7 +730,7 @@ If ($ADMtemp) {
 
 		'Remote Active Directory Administration' is required to check Kerberos Delegation settings. Aborting.
 "@
-		Write-Output $messageRSAT
+		Write-Warning $messageRSAT
 		break
 	}
 	Else
@@ -705,33 +751,13 @@ If ($ADMtemp) {
 			Write-Output "Installation of 'Remote Active Directory Administration' module is about to start.."
 			Add-WindowsFeature RSAT-AD-PowerShell
 		}
-			Else { Write-Output "'Remote Active Directory Administration' is required to check Kerberos Delegation settings. Aborting." 
+		Else { Write-Warning "'Remote Active Directory Administration' is required to check Kerberos Delegation settings. Aborting." 
 			break
 		}
 	}
 }
 
-	# Initialize variables
-	$global:strIssues = $null
-	$global:issueCount = 0
-	$global:strRecommendations = $null
-	$global:strClassicDelegation = $null
-	$global:RBKCDstring = $null
-	$CoresightDelegation = $null
-	$RemoteComputerName = $ComputerName
-	If($ComputerName -eq ""){$LocalComputer = $true}
-	Else{$LocalComputer = $false}
-
-	if(Test-WebAdministrationModuleAvailable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel)
-	{
-		$msg = 'WebAdministration module loaded successfully.'
-		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-	}
-	else
-	{
-		Write-Warning 'Unable to load the WebAdministration module on target machine.  Exiting... `nEnsure the Web-Scripting-Tools are installed and you have sufficient privilege.'
-		break
-	}
+	
 
 	# Get CoreSight Web Site Name
 	$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
