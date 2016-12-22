@@ -1972,7 +1972,8 @@ PROCESS
 		cls
 		
 		# Set the ShowUI flag
-		New-Variable -Name "PISysAuditShowUI" -Scope "Global" -Visibility "Public" -Value $ShowUI		
+		if($null -eq (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+		{ New-Variable -Name "PISysAuditShowUI" -Scope "Global" -Visibility "Public" -Value $true }		
 									
 		# Set an PISysAuditInitialized flag
 		New-Variable -Name "PISysAuditInitialized" -Scope "Global" -Visibility "Public" -Value $true				
