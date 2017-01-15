@@ -3354,7 +3354,7 @@ PROCESS
 		else
 		{																		
 			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName
-			# Set the PIPC\log folder (64 bit).
+			# Set the PIPC\dat folder (64 bit).
 			$scriptTempFilesPath = PathConcat -ParentPath $PIHome_path -ChildPath "dat"		                                       						                                   					                                      
 			# Define the arguments required by the afdiag.exe command						
 			$argListTemplate = "'/ExeFile:`"{0}`"'"	
@@ -5284,11 +5284,10 @@ PROCESS
 		# Initialize.
 		$ComputerParamsTable = @{}
 		
-		# This means an audit on the local computer is required
+		# This means an audit on the local computer is required only PI Data Archive and PI AF Server are checked by default.
+		# SQL Server checks ommitted by default as SQL Server will often require an instancename
 		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIServer"
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIAFServer"
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "SQLServer"
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PICoresightServer"		
+		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIAFServer"	
 	}
 	
 	# ............................................................................................................
