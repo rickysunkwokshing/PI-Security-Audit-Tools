@@ -311,7 +311,7 @@ function Get-PISysAudit_CheckAppLockerEnabled
 AU10004 - AppLocker Enabled
 .DESCRIPTION
 VALIDATION: verifies that AppLocker is enabled. <br/>  
-COMPLIANCE: set AppLocker to Enforce mode after establishing a policy.  For a 
+COMPLIANCE: set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
 primer on running AppLocker on a PI Data Archive, see: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00994">https://techsupport.osisoft.com/Troubleshooting/KB/KB00994</a>
 #>
@@ -349,8 +349,16 @@ PROCESS
 			if($(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
 				$(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")
 			{
-				$result = $true
-				$msg = "AppLocker is configured to enforce."
+				$svcStartupMode = Get-PISysAudit_ServiceStartupType -sn 'AppIDSvc' -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				if($svcStartupMode -ne 'Disabled')
+				{
+					$result = $true
+					$msg = "AppLocker is configured to enforce."
+				}
+				else
+				{
+					$msg = "AppLocker is configured to enforce but the Application Identity Service is disabled."
+				}
 			}
 			else
 			{

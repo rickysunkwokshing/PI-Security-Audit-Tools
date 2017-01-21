@@ -2787,6 +2787,61 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_ServiceStartupType
+{
+<#
+.SYNOPSIS
+(Core functionality) Get the startup type of a service on a given computer.
+.DESCRIPTION
+Get the startup type of a service on a given computer.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("sn")]
+		[string]
+		$ServiceName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		$className = "Win32_Service"
+		$namespace = "root\CIMV2"
+		$filterExpression = [string]::Format("name='{0}'", $ServiceName)
+		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
+		return $WMIObject.StartMode
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Execution of WMI Query has failed!" "Error" $fn -eo $_
+		return $null
+	}
+}	
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_InstalledComponents
 {
 <#
@@ -5412,6 +5467,7 @@ Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ServiceLogOnAccount
 Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceState
+Export-ModuleMember Get-PISysAudit_ServiceStartupType
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
 Export-ModuleMember Get-PISysAudit_InstalledKBs
