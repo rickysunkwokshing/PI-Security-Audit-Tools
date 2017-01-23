@@ -937,7 +937,7 @@ If ($ADMtemp) {
 									$msg = [string]::Format($msgTemplate, $AFServer)
 									Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
-									$AFSvcAccount = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
+									$AFSvcAccount = Get-PISysAudit_ServiceProperty -sn 'afservice' -sp LogOnAccount -lc $false -rcn $AFServer -ErrorAction SilentlyContinue
 									
 										If ($AFSvcAccount -ne $null ) { 
 										$AFSvcAccountObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $AFSvcAccount -DBGLevel $DBGLevel
@@ -961,7 +961,7 @@ If ($ADMtemp) {
 
 								foreach ( $PIServer in $PIServers ) { 
 									$AccType = 0
-									$PISvcAccount = Get-PISysAudit_ServiceLogOnAccount "pinetmgr" -lc $false -rcn $PIServer -ErrorAction SilentlyContinue
+									$PISvcAccount = Get-PISysAudit_ServiceProperty -sn "pinetmgr" -sp LogOnAccount -lc $false -rcn $PIServer -ErrorAction SilentlyContinue
 									
 									$msgTemplate = "Processing RBCD check for PI Server {0}"
 									$msg = [string]::Format($msgTemplate, $PIServer)

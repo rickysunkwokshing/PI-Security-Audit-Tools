@@ -349,7 +349,7 @@ PROCESS
 			if($(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
 				$(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")
 			{
-				$svcStartupMode = Get-PISysAudit_ServiceStartupType -sn 'AppIDSvc' -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				$svcStartupMode = Get-PISysAudit_ServiceProperty -sn 'AppIDSvc' -sp StartupType -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 				if($svcStartupMode -ne 'Disabled')
 				{
 					$result = $true
