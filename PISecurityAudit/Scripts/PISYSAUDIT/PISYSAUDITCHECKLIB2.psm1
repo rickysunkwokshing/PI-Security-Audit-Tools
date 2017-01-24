@@ -55,6 +55,7 @@ Get functions from PI Data Archive library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckExplicitLoginDisabled",1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckInstalledSoftware", 1)
 				
 	# Return the list.
 	return $listOfFunctions	
@@ -1193,6 +1194,83 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckInstalledSoftware
+{
+<#  
+.SYNOPSIS
+AU20009 - Client software check
+.DESCRIPTION
+VALIDATION: verify that knwon client software is not installed on the PI Data Archive machine. </br>
+COMPLIANCE: do not install client software like PI Processbook or Microsoft Office on the PI Data 
+Archive machine. These programs should be used on client machines and connect to the PI Data
+Archive remotely. </br>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{
+		# Define the search filters, using '%' as the wildcard term.
+		# Just PI Processbook and Microsoft Office for now.
+		$clientSearchFilters = @('%processbook%', '%microsoft office%')
+		$installedPrograms = Get-PISysAudit_InstalledProgramsFiltered -f $clientSearchFilters -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+
+		if($installedPrograms)
+		{
+			$msg = 'Detected one or more installations of client software on the PI Data Archive machine.'
+			$result = $false
+		}
+		else
+		{
+			$msg = 'No client software detected on the PI Data Archive machine.'
+			$result = $true
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		$result = "N/A"
+	}
+
+	# Define the results in the audit table
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable 'AU20009' `
+										-ain 'Client software check' -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 'PI System' -Group2 'PI Data Archive' `
+										-Severity 'Moderate'
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1271,6 +1349,7 @@ Export-ModuleMember Get-PISysAudit_CheckAutoTrustConfig
 Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
 Export-ModuleMember Get-PISysAudit_CheckExplicitLoginDisabled
 Export-ModuleMember Get-PISysAudit_CheckPISPN
+Export-ModuleMember Get-PISysAudit_CheckInstalledSoftware
 # </Do not remove>
 
 # ........................................................................
