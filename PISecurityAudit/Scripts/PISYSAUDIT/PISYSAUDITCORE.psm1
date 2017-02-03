@@ -2596,60 +2596,6 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_ServiceLogOnAccount
-{
-<#
-.SYNOPSIS
-(Core functionality) Get the logon account of a service on a given computer.
-.DESCRIPTION
-Get the logon account of a service on a given computer.
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("sn")]
-		[string]
-		$ServiceName,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)
-BEGIN {}
-PROCESS
-{
-	$fn = GetFunctionName
-	
-	try
-	{
-		$className = "Win32_Service"
-		$namespace = "root\CIMV2"
-		$filterExpression = [string]::Format("name='{0}'", $ServiceName)				
-		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		return $WMIObject.StartName				
-	}
-	catch
-	{
-		# Return the error message.				
-		Write-PISysAudit_LogMessage "Execution of WMI Query has failed!" "Error" $fn -eo $_
-		return $null
-	}
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
-
 function Get-PISysAudit_ParseDomainAndUserFromString
 {
 <#
@@ -2732,13 +2678,13 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_ServiceState
+function Get-PISysAudit_ServiceProperty
 {
 <#
 .SYNOPSIS
-(Core functionality) Get the state of a service on a given computer.
+(Core functionality) Get a property (state, startup type, or logon account) of a service on a given computer.
 .DESCRIPTION
-Get the state of a service on a given computer.
+Get a property (state, startup type, or logon account) of a service on a given computer.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
@@ -2746,6 +2692,11 @@ param(
 		[alias("sn")]
 		[string]
 		$ServiceName,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("sp")]
+		[ValidateSet("State", "StartupType", "LogOnAccount")]
+		[string]
+		$ServiceProperty,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("lc")]
 		[boolean]
@@ -2762,6 +2713,14 @@ BEGIN {}
 PROCESS		
 {		
 	$fn = GetFunctionName
+
+	# Map cmdlet parameter to actual property name of WMI object
+	# State        -> State
+	# StartupType  -> StartMode
+	# LogOnAccount -> StartName
+	if ($ServiceProperty -eq 'State') { $Property = 'State'}
+	elseif ($ServiceProperty -eq 'StartupType') { $Property = 'StartMode' }
+	elseif ($ServiceProperty -eq 'LogOnAccount') { $Property = 'StartName'}
 	
 	try
 	{
@@ -2769,7 +2728,7 @@ PROCESS
 		$namespace = "root\CIMV2"
 		$filterExpression = [string]::Format("name='{0}'", $ServiceName)
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		return $WMIObject.State
+		return ($WMIObject | select -ExpandProperty $Property)
 	}
 	catch
 	{
@@ -3917,7 +3876,7 @@ PROCESS
 			Else
 			{
 				# Get the Service account
-				$svcacc = Get-PISysAudit_ServiceLogOnAccount $ServiceName -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				$svcacc = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 			}
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
 
@@ -5409,9 +5368,8 @@ Export-ModuleMember Set-PISysAudit_SaltKey
 Export-ModuleMember Get-PISysAudit_EnvVariable
 Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey
-Export-ModuleMember Get-PISysAudit_ServiceLogOnAccount
 Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
-Export-ModuleMember Get-PISysAudit_ServiceState
+Export-ModuleMember Get-PISysAudit_ServiceProperty
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
 Export-ModuleMember Get-PISysAudit_InstalledKBs
