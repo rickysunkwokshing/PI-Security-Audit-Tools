@@ -1826,30 +1826,7 @@ PROCESS
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			return
 		}
-		 
-		# Set the Host/Window settings.
-		$appHost = Get-Host		
-		$appHost.UI.RawUI.BackgroundColor = "black"
-		$appHost.UI.RawUI.ForegroundColor = "white"
-		$appHost.UI.RawUI.WindowTitle = "PI System Audit"
-		$size = $appHost.UI.RawUI.WindowSize
-		$bufferSize = $appHost.UI.RawUI.BufferSize
-		$bufferSize.Width = 120
-		$size.Width = 120
-		$size.Height = 25
-		# It does not work all the time.
-		try
-		{
-			$appHost.UI.RawUI.WindowSize = $size
-			$appHost.UI.RawUI.BufferSize = $bufferSize
-		}
-		catch
-		{
-			# Do nothing and skip the resizing...
-		}
-		# Clear the screen. For some reasons, the Clear-Host cmdlet does not work.
-		cls
-		
+			
 		# Set the ShowUI flag
 		if($null -eq (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
 		{ New-Variable -Name "PISysAuditShowUI" -Scope "Global" -Visibility "Public" -Value $true }		
