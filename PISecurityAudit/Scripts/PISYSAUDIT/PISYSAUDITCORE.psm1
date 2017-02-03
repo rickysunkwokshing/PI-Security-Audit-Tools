@@ -1818,11 +1818,11 @@ PROCESS
 		$IsElevated = CheckIfRunningElevated
 		New-Variable -Name "PISysAuditIsElevated" -Scope "Global" -Visibility "Public" -Value $IsElevated
 
-		# Validate if used with PowerShell version 2.x and more	
+		# Validate if used with PowerShell version 3.x and more	
 		$majorVersionPS = $Host.Version.Major	
-		if($majorVersionPS -lt 2)
+		if($majorVersionPS -lt 3)
 		{						
-			$msg = "This script won't execute under less than version 2.0 of PowerShell"
+			$msg = "This script won't execute under less than version 3.0 of PowerShell"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			return
 		}
