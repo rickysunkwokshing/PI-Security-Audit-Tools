@@ -99,7 +99,7 @@ PROCESS
 	try
 	{				
 		# Get the service account.
-		$value = Get-PISysAudit_ServiceLogOnAccount "afservice" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel				
+		$value = Get-PISysAudit_ServiceProperty -sn 'afservice' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel				
 		
 		# Check if the value is <> LocalSystem		
 		if($value.ToLower() -eq "localsystem") 
