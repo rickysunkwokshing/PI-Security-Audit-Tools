@@ -6,42 +6,45 @@ This project is a framework to baseline the security configuration of your PI Sy
 
 A series of PowerShell script files (*.psm1) form a single module named PI System Audit Module (or PISysAudit Module) once loaded. You will find one core script containing the collection logic and library scripts containing the validation logic for different topics such as best practices to harden the machine, PI Server, etc. The module exposes several cmdlets either used for the internal logic or the external interface with the end-user.
 
-The PI System Audit Module (PISysAudit) can be executed locally or remotely and make use of existing command line utilities to perform many tasks.  Note that the script requires PowerShell version 3.0 or later for the machine running the script, if a remote machine is targeted, that machine needs to have powershell 2.0 or later.  This allows compatibility with many versions of the PI System.  Full support for PowerShell version 2.0 on the client and target machine is documented as Issue [#57](https://github.com/osisoft/PI-Security-Audit-Tools/issues/57).
+The PI System Audit Module (PISysAudit) can be executed locally or remotely and make use of existing command line utilities to perform many tasks.  
 
-The current version of the PISysAudit module implements validations covering machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX), SQL Server (AU4XXXX) and PI Coresight Server (AU5XXXX) best practices with the PI System.
+The current version of the PISysAudit module (2.0.1.0) implements validations covering machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX), SQL Server (AU4XXXX) and PI Coresight Server (AU5XXXX) best practices with the PI System.
 
 ### Validations
 
 ```markdown
-AU10001 - Machine: Domain Membership Check
+AU10001 - Machine: Domain Membership
 AU10002 - Machine: OS SKU
 AU10003 - Machine: Validate if Windows firewall is enabled
 AU10004 - Machine: AppLocker state
 AU10005 - Machine: UAC enabled
 AU20001 - PI Data Archive: Table Security
-AU20002 - PI Data Archive: PI Admin Trusts Disabled
+AU20002 - PI Data Archive: piadmin Usage
 AU20003 - PI Data Archive: Subsystem Version
 AU20004 - PI Data Archive: Edit Days
 AU20005 - PI Data Archive: Auto Trust Configuration
 AU20006 - PI Data Archive: Expensive Query Protection
 AU20007 - PI Data Archive: Check if explicit login is disabled
-AU20008 - PI Data Archive: piadmin used in Mappings and Trusts
-AU20009 - PI Data Archive: Service Principal Name check
+AU20008 - PI Data Archive: Service Principal Name
 AU30001 - PI AF Server: Service Account
 AU30002 - PI AF Server: Impersonation mode for AF Data Sets
 AU30003 - PI AF Server: Service Access
 AU30004 - PI AF Server: Plugin Verify Level
 AU30005 - PI AF Server: File Extension Whitelist
 AU30006 - PI AF Server: Version
-AU30007 - PI AF Server: Service Principal Name Check
+AU30007 - PI AF Server: Service Principal Name
 AU40001 - SQL Server: xp_CmdShell
 AU40002 - SQL Server: Adhoc Queries
 AU40003 - SQL Server: DB Mail XPs
 AU40004 - SQL Server: OLE Automation Procedures
+AU40005 - SQL Server: CLR Configuration Option
+AU40006 - SQL Server: Cross DB Ownership Chaining Option
+AU40007 - SQL Server: Remote Access Option
+AU40008 - SQL Server: sa Login
 AU50001 - Coresight: Version
-AU50002 - Coresight: AppPools Identity Check
-AU50003 - Coresight: SSL Configuration Check
-AU50004 - Coresight: Service Principal Name Check
+AU50002 - Coresight: AppPools Identity
+AU50003 - Coresight: SSL Configuration
+AU50004 - Coresight: Service Principal Name
 ```
 
 ## Getting Started
