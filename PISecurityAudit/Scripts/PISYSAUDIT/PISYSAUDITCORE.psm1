@@ -33,8 +33,6 @@
 # Global Variables
 #
 #	PISysAuditShowUI
-#	PISysAuditPIConfigExec
-#	PIConfigScriptPath
 #	ScriptsPath
 #	PasswordPath
 #	PISysAuditInitialized
@@ -59,7 +57,6 @@ function SetFolders
 	# ..\Scripts\PISYSAUDIT
 	# ..\Scripts\Temp
 	# ..\Export
-	# ..\Scripts\piconfig
 	# ..\pwd	
 	$scriptsPath = Split-Path $modulePath
 	$rootPath = Split-Path $scriptsPath				
@@ -73,7 +70,6 @@ function SetFolders
 	New-Item $scriptsPathTemp -type directory
 	}
 
-	$picnfgPath = PathConcat -ParentPath $scriptsPath -ChildPath "piconfig"
 	$pwdPath = PathConcat -ParentPath $rootPath -ChildPath "pwd"		
 	$logFile = PathConcat -ParentPath $exportPath -ChildPath "PISystemAudit.log"		
 
@@ -85,7 +81,6 @@ function SetFolders
 	{
 		New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
 	}
-	New-Variable -Name "PIConfigScriptPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $picnfgPath
 	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
 	{
 		New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
@@ -222,101 +217,6 @@ param(
 		$msg4 = $msg1 + $msg2
 		Write-PISysAudit_LogMessage $msg4 "Info" $fn
 	}
-}
-
-function GetPIConfigExecPath
-{				
-param(
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)
-		
-	$fn = GetFunctionName		
-	
-	try
-	{
-		#......................................................................................
-		# Set Paths
-		#......................................................................................						
-			$cluFound = $false
-			# Get the PIHOME folder.
-			$PIHome64_path = Get-PISysAudit_EnvVariable "PIHOME64"
-			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME"
-			
-			# Get the PI folder.
-			$PIServer_path = Get-PISysAudit_EnvVariable "PISERVER"			
-			
-			# Validate where the piconfig CLU is installed.
-			# The piconfig.exe is installed with PI SDK since version 1.4.0.416 on PINS									
-			
-			# Test for the PISERVER variable.
-			if($null -ne $PIServer_path)
-			{							
-				if($cluFound -eq $false)
-				{
-					$PIConfigExec = PathConcat -ParentPath $PIServer_path -ChildPath "adm\piconfig.exe"										
-					if(Test-Path $PIConfigExec) { $cluFound = $true }
-				}
-				
-				# ............................................................................................................
-				# Verbose at Debug Level 1+
-				# Show some extra messages.
-				# ............................................................................................................			
-				$msgTemplate = "Test the PISERVER variable, piconfigExec = {0}, CLU found = {1}"
-				$msg = [string]::Format($msgTemplate, $PIConfigExec, $cluFound)
-				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1
-			}									
-			
-			if($cluFound -eq $false)
-			{
-				$PIConfigExec = PathConcat -ParentPath $PIHome64_path -ChildPath "adm\piconfig.exe"
-				if(Test-Path $PIConfigExec) { $cluFound = $true }
-				
-				# ............................................................................................................
-				# Verbose at Debug Level 1+
-				# Show some extra messages.
-				# ............................................................................................................			
-				$msgTemplate = "Test the PIHOME64 variable, piconfigExec = {0}, CLU found = {1}"
-				$msg = [string]::Format($msgTemplate, $PIConfigExec, $cluFound)
-				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1
-			}
-			
-			if($cluFound -eq $false)
-			{
-				$PIConfigExec = PathConcat -ParentPath $PIHome_path -ChildPath "adm\piconfig.exe"
-				if(Test-Path $PIConfigExec) { $cluFound = $true }
-					
-				# ............................................................................................................
-				# Verbose at Debug Level 1+
-				# Show some extra messages.
-				# ............................................................................................................			
-				$msgTemplate = "Test the PIHOME variable, piconfigExec = {0}, CLU found = {1}"
-				$msg = [string]::Format($msgTemplate, $PIConfigExec, $cluFound)
-				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1
-			}
-			
-			# If found, set the path as a global variable to not redo this test continously.
-			if($cluFound)
-			{
-				# Set the PIConfig.exe path
-				New-Variable -Name "PISysAuditPIConfigExec" -Scope "Global" -Visibility "Public" -Value $PIConfigExec				
-				return $true
-			}
-			else
-			{
-				$msg = "The PI System Audit module cannot find a piconfig.exe command-line utility on this machine"				
-				Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
-				return $false
-			}            
-	}
-	catch
-	{
-		# Return the error message.
-		$msg = "The validation of piconfig.exe CLU presence has not been completed"						
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-		return $false
-	}	
 }
 
 function CheckIfRunningElevated
@@ -1419,29 +1319,8 @@ param(
 		}
 		else
 		{
-			$msgTemplate = "Unable to locate the PowerShell Tools for the PI System on the computer running this script.  The piconfig utility will be used instead."
+			$msgTemplate = "Unable to locate the PowerShell Tools for the PI System on the computer running this script."
 			Write-PISysAudit_LogMessage $msg "Info" $fn
-
-			# Get the piconfig CLU location on the machine where the script runs.		
-			if( -not(Test-Path variable:global:PISysAuditPIConfigExec) )
-			{
-				if((GetPIConfigExecPath -dbgl $DBGLevel) -eq $false) { return }
-			}
-
-			# After we've validated connections over 5450, make sure PI Utilities will be able to connect.
-			if($testConnection.Connected)
-			{
-				$outputFileContent = Invoke-PISysAudit_PIConfigScript -f "CheckPIServerAvailability.dif" `
-																	-lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
-				if($null -eq $outputFileContent)
-				{
-					$msgTemplate = "Unable to access the PI Data Archive {0} with piconfig.  Check if there is a valid mapping for your user."
-					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Warning" $fn
-					return
-				}
-			}
-
 		}
 		
 		# Get the list of functions to execute.
@@ -4979,8 +4858,6 @@ Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
-Export-ModuleMember Invoke-PISysAudit_PIConfigScript
-Export-ModuleMember Invoke-PISysAudit_PIVersionCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_SQLCMD_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-Sqlcmd_ScalarValue
