@@ -253,7 +253,6 @@ PROCESS
 	try
 	{							
 		# Initialize objects.
-		$securityBits = 0	
 		$piadminTrustsDisabled = $false							
 													
 		# CheckPIAdminUsageInTrusts.dif
@@ -287,46 +286,8 @@ PROCESS
 			$msg = "No Trust(s) or Mapping(s) identified as weaknesses.  "
 			
 			# Check whether using the piadmin user for trusts is blocked globally
-			if($global:ArePowerShellToolsAvailable)
-			{
-				$piadminTrustsDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowTrusts)
-			}
-			else
-			{
-				$piadminTrustsGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
-																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-				if($null -eq $piadminTrustsGlobalSetting)
-				{
-					# Return the error message.
-					$msg = "Global piadmin trust disabled parameter not returned.  Cannot proceed with check."					
-					Write-PISysAudit_LogMessage $msg "Warning" $fn 									
-					$result = "N/A"
-				}
-				else 
-				{
-					# Validate rules
-		
-					# Example of output.
-					# piadmin,24		
-		
-					# Read each line to find the one containing the token to replace.
-					foreach($line in $piadminTrustsGlobalSetting)
-					{								
-						# First line only.
-						$tokens = $line.Split(",")
-						$securityBits = [int16]$tokens[1]
-						break
-					}
-		
-					# Look for piadmin with identid=1
-					# Requires:
-					#	- explicit login disabled (bit5=16) <- Covered in AU20007
-					#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
-					#	- trust login disabled (bit3=4)
-					$piadminTrustsDisabled = $securityBits -band 4
-				}
-			}
- 
+			$piadminTrustsDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowTrusts)
+			
 			if($piadminTrustsDisabled) 
 			{ 
 				$result = $true 
@@ -816,36 +777,9 @@ PROCESS
 			$result = $false
 			$msgPolicy = "Using non-compliant policy:"
 			$Severity = "severe"
-
-			if($global:ArePowerShellToolsAvailable)
-			{
-				$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowExplicitLogin)
-			}
-			else
-			{
-				# Check whether piadmin user can use explicit login
-				$piadminExplicitLoginGlobalSetting = Invoke-PISysAudit_PIConfigScript -f "CheckPIAdminTrustsDisabled.dif" `
-																	-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-				# Validate rules
-		
-				# Example of output.
-				# piadmin,24		
-		
-				# Read each line to find the one containing the token to replace.
-				foreach($line in $piadminExplicitLoginGlobalSetting)
-				{								
-					# First line only.
-					$tokens = $line.Split(",")
-					$securityBits = [int16]$tokens[1]
-					#Look for piadmin with identid=1
-					# Requires:
-					#	- explicit login disabled (bit5=16) 
-					#	- deletion disabled (bit4=8) <- Cannot be changed for piadmin
-					#	- trust login disabled (bit3=4) <- Covered in AU20002
-					$piadminExplicitLoginDisabled = $securityBits -band 16
-					break
-				}
-			}
+			
+			$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowExplicitLogin)
+			
 			if($piadminExplicitLoginDisabled)
 			{
 				$description += "Explicit login disabled for piadmin."
