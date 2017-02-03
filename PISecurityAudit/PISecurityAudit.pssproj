@@ -30,13 +30,10 @@
     <Folder Include="en-US\" />
     <Folder Include="Scripts\" />
     <Folder Include="Scripts\Utilities\" />
-    <Folder Include="Scripts\piconfig\" />
     <Folder Include="Scripts\PISYSAUDIT\" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Scripts\DebugScript.ps1" />
-    <Compile Include="Scripts\piconfig\CheckPIAdminUsageInMappings.dif" />
-    <Compile Include="Scripts\piconfig\CheckPIAdminUsageInTrusts.dif" />
     <Compile Include="PISYSAUDIT.psd1" />
     <Compile Include="Scripts\CheckProcessPrivilege.ps1" />
     <Compile Include="Scripts\Examples.ps1" />
@@ -52,13 +49,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="en-US\about_PISYSAUDIT.help.txt" />
-    <Content Include="Scripts\piconfig\CheckAutoTrustConfig.dif" />
-    <Content Include="Scripts\piconfig\CheckEditDays.dif" />
-    <Content Include="Scripts\piconfig\CheckExpensiveQuery.dif" />
-    <Content Include="Scripts\piconfig\CheckPIAdminTrustsDisabled.dif" />
-    <Content Include="Scripts\piconfig\CheckPIServerAuthPolicy.dif" />
-    <Content Include="Scripts\piconfig\CheckPIServerAvailability.dif" />
-    <Content Include="Scripts\piconfig\CheckPIWorldReadAccess.dif" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Target Name="Build" />
