@@ -388,7 +388,14 @@ param(
 		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 		
 		# Cache the secure password for next usage.
-		New-Variable -Name "PISysAuditCachedSecurePWD" -Scope "Global" -Visibility "Public" -Value $securePWD		
+		if($null -eq (Get-Variable "PISysAuditCachedSecurePWD" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+		{
+			New-Variable -Name "PISysAuditCachedSecurePWD" -Scope "Global" -Visibility "Public" -Value $securePWD	
+		}
+		else
+		{
+			Set-Variable -Name "PISysAuditCachedSecurePWD" -Scope "Global" -Visibility "Public" -Value $securePWD
+		}		
 	}
 	catch
 	{
@@ -4023,30 +4030,34 @@ PROCESS
 				Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
 				$skipParam = $true			
 			}						
-			elseif($PasswordFile -eq "")
+			else
 			{
-				# Warning message to the end-user that a password will be asked
-				# before the first query is executed.
-				$msg = "You will be prompted for the SQL user account password before the first query!"
-				Write-PISysAudit_LogMessage $msg "Warning" $fn -sc $true
-				$skipParam = $false
-			}
-			# Read from the global constant bag.		
-			$pwdPath = (Get-Variable "PasswordPath" -Scope "Global").Value			
-			# Set the path.
-			$pwdFile = PathConcat -ParentPath $pwdPath -ChildPath $PasswordFile
+				if($PasswordFile -eq "") 
+				{
+					# Warning message to the end-user that a password will be asked
+					# before the first query is executed.
+					$msg = "You will be prompted for the SQL user account password before the first query!"
+					Write-PISysAudit_LogMessage $msg "Warning" $fn -sc $true
+					$skipParam = $false
+				}
+				else 
+				{
+					# Read from the global constant bag.		
+					$pwdPath = (Get-Variable "PasswordPath" -Scope "Global").Value			
+					# Set the path.
+					$pwdFile = PathConcat -ParentPath $pwdPath -ChildPath $PasswordFile
 	
-			# Test the password file
-			if((Test-Path $pwdFile) -eq $false)
-			{									
-				$msg = "The password file specified cannot be found. If you haven't defined one" `
-							+ " yet, use the New-PISysAudit_PasswordOnDisk cmdlet to create one. This parameter will be skipped"
-				Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
-				$skipParam = $true
+					# Test the password file
+					if((Test-Path $pwdFile) -eq $false)
+					{									
+						$msg = "The password file specified cannot be found. If you haven't defined one" `
+									+ " yet, use the New-PISysAudit_PasswordOnDisk cmdlet to create one. This parameter will be skipped"
+						Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
+						$skipParam = $true
+					}
+				}
 			}
-		}
-		
-		
+		}	
 	}
 	elseif (($PISystemComponentType.ToLower() -eq "picoresightserver") -or `
 		($PISystemComponentType.ToLower() -eq "picoresight") -or `
