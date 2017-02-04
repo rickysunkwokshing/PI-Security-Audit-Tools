@@ -117,7 +117,7 @@ PROCESS
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'xp_cmdshell'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
 
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -224,7 +224,7 @@ PROCESS
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Ad Hoc Distributed Queries'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
 		
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -332,7 +332,7 @@ PROCESS
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Database Mail XPs'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
 
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -439,7 +439,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Ole Automation Procedures'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -546,7 +546,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'clr enabled'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -654,7 +654,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Cross db ownership chaining'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -762,7 +762,7 @@ PROCESS
 		$requestedScalar = "value_in_use"			
 		$queryTemplate = "SELECT {0} FROM Master.sys.configurations WHERE name = 'Remote access'"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -871,7 +871,7 @@ PROCESS
 		$requestedScalar = "is_disabled"			
 		$queryTemplate = "SELECT {0} FROM master.sys.server_principals WHERE sid = 0x01"
 		$query = [string]::Format($queryTemplate,$requestedScalar)
-		$value = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+		$value = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `
@@ -901,7 +901,7 @@ PROCESS
 			$requestedScalar = "sa_renamed"			
 			$queryTemplate = "SELECT (CASE name WHEN 'sa' THEN 0 ELSE 1 END) as {0} FROM master.sys.server_principals WHERE sid = 0x01"
 			$query = [string]::Format($queryTemplate,$requestedScalar)
-			$sarenamed = Invoke-Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
+			$sarenamed = Invoke-PISysAudit_Sqlcmd_ScalarValue -Query $query -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName `
 												-InstanceName $InstanceName -ScalarValue $requestedScalar `
 												-IntegratedSecurity $IntegratedSecurity `
 												-Username $UserName -PasswordFile $PasswordFile `

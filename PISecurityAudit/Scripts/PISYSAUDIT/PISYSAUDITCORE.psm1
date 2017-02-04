@@ -1579,7 +1579,7 @@ param(
 				Import-Module SQLPS -DisableNameChecking
 				Pop-Location
 				# Simplest query to return a response to ensure we can query the SQL server
-				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
+				Invoke-PISysAudit_Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
 											-InstanceName $ComputerParams.InstanceName -IntegratedSecurity $ComputerParams.IntegratedSecurity `
 											-UserName $ComputerParams.SQLServerUserID -PasswordFile $ComputerParams.PasswordFile `
 											-ScalarValue 'TEST' | Out-Null
@@ -3594,7 +3594,7 @@ END {}
 #***************************
 }
 
-function Invoke-Sqlcmd_ScalarValue
+function Invoke-PISysAudit_Sqlcmd_ScalarValue
 {
 <#
 .SYNOPSIS
@@ -4576,7 +4576,7 @@ Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
-Export-ModuleMember Invoke-Sqlcmd_ScalarValue
+Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
 Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject
