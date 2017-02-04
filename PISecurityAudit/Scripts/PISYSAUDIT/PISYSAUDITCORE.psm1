@@ -1579,7 +1579,10 @@ param(
 				Import-Module SQLPS -DisableNameChecking
 				Pop-Location
 				# Simplest query to return a response to ensure we can query the SQL server
-				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -RemoteComputerName $ComputerParams.ComputerName -InstanceName $ComputerParams.InstanceName -ScalarValue 'TEST' | Out-Null
+				Invoke-Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
+											-InstanceName $ComputerParams.InstanceName -IntegratedSecurity $ComputerParams.IntegratedSecurity `
+											-UserName $ComputerParams.SQLServerUserID -PasswordFile $ComputerParams.PasswordFile `
+											-ScalarValue 'TEST' | Out-Null
 			}
 			catch
 			{
@@ -3368,9 +3371,9 @@ function Test-PISysAudit_ServicePrincipalName
 {
 <#
 .SYNOPSIS
-(Core functionality) Perform a SQL query against a local/remote computer using an ADO.NET connection.
+(Core functionality) Check for an SPN
 .DESCRIPTION
-Perform a SQL query against a local/remote computer using an ADO.NET connection.
+Check for the existence of an SPN
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
@@ -3601,6 +3604,10 @@ Perform a SQL query against a local/remote computer using the Invoke-Sqlcmd Cmdl
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[AllowEmptyString()]
 		[alias("rcn")]
@@ -3618,7 +3625,15 @@ param(
 		$InstanceName = "",									
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[boolean]
-		$IntegratedSecurity = $true,							
+		$IntegratedSecurity = $true,				
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("user")]
+		[string]
+		$UserName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("pf")]
+		[string]
+		$PasswordFile = "",							
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[alias("dbgl")]
 		[int]
@@ -3629,10 +3644,50 @@ PROCESS
 	$fn = GetFunctionName		
 															
 	try
-	{
-		if($null -eq $InstanceName -or $InstanceName -eq "Default"){ $ServerInstance = $RemoteComputerName }
-		else{ $ServerInstance = $RemoteComputerName + '\' + $InstanceName }
-		$value = Invoke-Sqlcmd -Query $query -ServerInstance $ServerInstance | Select-Object -ExpandProperty $ScalarValue
+	{	
+		# Define the requested server name.	
+		$computerName = ResolveComputerName $LocalComputer $RemoteComputerName						
+		
+		# Define the complete SQL Server name (Server + instance name)
+		$SQLServerName = ReturnSQLServerName $computerName $InstanceName											
+		
+		# Integrated Security or SQL Security?
+		if($IntegratedSecurity -eq $false)
+		{
+			if($PasswordFile -eq "")
+			{												
+				# Read from the global constant bag.
+				# Read the secure password from the cache								 
+				$securePWDFromCache = (Get-Variable "PISysAuditCachedSecurePWD" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
+				if(($null -eq $securePWDFromCache) -or ($securePWDFromCache -eq ""))
+				{ 
+					# Return the error message.
+					$msg = "The password is not stored in cache"					
+					Write-PISysAudit_LogMessage $msg "Error" $fn
+					return $null
+				}
+				else
+				{ 																				
+					# Verbose only if Debug Level is 2+
+					$msg = "The password stored in cached will be used for SQL connection"					
+					Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2										
+					
+					# The CLU does not understand secure string and needs to get the raw password
+					# Use the pointer method to reach the value in memory.
+					$pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePWDFromCache))
+				}
+			}
+			else
+			{				
+				$pwd = GetPasswordOnDisk $PasswordFile				
+			}
+
+			$value = Invoke-Sqlcmd -Query $query -ServerInstance $SQLServerName -Username $UserName -Password $pwd | Select-Object -ExpandProperty $ScalarValue
+		}
+		else
+		{
+			$value = Invoke-Sqlcmd -Query $query -ServerInstance $SQLServerName | Select-Object -ExpandProperty $ScalarValue
+		}
 	}
 	catch
 	{
