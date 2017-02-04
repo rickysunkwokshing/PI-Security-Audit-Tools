@@ -1576,11 +1576,18 @@ param(
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 				
 		# Validate the presence of a SQL Server
-		$global:UseSQLCmdlets = $PSVersionTable.PSVersion.Major -gt 2 -and $ComputerParams.PasswordFile -eq ""
-		if($global:UseSQLCmdlets)
-		{
 			try
 			{
+				if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+											-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)						
+				{
+					# Return the error message.
+					$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					return
+				}
+				
 				# Push and Pop are to prevent a context switch to the SQL shell from persisting after invocation of SQL commands.
 				Push-Location
 				Import-Module SQLPS -DisableNameChecking
@@ -1594,26 +1601,12 @@ param(
 			catch
 			{
 				# Return the error message.
-				$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+				$msgTemplate = "Could not execute test query against SQL Server on computer {0}"
 				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 				Write-PISysAudit_LogMessage $msg "Warning" $fn
 				return
 			}
-		}
-		else
-		{
-			if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-											-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)
-										
-			{
-				# Return the error message.
-				$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
-				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-				Write-PISysAudit_LogMessage $msg "Warning" $fn
-				return
-			}
-		}
-		
+
 		# Get the list of functions to execute.
 		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary4
 		# There is nothing to execute.
