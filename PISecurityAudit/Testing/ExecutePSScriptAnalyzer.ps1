@@ -1,4 +1,4 @@
-# Import the PSScriptAnalyzer module.
+# Note: PSScriptAnalyzer module must be installed.
 # Documentation for PSScriptAnalyzer = https://github.com/PowerShell/PSScriptAnalyzer
 Import-Module 'PSScriptAnalyzer'
 
@@ -8,7 +8,7 @@ function InvokePSScriptAnalysis ($scripts, $scriptPath, $excludedRules, $PISecAu
 	foreach ($script in $scripts) 
 	{
 		Invoke-ScriptAnalyzer -Path $($scriptPath + $script + '.psm1') -ExcludeRule $excludedRules `
-							| ConvertTo-Csv | Out-File $($PISecAuditRoot + '\Export\' + $script + '.staticanalysis.csv') -Force
+							 | Out-File $($PISecAuditRoot + '\Export\' + $script + '.staticanalysis.dat') -Force
 	}
 } 
 

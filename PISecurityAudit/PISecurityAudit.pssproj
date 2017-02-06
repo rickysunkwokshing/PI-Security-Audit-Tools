@@ -48,6 +48,7 @@
     <Compile Include="Scripts\Utilities\CoresightKerberosConfiguration.psm1" />
     <Compile Include="Scripts\Utilities\PISECCONFIGEXPORT.psm1" />
     <Compile Include="Testing\ExecutePSScriptAnalyzer.ps1" />
+    <Compile Include="Testing\InstallTestingModules.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="en-US\about_PISYSAUDIT.help.txt" />
