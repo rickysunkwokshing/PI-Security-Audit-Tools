@@ -116,7 +116,7 @@ try
 
 	# Invoke...
 	# https://github.com/pester/Pester/wiki/Invoke-Pester
-	Invoke-Pester -Script $($rootFolder + '\PISYSAUDITCORE.tests.ps1') -Tag $TagList -TestName $TestNameFilter
+	Invoke-Pester -Script $($rootFolder + '\*.tests.ps1') -Tag $TagList -TestName $TestNameFilter
 }
 catch
 { Throw }
