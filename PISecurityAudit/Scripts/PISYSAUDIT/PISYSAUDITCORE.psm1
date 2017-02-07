@@ -4526,7 +4526,10 @@ param(
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
 		[alias("at")]
 		[System.Collections.HashTable]
-		$AuditHashTable,		
+		$AuditTable,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("cp")]		
+		$ComputerParams,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
