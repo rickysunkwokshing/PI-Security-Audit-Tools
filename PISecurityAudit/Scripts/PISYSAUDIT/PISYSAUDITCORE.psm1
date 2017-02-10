@@ -1058,6 +1058,68 @@ param(
 	}	
 }
 
+function Test-PISysAudit_PrincipalOrGroupType
+{
+<#
+.SYNOPSIS
+(Core functionality) Checks a specified characteristic of a Principal or Group.
+.DESCRIPTION
+Checks a specified Principal or Group Type based on the SID.  
+Return values include LowPrivileged, Administrator, Machine or Custom
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[string]
+		$SID,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{			
+	$fn = GetFunctionName
+	$type = 'Custom'
+
+	# Enumerate test arrays
+	$WellKnownSIDs = @{
+								'S-1-1-0'='LowPrivileged';       # Everyone
+								'S-1-5-7'='LowPrivileged';       # Anonymous
+								'S-1-5-11'='LowPrivileged';      # Authenticated Users
+								'S-1-5-32-545'='LowPrivileged';  # Users
+								'S-1-5-32-546'='LowPrivileged';  # Guests
+								'S-1-5-21*-513'='LowPrivileged'; # Domain Users
+								'S-1-5-21*-514'='LowPrivileged'; # Domain Guests
+								'S-1-5-18'='Machine';            # Local System
+								'S-1-5-19'='Machine';            # Local Service
+								'S-1-5-20'='Machine';            # Network Service
+								'S-1-5-32-544'='Administrator';  # Administrators 
+								'S-1-5-21*-500'='Administrator'; # Administrator
+								'S-1-5-21*-512'='Administrator'; # Domain Administrators
+							}
+	try
+	{	
+		$type = $WellKnownSIDs.GetEnumerator() | Where-Object {$SID -like $_.Name} | Select-Object -ExpandProperty Value
+		return $type
+	}
+	catch
+	{
+		# Return the error message.
+		$msgTemplate = "A problem occurred checking the condition {0} on account {1}. Error:{2}"
+		$msg = [string]::Format($msgTemplate, $Condition, $AccountSID, $_.Exception.Message) }
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Test-WebAdministrationModuleAvailable
 {
 <#
@@ -1124,7 +1186,7 @@ PROCESS
 		if($LocalComputer)
 		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
 		else
-		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message) }
+		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message, $RemoteComputerName) }
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return $null
 	}
@@ -4578,6 +4640,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
+Export-ModuleMember Test-PISysAudit_AccountProperties
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
