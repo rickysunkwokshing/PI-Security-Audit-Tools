@@ -1076,9 +1076,11 @@ param(
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)		
+
 BEGIN {}
-PROCESS
-{			
+PROCESS 
+{	
+
 	$fn = GetFunctionName
 	$type = 'Custom'
 
@@ -1107,7 +1109,7 @@ PROCESS
 	{
 		# Return the error message.
 		$msgTemplate = "A problem occurred checking the condition {0} on account {1}. Error:{2}"
-		$msg = [string]::Format($msgTemplate, $Condition, $AccountSID, $_.Exception.Message) }
+		$msg = [string]::Format($msgTemplate, $Condition, $AccountSID, $_.Exception.Message)
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return $null
 	}
@@ -4640,7 +4642,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
-Export-ModuleMember Test-PISysAudit_AccountProperties
+Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
