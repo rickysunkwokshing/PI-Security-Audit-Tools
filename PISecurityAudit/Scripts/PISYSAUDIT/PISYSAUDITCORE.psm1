@@ -2866,39 +2866,21 @@ PROCESS
 	
 	try
 	{									
-		
-		# Set the path to netsh CLU.
-		$windowsFolder = Get-PISysAudit_EnvVariable "WINDIR" -lc $LocalComputer -rcn $RemoteComputerName
-		$netshExec = PathConcat -ParentPath $windowsFolder -ChildPath "System32\netsh.exe"
-
 		if($LocalComputer)
-		{			
-			# Get the Scripts path.
-			$scriptTempFileLocation = (Get-Variable "ScriptsPathTemp" -Scope "Global").Value																			                                                             						
-			# Set the arguments of netsh.exe
-			$argList = "advfirewall show allprofiles state"						
+		{			                    			
+			$firewallState = Get-NetFirewallProfile 
 		}
 		else
-		{
-			# Get the PIHome folder.
-			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName											           
-			# Set the log folder.
-			$scriptTempFileLocation = PathConcat -ParentPath $PIHome_path -ChildPath "dat"                          			                                						
-			# Set the arguments of netsh.exe
-			$argList = "'advfirewall show allprofiles state'"
+		{                            				
+			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock { Get-NetFirewallProfile } 
 		}
-		# Set the output for the CLU.
-		$outputFilePath = PathConcat -ParentPath $scriptTempFileLocation -ChildPath "netsh_output.txt"
-		$outputFileContent = ExecuteCommandLineUtility -lc $LocalComputer -rcn $RemoteComputerName -UtilityExec $netshExec `
-																			-ArgList $argList -OutputFilePath $outputFilePath -dbgl $DBGLevel
-		
 		# Return the content.
-		return $outputFileContent
+		return $firewallState
 	}
 	catch
 	{
 		# Return the error message.
-		Write-PISysAudit_LogMessage "A problem occurred when calling the netsh command." "Error" $fn -eo $_
+		Write-PISysAudit_LogMessage "A problem occurred when calling the Get-NetFirewallProfile cmdlet." "Error" $fn -eo $_
 		return $null
 	}
 }
