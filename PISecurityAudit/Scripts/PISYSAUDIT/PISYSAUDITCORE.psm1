@@ -1084,21 +1084,25 @@ PROCESS
 	$fn = GetFunctionName
 	$type = 'Custom'
 
-	# Enumerate test arrays
+	# Enumerate test arrays https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
 	$WellKnownSIDs = @{
 								'S-1-1-0'='LowPrivileged';       # Everyone
 								'S-1-5-7'='LowPrivileged';       # Anonymous
 								'S-1-5-11'='LowPrivileged';      # Authenticated Users
-								'S-1-5-32-545'='LowPrivileged';  # Users
-								'S-1-5-32-546'='LowPrivileged';  # Guests
-								'S-1-5-21*-513'='LowPrivileged'; # Domain Users
-								'S-1-5-21*-514'='LowPrivileged'; # Domain Guests
 								'S-1-5-18'='Machine';            # Local System
 								'S-1-5-19'='Machine';            # Local Service
 								'S-1-5-20'='Machine';            # Network Service
-								'S-1-5-32-544'='Administrator';  # Administrators 
+								'S-1-5-32-544'='Administrator';  # Administrators						
+								'S-1-5-32-545'='LowPrivileged';  # Users
+								'S-1-5-32-546'='LowPrivileged';  # Guests
+								'S-1-5-32-555'='LowPrivileged';  # Remote Desktop Users
 								'S-1-5-21*-500'='Administrator'; # Administrator
-								'S-1-5-21*-512'='Administrator'; # Domain Administrators
+								'S-1-5-21*-501'='LowPrivileged'; # Guest
+								'S-1-5-21*-512'='Administrator'; # Domain Admins
+								'S-1-5-21*-513'='LowPrivileged'; # Domain Users
+								'S-1-5-21*-514'='LowPrivileged'; # Domain Guests
+								'S-1-5-21*-515'='Machine';       # Domain Computers
+								'S-1-5-21*-519'='Administrator'; # Enterprise Admins
 							}
 	try
 	{	
