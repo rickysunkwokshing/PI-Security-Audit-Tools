@@ -125,7 +125,7 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 
 		AU10004 - AppLocker Enabled
 		VALIDATION: verifies that AppLocker is enabled.   
-		COMPLIANCE: set AppLocker to Enforce mode after establishing a policy.  For a 
+		COMPLIANCE: set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
 		primer on running AppLocker on a PI Data Archive, see: 
 		https://techsupport.osisoft.com/Troubleshooting/KB/KB00994
 
@@ -160,7 +160,7 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		AU20003 - PI Data Archive SubSystem Version Check
 		VALIDATION: verifies that the PI Data Archive is using the most recent release.   
 		COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
-		2016 (3.4.400.1162).  For more information, see the "Upgrade a PI Data Archive Server" 
+		2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
 		section of the PI Data Archive Installation and Upgrade Guide, Live Library: 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD 
 
@@ -253,6 +253,14 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. This makes Kerberos Authentication possible.
 		For more information, see "PI AF and Kerberos authentication" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D
+
+		AU30008 - PI AF Server Admin Right
+		VALIDATION: verifies PI AF Server Admin right on the server object is not set improperly. 
+		COMPLIANCE: for compliance, there should be a single identity with the Admin right at the server 
+		level.  That identity should have a single custom account or group mapped to it.  Admin rights 
+		at the server level should not be necessary for ordinary administration tasks.
+		For more information, see "PI AF Access rights" in the PI Live Library. 
+		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
 
 		AU40001 - SQL Server xp_CmdShell Check
 		VALIDATION: verifies that SQL Server does not have xp_CmdShell enabled.
@@ -355,3 +363,4 @@ CONTRIBUTE
 	If you encounter a bug, please submit it as an issue on the GitHub repo
 	or fix the bug and submit a pull request!
         https://github.com/osisoft/PI-System-Audit-Tools/issues
+
