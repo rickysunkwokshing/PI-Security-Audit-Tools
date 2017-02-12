@@ -3753,6 +3753,67 @@ END {}
 #***************************
 }
 
+function Import-PISysAuditComputerParamsFromCsv
+{
+<#
+.SYNOPSIS
+(Core functionality) Parse CSV file with components to audit.
+.DESCRIPTION
+Parse a CSV file with computer parameters and put them in the appropriate format 
+to run an audit.  The CSV file must have the following headings: ComputerName, 
+PISystemComponentType, InstanceName, IntegratedSecurity, SQLServerUserID, 
+PasswordFile.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(															
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("cpf")]
+		[string]
+		$ComputerParametersFile
+		)
+BEGIN {}
+PROCESS		
+{	
+	$fn = GetFunctionName
+	$ComputerParamsTable = $null
+	If(Test-Path -Path $ComputerParametersFile)
+	{
+		$ComputerParameters = Import-Csv -Path $ComputerParametersFile
+	}
+	Else
+	{
+		$msg = "Computer parameters file not found."
+		Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
+		return $null
+	}
+	$sqlServerLabels = @('sql','sqlserver')
+	Foreach($ComputerParameter in $ComputerParameters)
+	{
+		If($ComputerParameter.PISystemComponentType.ToLower() -in $sqlServerLabels)
+		{
+			If($ComputerParameter.IntegratedSecurity.ToLower() -eq 'false'){$ComputerParameter.IntegratedSecurity = $false}
+			Else {$ComputerParameter.IntegratedSecurity = $true}
+			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
+																-ComputerName $ComputerParameter.ComputerName `
+																-PISystemComponent $ComputerParameter.PISystemComponentType `
+																-InstanceName $ComputerParameter.InstanceName `
+																-IntegratedSecurity $ComputerParameter.IntegratedSecurity `
+																-SQLServerUserID $ComputerParameter.SQLServerUserID `
+																-PasswordFile $ComputerParameter.PasswordFile
+		}
+		Else
+		{
+			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
+																-ComputerName $ComputerParameter.ComputerName `
+																-PISystemComponent $ComputerParameter.PISystemComponentType
+		}
+					
+	}
+	return $ComputerParamsTable
+}
+END {}
+}
+
 function New-PISysAuditObject
 {
 <#
@@ -4399,7 +4460,12 @@ New-PISysAuditReport [[-ComputerParamsTable | -cpt] <hashtable>]
 Parameter table defining which computers/servers
 to audit and for which PI System components. If a $null
 value is passed or the parameter is skipped, the cmdlet
-will assume to audit the local machine.
+will assume to audit the local machine, unless cpf 
+specifies a CSV file.
+.PARAMETER cpf
+CSV file defining which computers/servers to audit and 
+for which PI System components. Headings must be included 
+in the CSV file.  See example 7 in the conceptual help.
 .PARAMETER obf
 Obfuscate or not the name of computers/servers
 exposed in the audit report.
@@ -4410,7 +4476,8 @@ DebugLevel: 0 for no verbose, 1 for intermediary message
 to help debugging, 2 for full level of details
 .EXAMPLE
 New-PISysAuditReport -cpt $cpt -obf $false
-The -cpt will use the hashtable of parameters to know how to audit
+The -cpt switch will use the hashtable of parameters to know how to audit
+The -cpf switch can be used to load parameters from a CSV file
 The -obf switch deactivate the obfuscation of the server name.
 The -dbgl switch sets the debug level to 2 (full debugging)
 .EXAMPLE
@@ -4425,7 +4492,11 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]										
 		[alias("cpt")]
 		[System.Collections.HashTable]				
-		$ComputerParamsTable = $null,		
+		$ComputerParamsTable = $null,	
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]										
+		[alias("cpf")]
+		[string]
+		$ComputerParametersFile,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[alias("obf")]
 		[boolean]
@@ -4489,10 +4560,17 @@ PROCESS
 		# Initialize.
 		$ComputerParamsTable = @{}
 		
-		# This means an audit on the local computer is required only PI Data Archive and PI AF Server are checked by default.
-		# SQL Server checks ommitted by default as SQL Server will often require an instancename
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIServer"
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIAFServer"	
+		if($null -eq $ComputerParametersFile)
+		{
+			# This means an audit on the local computer is required only PI Data Archive and PI AF Server are checked by default.
+			# SQL Server checks ommitted by default as SQL Server will often require an instancename
+			$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIServer"
+			$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIAFServer"
+		}
+		Else
+		{
+			$ComputerParamsTable = Import-PISysAuditComputerParamsFromCsv -cpf $ComputerParametersFile
+		}	
 	}
 	
 	# ............................................................................................................

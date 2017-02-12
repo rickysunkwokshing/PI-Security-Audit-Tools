@@ -76,6 +76,22 @@ RUNNING THE PI SECURITY AUDIT SCRIPTS
 	# Disable the output to screen when used with scheduled task.
 	piaudit -ShowUI $false 
 
+	# Example 7
+	# CSV file with parameters
+	piaudit -cpf "Servers.csv"
+	# Sample contents for CSV file.  Note: headings must be specified.
+	# Servers.csv
+	ComputerName,PISystemComponentType,InstanceName,IntegratedSecurity,SQLServerUserID,PasswordFile
+	mySQL1,sql,sqlexpress,false,myTestUser,
+	myPI1,pidataarchive,,,,
+	myPI1,piaf,,,,
+	# If no SQL Servers are included, the file can be simplified to two columns
+	# Servers.csv
+	ComputerName,PISystemComponentType
+	myPI1,piaf
+	myPI1,pidataarchive
+	myPI2,picoresight
+
 VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 	
 		//BEGINSECTION - VALIDATIONS// This section is automatically generated.
