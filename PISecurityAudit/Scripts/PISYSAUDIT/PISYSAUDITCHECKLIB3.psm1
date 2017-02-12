@@ -865,7 +865,7 @@ PROCESS
 				{
 					$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
 				}
-				foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "," } 
+				foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
 			}	
 		}
 		else # Evaluate well known accounts for severity
@@ -891,9 +891,9 @@ PROCESS
 					$priorityMappings = $wellKnownMappings
 				}
 			}
-			foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "," }
+			foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
 		}
-		$msg = $msg.Trim(',')
+		$msg = $msg.Trim('|')
 	}
 	catch
 	{
