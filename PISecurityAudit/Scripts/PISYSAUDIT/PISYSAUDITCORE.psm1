@@ -1058,6 +1058,74 @@ param(
 	}	
 }
 
+function Test-PISysAudit_PrincipalOrGroupType
+{
+<#
+.SYNOPSIS
+(Core functionality) Checks a specified characteristic of a Principal or Group.
+.DESCRIPTION
+Checks a specified Principal or Group Type based on the SID.  
+Return values include LowPrivileged, Administrator, Machine or Custom
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[string]
+		$SID,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+
+BEGIN {}
+PROCESS 
+{	
+
+	$fn = GetFunctionName
+	$type = 'Custom'
+
+	# Enumerate test arrays https://support.microsoft.com/en-us/help/243330/well-known-security-identifiers-in-windows-operating-systems
+	$WellKnownSIDs = @{
+								'S-1-1-0'='LowPrivileged';       # Everyone
+								'S-1-5-7'='LowPrivileged';       # Anonymous
+								'S-1-5-11'='LowPrivileged';      # Authenticated Users
+								'S-1-5-18'='Machine';            # Local System
+								'S-1-5-19'='Machine';            # Local Service
+								'S-1-5-20'='Machine';            # Network Service
+								'S-1-5-32-544'='Administrator';  # Administrators						
+								'S-1-5-32-545'='LowPrivileged';  # Users
+								'S-1-5-32-546'='LowPrivileged';  # Guests
+								'S-1-5-32-555'='LowPrivileged';  # Remote Desktop Users
+								'S-1-5-21*-500'='Administrator'; # Administrator
+								'S-1-5-21*-501'='LowPrivileged'; # Guest
+								'S-1-5-21*-512'='Administrator'; # Domain Admins
+								'S-1-5-21*-513'='LowPrivileged'; # Domain Users
+								'S-1-5-21*-514'='LowPrivileged'; # Domain Guests
+								'S-1-5-21*-515'='Machine';       # Domain Computers
+								'S-1-5-21*-519'='Administrator'; # Enterprise Admins
+							}
+	try
+	{	
+		$type = $WellKnownSIDs.GetEnumerator() | Where-Object {$SID -like $_.Name} | Select-Object -ExpandProperty Value
+		return $type
+	}
+	catch
+	{
+		# Return the error message.
+		$msgTemplate = "A problem occurred checking the condition {0} on account {1}. Error:{2}"
+		$msg = [string]::Format($msgTemplate, $Condition, $AccountSID, $_.Exception.Message)
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Test-WebAdministrationModuleAvailable
 {
 <#
@@ -1124,7 +1192,7 @@ PROCESS
 		if($LocalComputer)
 		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
 		else
-		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message) }
+		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message, $RemoteComputerName) }
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return $null
 	}
@@ -2802,39 +2870,21 @@ PROCESS
 	
 	try
 	{									
-		
-		# Set the path to netsh CLU.
-		$windowsFolder = Get-PISysAudit_EnvVariable "WINDIR" -lc $LocalComputer -rcn $RemoteComputerName
-		$netshExec = PathConcat -ParentPath $windowsFolder -ChildPath "System32\netsh.exe"
-
 		if($LocalComputer)
-		{			
-			# Get the Scripts path.
-			$scriptTempFileLocation = (Get-Variable "ScriptsPathTemp" -Scope "Global").Value																			                                                             						
-			# Set the arguments of netsh.exe
-			$argList = "advfirewall show allprofiles state"						
+		{			                    			
+			$firewallState = Get-NetFirewallProfile 
 		}
 		else
-		{
-			# Get the PIHome folder.
-			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName											           
-			# Set the log folder.
-			$scriptTempFileLocation = PathConcat -ParentPath $PIHome_path -ChildPath "dat"                          			                                						
-			# Set the arguments of netsh.exe
-			$argList = "'advfirewall show allprofiles state'"
+		{                            				
+			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock { Get-NetFirewallProfile } 
 		}
-		# Set the output for the CLU.
-		$outputFilePath = PathConcat -ParentPath $scriptTempFileLocation -ChildPath "netsh_output.txt"
-		$outputFileContent = ExecuteCommandLineUtility -lc $LocalComputer -rcn $RemoteComputerName -UtilityExec $netshExec `
-																			-ArgList $argList -OutputFilePath $outputFilePath -dbgl $DBGLevel
-		
 		# Return the content.
-		return $outputFileContent
+		return $firewallState
 	}
 	catch
 	{
 		# Return the error message.
-		Write-PISysAudit_LogMessage "A problem occurred when calling the netsh command." "Error" $fn -eo $_
+		Write-PISysAudit_LogMessage "A problem occurred when calling the Get-NetFirewallProfile cmdlet." "Error" $fn -eo $_
 		return $null
 	}
 }
@@ -3707,6 +3757,67 @@ END {}
 #***************************
 }
 
+function Import-PISysAuditComputerParamsFromCsv
+{
+<#
+.SYNOPSIS
+(Core functionality) Parse CSV file with components to audit.
+.DESCRIPTION
+Parse a CSV file with computer parameters and put them in the appropriate format 
+to run an audit.  The CSV file must have the following headings: ComputerName, 
+PISystemComponentType, InstanceName, IntegratedSecurity, SQLServerUserID, 
+PasswordFile.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(															
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
+		[alias("cpf")]
+		[string]
+		$ComputerParametersFile
+		)
+BEGIN {}
+PROCESS		
+{	
+	$fn = GetFunctionName
+	$ComputerParamsTable = $null
+	If(Test-Path -Path $ComputerParametersFile)
+	{
+		$ComputerParameters = Import-Csv -Path $ComputerParametersFile
+	}
+	Else
+	{
+		$msg = "Computer parameters file not found."
+		Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
+		return $null
+	}
+	$sqlServerLabels = @('sql','sqlserver')
+	Foreach($ComputerParameter in $ComputerParameters)
+	{
+		If($ComputerParameter.PISystemComponentType.ToLower() -in $sqlServerLabels)
+		{
+			If($ComputerParameter.IntegratedSecurity.ToLower() -eq 'false'){$ComputerParameter.IntegratedSecurity = $false}
+			Else {$ComputerParameter.IntegratedSecurity = $true}
+			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
+																-ComputerName $ComputerParameter.ComputerName `
+																-PISystemComponent $ComputerParameter.PISystemComponentType `
+																-InstanceName $ComputerParameter.InstanceName `
+																-IntegratedSecurity $ComputerParameter.IntegratedSecurity `
+																-SQLServerUserID $ComputerParameter.SQLServerUserID `
+																-PasswordFile $ComputerParameter.PasswordFile
+		}
+		Else
+		{
+			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
+																-ComputerName $ComputerParameter.ComputerName `
+																-PISystemComponent $ComputerParameter.PISystemComponentType
+		}
+					
+	}
+	return $ComputerParamsTable
+}
+END {}
+}
+
 function New-PISysAuditObject
 {
 <#
@@ -4353,7 +4464,12 @@ New-PISysAuditReport [[-ComputerParamsTable | -cpt] <hashtable>]
 Parameter table defining which computers/servers
 to audit and for which PI System components. If a $null
 value is passed or the parameter is skipped, the cmdlet
-will assume to audit the local machine.
+will assume to audit the local machine, unless cpf 
+specifies a CSV file.
+.PARAMETER cpf
+CSV file defining which computers/servers to audit and 
+for which PI System components. Headings must be included 
+in the CSV file.  See example 7 in the conceptual help.
 .PARAMETER obf
 Obfuscate or not the name of computers/servers
 exposed in the audit report.
@@ -4364,7 +4480,8 @@ DebugLevel: 0 for no verbose, 1 for intermediary message
 to help debugging, 2 for full level of details
 .EXAMPLE
 New-PISysAuditReport -cpt $cpt -obf $false
-The -cpt will use the hashtable of parameters to know how to audit
+The -cpt switch will use the hashtable of parameters to know how to audit
+The -cpf switch can be used to load parameters from a CSV file
 The -obf switch deactivate the obfuscation of the server name.
 The -dbgl switch sets the debug level to 2 (full debugging)
 .EXAMPLE
@@ -4379,7 +4496,11 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]										
 		[alias("cpt")]
 		[System.Collections.HashTable]				
-		$ComputerParamsTable = $null,		
+		$ComputerParamsTable = $null,	
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]										
+		[alias("cpf")]
+		[string]
+		$ComputerParametersFile,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[alias("obf")]
 		[boolean]
@@ -4443,10 +4564,17 @@ PROCESS
 		# Initialize.
 		$ComputerParamsTable = @{}
 		
-		# This means an audit on the local computer is required only PI Data Archive and PI AF Server are checked by default.
-		# SQL Server checks ommitted by default as SQL Server will often require an instancename
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIServer"
-		$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIAFServer"	
+		if($null -eq $ComputerParametersFile)
+		{
+			# This means an audit on the local computer is required only PI Data Archive and PI AF Server are checked by default.
+			# SQL Server checks ommitted by default as SQL Server will often require an instancename
+			$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIServer"
+			$ComputerParamsTable = New-PISysAuditComputerParams $ComputerParamsTable "localhost" "PIAFServer"
+		}
+		Else
+		{
+			$ComputerParamsTable = Import-PISysAuditComputerParamsFromCsv -cpf $ComputerParametersFile
+		}	
 	}
 	
 	# ............................................................................................................
@@ -4581,6 +4709,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
+Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue

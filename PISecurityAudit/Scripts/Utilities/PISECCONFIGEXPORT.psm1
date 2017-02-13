@@ -98,7 +98,7 @@ param(
 				break
 			}
 			"PIMappings" { $outputFileContent = Get-PIMapping -Connection $PIDataArchiveConnection	| Select-Object Identity, PrincipalName | ConvertSelectionToPSObject; break }
-			"PIMessages" { $outputFileContent = Get-PIMessage -Connection $PIDataArchiveConnection -Starttime $(Get-Date).AddMonths(-1) -Endtime $(Get-Date) -SeverityType Warning -Count $MaxResults | Select * | ConvertSelectionToPSObject; break }
+			"PIMessages" { $outputFileContent = Get-PIMessage -Connection $PIDataArchiveConnection -Starttime $(Get-Date).AddMonths(-1) -Endtime $(Get-Date) -SeverityType Warning -Count $MaxResults | Select-Object * | ConvertSelectionToPSObject; break }
 			"PINetManagerStats" {
 				$outputFileContentRaw = Get-PIConnectionStatistics -Connection $PIDataArchiveConnection
 				# Note: ConvertSelectionToPSObject is not used for NetManStats because attributes are dictionary entries and it is simpler to convert them directly to NoteProperties

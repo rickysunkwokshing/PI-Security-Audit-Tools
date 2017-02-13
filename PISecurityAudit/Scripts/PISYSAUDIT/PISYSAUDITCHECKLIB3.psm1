@@ -54,6 +54,7 @@ Get functions from PI AF Server library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckFileExtensionWhitelist", 1)	
 	$listOfFunctions.Add("Get-PISysAudit_CheckAFServerVersion", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckAFSPN", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckAFServerAdminRight", 1)
 	# Return the list.
 	return $listOfFunctions
 }
@@ -634,35 +635,9 @@ PROCESS
 	$installVersion = $null
 	try
 	{						
-		# Get install version via PowerShell, fall back to AFDiag
-		if($global:ArePowerShellToolsAvailable)
-		{
-			$installVersion = $global:AFServerConnection.ServerVersion
-		}
-		else
-		{
-			# Read the afdiag.exe command output.
-			$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-			# Verify that we can read AF Diag output.
-			if($null -eq $outputFileContent)
-			{
-				$msg = "AFDiag output not found.  Cannot continue processing the validation check"
-				Write-PISysAudit_LogMessage $msg "Warning" $fn
-				$result = "N/A"
-			}
-			else
-			{
-				# Read each line to find the one containing the token to replace.
-				foreach($line in $outputFileContent)
-				{								
-					if($line.Contains("Version"))
-					{								
-						$installVersion = $line.Split('=')[1].Trim()
-						break
-					}						
-				}
-			}	
-		}
+		# Get install version via PowerShell
+		$installVersion = $global:AFServerConnection.ServerVersion
+		
 		# Perform logic on install version
 		if($null -ne $installVersion)
 		{
@@ -790,6 +765,161 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckAFServerAdminRight
+{
+<#  
+.SYNOPSIS
+AU30008 - PI AF Server Admin Right
+.DESCRIPTION
+VALIDATION: verifies PI AF Server Admin right on the server object is not set improperly. <br/>
+COMPLIANCE: for compliance, there should be a single identity with the Admin right at the server 
+level.  That identity should have a single custom account or group mapped to it.  Admin rights 
+at the server level should not be necessary for ordinary administration tasks.
+For more information, see "PI AF Access rights" in the PI Live Library. <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = 'Unknown'
+	
+	try
+	{						
+		$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
+		# Get identities with Admin Right on the AF Server object
+		$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
+									| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
+									| Select-Object -ExpandProperty Identity
+		# Flag if more than one Identity is an AF super user 
+		$hasSingleIdentity = $false
+		If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
+
+		# Find all mappings to super user identities. 
+		$afAdminMappings = Get-AFSecurityMapping -AFServer $afserver `
+									| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
+									| Select-Object Name, SecurityIdentity, Account
+		# Flag if more than one mapping exists to the AF super user 
+		$hasSingleMapping = $false
+		If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
+
+		$endUserMappings = @{}
+		$osAdminMappings = @{}
+		$wellKnownMappings = @{}
+		ForEach($afAdminMapping in $afAdminMappings)
+		{
+			$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
+			
+			If($null -ne $accountType){
+				switch ($accountType)
+				{
+					'LowPrivileged' {
+										$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+										$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+									}
+					'Administrator' {
+										$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+										$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+									}
+					default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
+				}
+			}
+		}
+
+		if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
+		{
+			if($hasSingleMapping) # Ideal case, a single compliant mapping
+			{
+				$result = $true
+				$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
+			}
+			else # One Identity but multiple mappings which may not be necessary
+			{
+				$result = $false
+				$Severity = 'Low'
+				if($hasSingleIdentity)
+				{
+					$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
+				}
+				else # Multiple Identities should not have super user access
+				{
+					$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
+				}
+				foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
+			}	
+		}
+		else # Evaluate well known accounts for severity
+		{
+			$result = $false
+			if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
+			{
+				$Severity = 'severe'
+				$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
+				$priorityMappings = $endUserMappings
+			}
+			else
+			{
+				$Severity = 'moderate'
+				if($osAdminMappings.Count -gt 0)
+				{
+					$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
+					$priorityMappings = $osAdminMappings
+				}
+				else
+				{
+					$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
+					$priorityMappings = $wellKnownMappings
+				}
+			}
+			foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
+		}
+		$msg = $msg.Trim('|')
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30008" `
+										-ain "PI AF Server Admin Right" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity $Severity
+										
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -867,6 +997,7 @@ Export-ModuleMember Get-PISysAudit_CheckPlugInVerifyLevel
 Export-ModuleMember Get-PISysAudit_CheckFileExtensionWhitelist
 Export-ModuleMember Get-PISysAudit_CheckAFServerVersion
 Export-ModuleMember Get-PISysAudit_CheckAFSPN
+Export-ModuleMember Get-PISysAudit_CheckAFServerAdminRight
 # </Do not remove>
 
 # ........................................................................
