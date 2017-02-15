@@ -253,31 +253,32 @@ PROCESS
 	$msg = ""
 	try
 	{				
-		# Read the registry key.
-		$outputFileContent = Get-PISysAudit_FirewallState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 		
-		# Read each line to find the state of each profile.	
+		$firewallState = Get-PISysAudit_FirewallState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		
 		$result = $false		
 		$validationCounter = 0
+		$disabledProfiles = ""
 		
-		foreach($line in $OutputFileContent)
-		{														
-			if($line.ToLower().Contains("state"))
-			{								
-				if($line.ToLower().Contains("on")) { $validationCounter++ }				
-			}					
+		foreach($profile in $firewallState) 
+		{ 
+			If($profile.Enabled)
+			{ $validationCounter++ } 
+			Else
+			{ $disabledProfiles += " " + $profile.Name + ";" }
 		}
 		
 		# Check if the counter is 3 = compliant, 2 or less it is not compliant
 		if($validationCounter -eq 3) 
 		{ 
 			$result = $true 
-			$msg = "Firewall enabled."
+			$msg = "All Firewall profiles enabled."
 		} 
 		else 
 		{ 
 			$result = $false 
-			$msg = "Firewall not enabled."
+			$msg = "The following Firewall profiles are not enabled:" + $disabledProfiles
+			$msg = $msg.Trim(';')
 		}							
 	}
 	catch
