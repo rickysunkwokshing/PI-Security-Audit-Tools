@@ -1394,8 +1394,9 @@ param(
 		}
 		else
 		{
-			$msg = "Unable to locate the PowerShell Tools for the PI System on the computer running this script."
-			Write-PISysAudit_LogMessage $msg "Info" $fn
+			$msg = "Unable to locate the PowerShell Tools for the PI System on the computer running this script. Terminating PI Data Archive audit"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			return
 		}
 		
 		# Get the list of functions to execute.
