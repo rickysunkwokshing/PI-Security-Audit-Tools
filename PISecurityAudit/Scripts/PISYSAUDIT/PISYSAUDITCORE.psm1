@@ -1394,7 +1394,7 @@ param(
 		}
 		else
 		{
-			$msgTemplate = "Unable to locate the PowerShell Tools for the PI System on the computer running this script."
+			$msg = "Unable to locate the PowerShell Tools for the PI System on the computer running this script."
 			Write-PISysAudit_LogMessage $msg "Info" $fn
 		}
 		
