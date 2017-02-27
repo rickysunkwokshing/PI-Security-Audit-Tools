@@ -55,6 +55,7 @@ Get functions from PI Data Archive library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckExplicitLoginDisabled",1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckPICollective",1)
 				
 	# Return the list.
 	return $listOfFunctions	
@@ -899,6 +900,79 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPICollective
+{
+<#  
+.SYNOPSIS
+AU20009 - PI Collective Check
+.DESCRIPTION
+VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. 
+COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
+	High Availability. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$collectiveName = Get-PICollective -Connection $global:PIDataArchiveConnection -ErrorAction Stop `
+					| select -ExpandProperty Name
+		$msg = "PI Data Archive is a member of PI Collective '{0}'"
+		$msg = [string]::Format($msg, $collectiveName)
+		$result = $true
+	}
+	# Get-PICollective returns ArgumentException if the PI Data Archive is not in a Collective
+	catch [System.ArgumentException]
+	{
+		$msg = "PI Data Archive is not a member of a PI Collective"
+		$result = $false
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20009" `
+										-ain "PI Collective Check" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive"`
+										-Severity "Moderate"								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -977,6 +1051,7 @@ Export-ModuleMember Get-PISysAudit_CheckAutoTrustConfig
 Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
 Export-ModuleMember Get-PISysAudit_CheckExplicitLoginDisabled
 Export-ModuleMember Get-PISysAudit_CheckPISPN
+Export-ModuleMember Get-PISysAudit_CheckPICollective
 # </Do not remove>
 
 # ........................................................................
