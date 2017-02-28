@@ -2656,7 +2656,7 @@ PROCESS
 		$namespace = "root\CIMV2"
 		$filterExpression = [string]::Format("name='{0}'", $ServiceName)
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		return ($WMIObject | select -ExpandProperty $Property)
+		return ($WMIObject | Select-Object -ExpandProperty $Property)
 	}
 	catch
 	{
