@@ -3158,59 +3158,6 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_InstalledProgramsFiltered
-{
-<#
-.SYNOPSIS
-(Core functionality) Gets a list of installed program names matching provided filters on a given machine.
-.DESCRIPTION
-Gets a list of installed program names matching provided filters on a given machine.
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("f")]
-		[String[]]
-		$Filters,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]		
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",		
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)
-BEGIN {}
-PROCESS
-{		
-	$fn = GetFunctionName
-	
-	$filterExpression = ''
-
-	foreach ($filter in $Filters)
-	{
-		$filterExpression += [string]::Format("name LIKE '{0}' OR ", $filter)
-	}
-	$filterExpression = $filterExpression.Substring(0, $filterExpression.Length-4)
-
-	$nameSpace = 'root\CIMV2'
-	$className = 'Win32_Product'
-	$WMIObjectList = ExecuteWMIQuery $className -n $nameSpace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel
-
-	return $WMIObjectList.Name
-}	
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
-
 function Invoke-PISysAudit_AFDiagCommand
 {
 <#
