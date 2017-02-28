@@ -904,7 +904,7 @@ function Get-PISysAudit_CheckPICollective
 {
 <#  
 .SYNOPSIS
-AU20009 - PI Collective Check
+AU20009 - PI Collective
 .DESCRIPTION
 VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. 
 COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
@@ -935,18 +935,19 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{		
-		$collectiveName = Get-PICollective -Connection $global:PIDataArchiveConnection -ErrorAction Stop `
-					| select -ExpandProperty Name
-		$msg = "PI Data Archive is a member of PI Collective '{0}'"
-		$msg = [string]::Format($msg, $collectiveName)
-		$result = $true
-	}
-	# Get-PICollective returns ArgumentException if the PI Data Archive is not in a Collective
-	catch [System.ArgumentException]
-	{
-		$msg = "PI Data Archive is not a member of a PI Collective"
-		$result = $false
+	{	
+		$serviceType = $global:PIDataArchiveConnection.Service.Type.ToString()
+		if ($serviceType.ToLower() -eq 'collective')
+		{
+			$result = $true
+			$msg = "PI Data Archive is a member of PI Collective '{0}'"
+			$msg = [string]::Format($msg, $global:PIDataArchiveConnection.Service.Name)
+		}
+		else
+		{
+			$msg = "PI Data Archive is not a member of a PI Collective"
+			$result = $false
+		}
 	}
 	catch
 	{
@@ -959,7 +960,7 @@ PROCESS
 	# Define the results in the audit table	
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20009" `
-										-ain "PI Collective Check" -aiv $result `
+										-ain "PI Collective" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
 										-Severity "Moderate"								
@@ -971,7 +972,6 @@ END {}
 #End of exported function
 #***************************
 }
-
 
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
