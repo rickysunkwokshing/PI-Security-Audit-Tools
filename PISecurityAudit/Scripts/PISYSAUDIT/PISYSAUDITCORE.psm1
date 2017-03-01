@@ -1259,8 +1259,8 @@ param(
 		}																						
 				
 		# Set message templates.
-		$activityMsgTemplate1 = "Check computer '{0}'..."				
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsgTemplate1 = "Check computer '{0}'..."
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
@@ -1281,9 +1281,10 @@ param(
 				if($ShowUI)
 				{
 					# Increment the counter.
-					$i++				
-					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)                     
-					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+					$i++
+					$auditItem = (Get-Help $function.Name).Synopsis
+					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)
+					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 					Write-Progress -activity $ActivityMsg1 -Status $StatusMsg	
 				}
 				
@@ -1412,8 +1413,8 @@ param(
 									
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI Data Archive component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 															
@@ -1425,8 +1426,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg
 			}
 			
@@ -1569,10 +1571,10 @@ param(
 
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI AF Server component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"						
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
 		# Prepare data required for multiple compliance checks
 
@@ -1586,8 +1588,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg							
 			}
 			
@@ -1689,8 +1692,8 @@ param(
 		
 		# Set message templates.
 		$activityMsgTemplate1 = "Check SQL Server component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}, SQL Server Instance Name = {3}," `
@@ -1711,9 +1714,10 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
-				Write-Progress -activity $activityMsg1 -Status $statusMsg				
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
+				Write-Progress -activity $activityMsg1 -Status $statusMsg
 			}
 
 			# ............................................................................................................
@@ -1810,8 +1814,8 @@ param(
 		
 		# Set message templates.
 		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}," `
@@ -1825,8 +1829,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg				
 			}
 
@@ -2656,7 +2661,7 @@ PROCESS
 		$namespace = "root\CIMV2"
 		$filterExpression = [string]::Format("name='{0}'", $ServiceName)
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		return ($WMIObject | select -ExpandProperty $Property)
+		return ($WMIObject | Select-Object -ExpandProperty $Property)
 	}
 	catch
 	{
@@ -2705,17 +2710,24 @@ PROCESS
 	{				
 		if($LocalComputer)
 		{
+			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
 			$unsortedAndUnfilteredResult = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
-			$result = $unsortedAndUnfilteredResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate			
+			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
+			$wow6432NodeResult = Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
+			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
 			return $result
 		}
-		else
+		else # Use PS Remoting script blocks
 		{	
+			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
 			$scriptBlockCmd = "Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
-			# Create the script block to send via PS Remoting.
 			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock									
-			$result = $unsortedAndUnfilteredResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
+			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
+			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
+			$scriptBlockCmd2 = "Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
+			$scriptBlock2 = [scriptblock]::create( $scriptBlockCmd2 )	
+			$wow6432NodeResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock2					
+			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
 			return $result			
 		}	
 	}
