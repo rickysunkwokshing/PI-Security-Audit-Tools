@@ -1660,6 +1660,14 @@ param(
 					return
 				}
 				
+				if (-not (Get-Module -ListAvailable -Name SQLPS))
+				{
+					# Return if SQLPS not available on machine
+					$msg = "Module 'SQLPS' is required to execute the SQL Server audit checks"
+					Write-PISysAudit_LogMessage $msg "Error" $fn
+					return
+				}
+
 				# Push and Pop are to prevent a context switch to the SQL shell from persisting after invocation of SQL commands.
 				Push-Location
 				Import-Module SQLPS -DisableNameChecking
