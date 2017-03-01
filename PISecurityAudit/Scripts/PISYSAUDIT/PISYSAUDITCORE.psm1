@@ -1397,6 +1397,12 @@ param(
 		{
 			$msg = "Unable to locate the PowerShell Tools for the PI System on the computer running this script. Terminating PI Data Archive audit"
 			Write-PISysAudit_LogMessage $msg "Error" $fn
+			$AuditTable = New-PISysAuditObject -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+										-at $AuditTable -id "Error" `
+										-ain "PI Data Archive Audit" -aiv "Error" `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity "N/A"
 			return
 		}
 		
@@ -1665,6 +1671,12 @@ param(
 					# Return if SQLPS not available on machine
 					$msg = "Module 'SQLPS' is required to execute the SQL Server audit checks"
 					Write-PISysAudit_LogMessage $msg "Error" $fn
+					$AuditTable = New-PISysAuditObject -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+										-at $AuditTable -id "Error" `
+										-ain "SQL Server Audit" -aiv "Error" `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "SQL Server" `
+										-Severity "N/A"
 					return
 				}
 
@@ -4297,7 +4309,9 @@ PROCESS
 		}
 		
 		# Export to .csv but sort the results table first to have Failed items on the top sorted by Severity 
-		$results = $results | Sort-Object @{Expression="AuditItemValue";Descending=$false},@{Expression="Severity";Descending=$true},@{Expression="ID";Descending=$false}
+		$errs = $results | Where-Object AuditItemValue -EQ 'Error'
+		$results = $results | Where-Object AuditItemValue -NE 'Error' | Sort-Object @{Expression="AuditItemValue";Descending=$false},@{Expression="Severity";Descending=$true},@{Expression="ID";Descending=$false}
+		$results = $results + $errs
 		$results | Export-Csv -Path $fileToExport -Encoding ASCII -NoType
 	
 		
@@ -4319,6 +4333,7 @@ PROCESS
 					"moderate" {$highlight="`"warning`""; break}
 					"low" {$highlight="`"info`""; break}
 				}
+				if ($result.AuditItemValue -eq 'Error') { $highlight="`"redtext`"" }
 	
 				$anchorTag=""
 				if($result.AuditItemValue -ieq "fail"){
@@ -4410,7 +4425,10 @@ PROCESS
 						}
 						.error{
 							background-color: #FFAB91;
-						}	
+						}
+						.redtext{
+							color: #FF0000;
+						}
 					</style>
 
 			
