@@ -1259,8 +1259,8 @@ param(
 		}																						
 				
 		# Set message templates.
-		$activityMsgTemplate1 = "Check computer '{0}'..."				
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsgTemplate1 = "Check computer '{0}'..."
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
@@ -1281,9 +1281,10 @@ param(
 				if($ShowUI)
 				{
 					# Increment the counter.
-					$i++				
-					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)                     
-					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+					$i++
+					$auditItem = (Get-Help $function.Name).Synopsis
+					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)
+					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 					Write-Progress -activity $ActivityMsg1 -Status $StatusMsg	
 				}
 				
@@ -1412,8 +1413,8 @@ param(
 									
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI Data Archive component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 															
@@ -1425,8 +1426,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg
 			}
 			
@@ -1569,10 +1571,10 @@ param(
 
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI AF Server component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"						
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
 		# Prepare data required for multiple compliance checks
 
@@ -1586,8 +1588,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg							
 			}
 			
@@ -1689,8 +1692,8 @@ param(
 		
 		# Set message templates.
 		$activityMsgTemplate1 = "Check SQL Server component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}, SQL Server Instance Name = {3}," `
@@ -1711,9 +1714,10 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
-				Write-Progress -activity $activityMsg1 -Status $statusMsg				
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
+				Write-Progress -activity $activityMsg1 -Status $statusMsg
 			}
 
 			# ............................................................................................................
@@ -1810,8 +1814,8 @@ param(
 		
 		# Set message templates.
 		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}," `
@@ -1825,8 +1829,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg				
 			}
 
