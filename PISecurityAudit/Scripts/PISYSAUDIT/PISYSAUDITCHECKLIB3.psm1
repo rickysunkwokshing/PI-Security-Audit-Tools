@@ -671,7 +671,7 @@ PROCESS
 			# OSIsoft.Powershell not available
 			$result = "N/A"
 			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
 	}
 	catch
@@ -912,7 +912,7 @@ PROCESS
 			# OSIsoft.Powershell not available
 			$result = "N/A"
 			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
 	}
 	catch
