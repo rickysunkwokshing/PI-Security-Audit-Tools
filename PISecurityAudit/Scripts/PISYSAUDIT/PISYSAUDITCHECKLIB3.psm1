@@ -805,7 +805,9 @@ PROCESS
 	$Severity = 'Unknown'
 	
 	try
-	{						
+	{
+		if($global:ArePowerShellToolsAvailable)
+		{			
 		$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
 		# Get identities with Admin Right on the AF Server object
 		$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
@@ -894,6 +896,14 @@ PROCESS
 			foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
 		}
 		$msg = $msg.Trim('|')
+		}
+		else
+		{
+			# OSIsoft.Powershell not available
+			$result = "N/A"
+			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+		}
 	}
 	catch
 	{
