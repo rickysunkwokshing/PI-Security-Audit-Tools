@@ -1656,7 +1656,14 @@ param(
 	{
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-				
+
+		# If no password has been given and SQL Server security is in use,
+		# prompt for a password and store in the cache.
+		# This will avoid to ask many times to the user when a
+		# SQL query is performed.
+		if(($ComputerParams.IntegratedSecurity -eq $false) -and ($ComputerParams.PasswordFile -eq ""))
+		{ SetSQLAccountPasswordInCache $ComputerParams.ComputerName $ComputerParams.InstanceName $ComputerParams.SQLServerUserID}		
+			
 		# Validate the presence of a SQL Server
 			try
 			{
@@ -1722,14 +1729,7 @@ param(
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}, SQL Server Instance Name = {3}," `
 												+ " Use Integrated Security  = {4}, User name = {5}, Password file = {6}, Debug Level = {7}"								
-
-		# If no password has been given and SQL Server security is in use,
-		# prompt for a password and store in the cache.
-		# This will avoid to ask many times to the user when a
-		# SQL query is performed.
-		if(($ComputerParams.IntegratedSecurity -eq $false) -and ($ComputerParams.PasswordFile -eq ""))
-		{ SetSQLAccountPasswordInCache $ComputerParams.ComputerName $ComputerParams.InstanceName $ComputerParams.SQLServerUserID}		
-				
+	
 		# Proceed with all the compliance checks.
 		$i = 0
 		foreach($function in $listOfFunctions.GetEnumerator())
