@@ -53,6 +53,7 @@ Get functions from machine library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckAppLockerEnabled", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckUACEnabled", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckManagedPI", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckIEEnhancedSecurity", 1)
 			
 	# Return the list.
 	return $listOfFunctions
@@ -604,6 +605,93 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckIEEnhancedSecurity
+{
+<#  
+.SYNOPSIS
+AU10007 - Internet Explorer Enhanced Security
+.DESCRIPTION
+VERIFICATION: Validates that IE Enhanced Security is enabled <br/>
+COMPLIANCE: Ensure that Internet Explorer Enhanced Security is enabled
+	for both Administrators and Users. More information is available at: 
+	<a href="https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx"> https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx </a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$adminKeyPath = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"	
+		$userKeyPath  = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+		# Attribute is 0 or 1 for enabled/disabled
+		$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+		$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+		if($adminIsEnabled -and $userIsEnabled)
+		{
+			$result = $true
+			$msg = "IE Enhanced Security is enabled for Users and Admins."
+		}
+		elseif($adminIsEnabled)
+		{
+			$result = $false
+			$msg = "IE Enhanced Security is disabled for Users."
+		}
+		elseif($userIsEnabled)
+		{
+			$result = $false
+			$msg = "IE Enhanced Security is disabled for Admins."
+		}
+		else
+		{
+			$result = $false
+			$msg = "IE Enhanced Security is disabled for Users and Admins."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10007" `
+									-ain "IE Enhanced Security" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -681,6 +769,7 @@ Export-ModuleMember Get-PISysAudit_CheckFirewallEnabled
 Export-ModuleMember Get-PISysAudit_CheckAppLockerEnabled
 Export-ModuleMember Get-PISysAudit_CheckUACEnabled
 Export-ModuleMember Get-PISysAudit_CheckManagedPI
+Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
 # </Do not remove>
 
 # ........................................................................
