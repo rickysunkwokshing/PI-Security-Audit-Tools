@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -46,14 +55,14 @@ Get functions from machine library.
 #>
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckDomainMemberShip", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckOSInstallationType", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckFirewallEnabled", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAppLockerEnabled", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckUACEnabled", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckManagedPI", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckIEEnhancedSecurity", 1)
+    $listOfFunctions = @()
+    $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckDomainMemberShip"   1    # AU10001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckOSInstallationType" 1    # AU10002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFirewallEnabled"    1    # AU10003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAppLockerEnabled"   1    # AU10004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1    # AU10005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1    # AU10006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1    # AU10007
 			
 	# Return the list.
 	return $listOfFunctions

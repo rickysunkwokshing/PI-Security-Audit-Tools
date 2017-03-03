@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -46,16 +55,16 @@ Get functions from PI Data Archive library.
 #>
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAdminUsage", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerSubSysVersions", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckEditDays", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAutoTrustConfig", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckExplicitLoginDisabled",1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPICollective",1)
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 # AU20001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 # AU20002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerSubSysVersions"               1 # AU20003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 # AU20004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 # AU20005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 # AU20006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 # AU20007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 # AU20008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
 				
 	# Return the list.
 	return $listOfFunctions	
