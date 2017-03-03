@@ -34,6 +34,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -45,11 +54,12 @@ Get functions from machine library.
 #>
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckCoresightVersion", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckCoresightAppPools", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CoresightSSLcheck", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CoresightSPNcheck", 1)
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckCoresightVersion"  1 # AU50001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckCoresightAppPools" 1 # AU50002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CoresightSSLcheck"      1 # AU50003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CoresightSPNcheck"      1 # AU50004
+	
 	# Return the list.
 	return $listOfFunctions
 }

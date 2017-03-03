@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -46,15 +55,16 @@ Get functions from PI AF Server library.
 #>
 	# Form a list of all functions that need to be called to test
 	# the PI AF Server compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAFServiceConfiguredAccount", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPImpersonationModeForAFDataSets", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAFServicePrivileges", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPlugInVerifyLevel", 1)	
-	$listOfFunctions.Add("Get-PISysAudit_CheckFileExtensionWhitelist", 1)	
-	$listOfFunctions.Add("Get-PISysAudit_CheckAFServerVersion", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAFSPN", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAFServerAdminRight", 1)
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServiceConfiguredAccount"    1 # AU30001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPImpersonationModeForAFDataSets" 1 # AU30002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServicePrivileges"           1 # AU30003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPlugInVerifyLevel"               1 # AU30004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFileExtensionWhitelist"          1 # AU30005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerVersion"                 1 # AU30006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFSPN"                           1 # AU30007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
+
 	# Return the list.
 	return $listOfFunctions
 }
