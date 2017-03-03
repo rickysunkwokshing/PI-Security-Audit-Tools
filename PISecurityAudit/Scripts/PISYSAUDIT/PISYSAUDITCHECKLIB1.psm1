@@ -52,6 +52,7 @@ Get functions from machine library.
 	$listOfFunctions.Add("Get-PISysAudit_CheckFirewallEnabled", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckAppLockerEnabled", 1)
 	$listOfFunctions.Add("Get-PISysAudit_CheckUACEnabled", 1)
+	$listOfFunctions.Add("Get-PISysAudit_CheckManagedPI", 1)
 			
 	# Return the list.
 	return $listOfFunctions
@@ -253,31 +254,32 @@ PROCESS
 	$msg = ""
 	try
 	{				
-		# Read the registry key.
-		$outputFileContent = Get-PISysAudit_FirewallState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 		
-		# Read each line to find the state of each profile.	
+		$firewallState = Get-PISysAudit_FirewallState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		
 		$result = $false		
 		$validationCounter = 0
+		$disabledProfiles = ""
 		
-		foreach($line in $OutputFileContent)
-		{														
-			if($line.ToLower().Contains("state"))
-			{								
-				if($line.ToLower().Contains("on")) { $validationCounter++ }				
-			}					
+		foreach($profile in $firewallState) 
+		{ 
+			If($profile.Enabled)
+			{ $validationCounter++ } 
+			Else
+			{ $disabledProfiles += " " + $profile.Name + ";" }
 		}
 		
 		# Check if the counter is 3 = compliant, 2 or less it is not compliant
 		if($validationCounter -eq 3) 
 		{ 
 			$result = $true 
-			$msg = "Firewall enabled."
+			$msg = "All Firewall profiles enabled."
 		} 
 		else 
 		{ 
 			$result = $false 
-			$msg = "Firewall not enabled."
+			$msg = "The following Firewall profiles are not enabled:" + $disabledProfiles
+			$msg = $msg.Trim(';')
 		}							
 	}
 	catch
@@ -493,6 +495,115 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckManagedPI
+{
+<#  
+.SYNOPSIS
+AU10006 - Monitored by OSIsoft NOC
+.DESCRIPTION
+VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled. <br/>
+COMPLIANCE: Ensure that PI Agent and PI Diagnostics are installed and running
+	on the machine so that the OSIsoft NOC will detect issues. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{
+		$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		$agent = $installedPrograms | Where-Object DisplayName -EQ 'PI Agent'
+		$diagnostics = $installedPrograms | Where-Object DisplayName -EQ 'PI Diagnostics'
+		if (-not ($agent -and $diagnostics))
+		{
+			$result = $false
+			$msg = "PI Agent and/or PI Diagnostics not installed."
+		}
+		else
+		{
+			$agentServiceState = Get-PISysAudit_ServiceProperty -sn 'OSISoftPIAgent' -sp State `
+					-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			$diagnosticsServiceState = Get-PISysAudit_ServiceProperty -sn 'PIDiagnosticsService' -sp State `
+					-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			if (($agentServiceState -ne 'Running') -or ($diagnosticsServiceState -ne 'Running'))
+			{
+				$result = $false
+				$msg = "PI Agent and PI Diagnostics installed but one or both services are not running."
+			}
+			else
+			{
+				$agentVersion = $agent.DisplayVersion + '.0'
+				$agentConfigPath = [string]::Format("C:\ProgramData\OSIsoft\PI Agent\{0}\user.config", $agentVersion)
+				if ($LocalComputer)
+				{
+					$agentConfig = [xml](Get-Content -Path $agentConfigPath)
+				}
+				else
+				{
+					$scriptBlockCmd = "Get-Content -Path `"C:\ProgramData\OSIsoft\PI Agent\{0}\user.config`""
+					$scriptBlockCmd = [string]::Format($scriptBlockCmd, $agentVersion)
+					$scriptBlock = [scriptblock]::Create($scriptBlockCmd)
+					$agentConfig = [xml](Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock)
+				}
+				$agentSettings = $agentConfig.configuration.userSettings.'SIS.Properties.Settings'.setting 
+				$agentRegistered = $agentSettings | Where-Object Name -EQ 'IsRegistered'
+				if ($agentRegistered.value -eq 'True')
+				{
+					$result = $true
+					$msg = "Machine is registered with the OSIsoft NOC."
+				}
+				else
+				{
+					$result = $false
+					$msg = "PI Agent and PI Diagnostics installed and running, but not registered with OSIsoft NOC."
+				}
+			}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU10006" `
+										-ain "OSIsoft NOC Monitoring" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "Montitoring"`
+										-Severity "Moderate"								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -569,6 +680,7 @@ Export-ModuleMember Get-PISysAudit_CheckOSInstallationType
 Export-ModuleMember Get-PISysAudit_CheckFirewallEnabled
 Export-ModuleMember Get-PISysAudit_CheckAppLockerEnabled
 Export-ModuleMember Get-PISysAudit_CheckUACEnabled
+Export-ModuleMember Get-PISysAudit_CheckManagedPI
 # </Do not remove>
 
 # ........................................................................
