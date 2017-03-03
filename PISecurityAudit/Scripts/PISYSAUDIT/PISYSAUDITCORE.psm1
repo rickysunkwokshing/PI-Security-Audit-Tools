@@ -1259,8 +1259,8 @@ param(
 		}																						
 				
 		# Set message templates.
-		$activityMsgTemplate1 = "Check computer '{0}'..."				
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsgTemplate1 = "Check computer '{0}'..."
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
@@ -1281,9 +1281,10 @@ param(
 				if($ShowUI)
 				{
 					# Increment the counter.
-					$i++				
-					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)                     
-					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+					$i++
+					$auditItem = (Get-Help $function.Name).Synopsis
+					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)
+					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 					Write-Progress -activity $ActivityMsg1 -Status $StatusMsg	
 				}
 				
@@ -1377,25 +1378,32 @@ param(
 				}
 				else
 				{
-					$msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user."
+					$msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user. Terminating PI Data Archive audit"
 					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					Write-PISysAudit_LogMessage $msg "Error" $fn
+					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Data Archive Audit" -fn $fn -msg $msg
 					return
 				}
 			}
 			catch
 			{
 				# Return the error message.
-				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell."
+				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell. Terminating PI Data Archive audit"
 				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+				$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Data Archive Audit" -fn $fn -msg $msg
 				return
 			}
 		}
 		else
 		{
-			$msgTemplate = "Unable to locate the PowerShell Tools for the PI System on the computer running this script."
-			Write-PISysAudit_LogMessage $msg "Info" $fn
+			$msg = "Unable to locate module OSIsoft.Powershell on the computer running this script. Terminating PI Data Archive audit"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Data Archive Audit" -fn $fn -msg $msg
+			return
 		}
 		
 		# Get the list of functions to execute.
@@ -1411,8 +1419,8 @@ param(
 									
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI Data Archive component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 															
@@ -1424,8 +1432,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg
 			}
 			
@@ -1520,6 +1529,8 @@ param(
 			$msgTemplate = "The computer {0} does not have a PI AF Server role or the validation failed"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI AF Server Audit" -fn $fn -msg $msg
 			return
 		}
 		
@@ -1559,19 +1570,21 @@ param(
 			catch
 			{
 				# Return the error message.
-				$msgTemplate = "An error occurred connecting to the PI Data Archive {0} with PowerShell."
+				$msgTemplate = "An error occurred connecting to the PI AF Server {0} with PowerShell."
 				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+				$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI AF Server Audit" -fn $fn -msg $msg
 				return
 			}
 		}
 
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI AF Server component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"						
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
 		# Prepare data required for multiple compliance checks
 
@@ -1585,8 +1598,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg							
 			}
 			
@@ -1653,9 +1667,21 @@ param(
 					$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
 					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
 					return
 				}
 				
+				if (-not (Get-Module -ListAvailable -Name SQLPS))
+				{
+					# Return if SQLPS not available on machine
+					$msg = "Unable to locate module SQLPS on the computer running this script. Terminating SQL Server audit"
+					Write-PISysAudit_LogMessage $msg "Error" $fn
+					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
+					return
+				}
+
 				# Push and Pop are to prevent a context switch to the SQL shell from persisting after invocation of SQL commands.
 				Push-Location
 				Import-Module SQLPS -DisableNameChecking
@@ -1672,6 +1698,8 @@ param(
 				$msgTemplate = "Could not execute test query against SQL Server on computer {0}"
 				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+						-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
 				return
 			}
 
@@ -1688,8 +1716,8 @@ param(
 		
 		# Set message templates.
 		$activityMsgTemplate1 = "Check SQL Server component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}, SQL Server Instance Name = {3}," `
@@ -1710,9 +1738,10 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
-				Write-Progress -activity $activityMsg1 -Status $statusMsg				
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
+				Write-Progress -activity $activityMsg1 -Status $statusMsg
 			}
 
 			# ............................................................................................................
@@ -1777,6 +1806,8 @@ param(
 			$msgTemplate = "The computer {0} does not have the PI Coresight role or the validation failed"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1784,6 +1815,8 @@ param(
 		{
 			$msg = "Elevation required to run Audit checks using IIS Cmdlet.  Run PowerShell as Administrator to complete these checks."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1793,6 +1826,8 @@ param(
 			$msgTemplate = "The computer {0} does not have the IIS Management Scripting Tools Feature (IIS cmdlets) or the validation failed; some audit checks may not be available."
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
 			return
 		}
 		
@@ -1809,8 +1844,8 @@ param(
 		
 		# Set message templates.
 		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)					
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}"	
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}," `
@@ -1824,8 +1859,9 @@ param(
 			if($ShowUI)
 			{
 				# Increment the counter.
-				$i++				
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString())
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
 				Write-Progress -activity $activityMsg1 -Status $statusMsg				
 			}
 
@@ -2655,7 +2691,7 @@ PROCESS
 		$namespace = "root\CIMV2"
 		$filterExpression = [string]::Format("name='{0}'", $ServiceName)
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		return ($WMIObject | select -ExpandProperty $Property)
+		return ($WMIObject | Select-Object -ExpandProperty $Property)
 	}
 	catch
 	{
@@ -2704,17 +2740,24 @@ PROCESS
 	{				
 		if($LocalComputer)
 		{
+			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
 			$unsortedAndUnfilteredResult = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
-			$result = $unsortedAndUnfilteredResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate			
+			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
+			$wow6432NodeResult = Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
+			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
 			return $result
 		}
-		else
+		else # Use PS Remoting script blocks
 		{	
+			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
 			$scriptBlockCmd = "Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
-			# Create the script block to send via PS Remoting.
 			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock									
-			$result = $unsortedAndUnfilteredResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
+			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
+			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
+			$scriptBlockCmd2 = "Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
+			$scriptBlock2 = [scriptblock]::create( $scriptBlockCmd2 )	
+			$wow6432NodeResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock2					
+			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
 			return $result			
 		}	
 	}
@@ -3931,6 +3974,80 @@ END {}
 #***************************
 }
 
+function New-PISysAuditError
+{
+<#
+.SYNOPSIS
+(Core functionality) Create an audit error object and place it inside a hash table object.
+.DESCRIPTION
+Create an audit error object and place it inside a hash table object.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[AllowEmptyString()]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[AllowEmptyString()]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditHashTable,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("an")]
+		[String]
+		$AuditName,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("fn")]
+		[String]
+		$FunctionName,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("msg")]
+		[String]
+		$MessageList = "")
+
+BEGIN {}
+PROCESS		
+{
+	$fn = GetFunctionName
+
+	# Define the server name to use for reporting.
+	$computerName = ResolveComputerName $LocalComputer $RemoteComputerName
+
+	# Create a custom object.
+	$tempObj = New-Object PSCustomObject
+	
+	# Create an unique ID with format "ERROR_<function>-<computerName>
+	$myKey = "ERROR_" + $FunctionName + "-" + $computerName
+	
+	# If the validation succeeds, there is no issue; if the validation fails, we can't accurately assess severity.
+
+	# Set the properties.
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Severity" -Value "Error"
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ServerName" -Value $computerName
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditName" -Value $AuditName
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "FunctionName" -Value $FunctionName
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "MessageList" -Value $MessageList
+	
+	# Add this custom object to the hash table.
+	$AuditHashTable.Add($myKey, $tempObj)
+	
+	# return the table
+	return $AuditHashTable
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function New-PISysAuditComputerParams
 {
 <#
@@ -4253,9 +4370,16 @@ PROCESS
 		$fileName = "PISecurityAudit_$reportFileTimestamp.csv"
 		$fileToExport = PathConcat -ParentPath $exportPath -ChildPath $fileName
 
+		# Build a collection for errors
+		$errs = @()
+		foreach($item in $AuditHashTable.GetEnumerator() | Where-Object Name -Like "ERROR*")
+		{
+			$errs += $item.Value
+		}
+
 		# Build a collection for output.
-		$results = @()	
-		foreach($item in $AuditHashTable.GetEnumerator())			
+		$results = @()
+		foreach($item in $AuditHashTable.GetEnumerator() | Where-Object Name -NotLike "ERROR*")
 		{
 			# Protect sensitive data if necessary.
 			if($ObfuscateSensitiveData)
@@ -4286,6 +4410,42 @@ PROCESS
 
 			$fileToExport = PathConcat -ParentPath $exportPath -ChildPath $fileName
 
+			# Construct HTML table for errors
+			$errorRows = ""
+			if($errs){ 
+				foreach($err in $errs)
+				{
+					$style = "`"error`""
+					$errorRow = @"
+					<tr class=$style>
+						<td>$($err.Severity)</td>
+						<td>$($err.ServerName)</td>
+						<td>$($err.AuditName)</td>
+						<td>$($err.MessageList)</td>
+					</tr>
+"@
+					$errorRows += $errorRow
+				}
+				$errorTable = @"
+					<table class="errortable table">
+						<thead>
+							<tr>
+								<th colspan="4">Errors</th>
+							</tr>
+						</thead>
+						<thead>
+							<tr>
+								<th>Severity</th>
+								<th>Server</th>
+								<th>Audit Name</th>
+								<th>Message</th>
+							</tr>
+						</thead>
+						$errorRows
+					</table>
+					<br/>
+"@
+			}
 
 			# Construct HTML table and color code the rows by result and severity.
 			$tableRows=""
@@ -4294,10 +4454,11 @@ PROCESS
 				$highlight = "`"`""
 				switch ($result.Severity.ToLower())
 				{
-					"severe" {$highlight="`"error`""; break}
-					"moderate" {$highlight="`"warning`""; break}
-					"low" {$highlight="`"info`""; break}
+					"severe" {$highlight="`"severe`""; break}
+					"moderate" {$highlight="`"moderate`""; break}
+					"low" {$highlight="`"low`""; break}
 				}
+				if ($result.AuditItemValue -eq "N/A") {$highlight="`"error`""}
 	
 				$anchorTag=""
 				if($result.AuditItemValue -ieq "fail"){
@@ -4379,17 +4540,33 @@ PROCESS
 							background-color: #f2f2f2;
 						}
 
+						.errortable {
+							width: 100%;
+							border-collapse: collapse;
+							}
+
+						.errortable td, .errortable th {
+							border: 1px solid #ddd;
+							font-size: 0.875em;
+						}
+						.errortable th{
+							background-color: #f2f2f2;
+						}
+
 			
-						.info{
+						.low{
 							background-color: #FFF59D;
 						}
 			
-						.warning{
+						.moderate{
 							background-color: #FFCC80;
 						}
-						.error{
+						.severe{
 							background-color: #FFAB91;
-						}	
+						}
+						.error{
+							color: #FF0000;
+						}
 					</style>
 
 			
@@ -4400,7 +4577,14 @@ PROCESS
 						<h4>$reportTimestamp</h4> 
 					</div>
 
+					$errorTable
+
 					<table class="summarytable table">
+						<thead>
+							<tr>
+								<th colspan="8">Audit Results</th>
+							</tr>
+						</thead>
 						<thead>	
 							<tr>
 								<th>ID</th>
@@ -4654,7 +4838,10 @@ param(
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
 		[alias("at")]
 		[System.Collections.HashTable]
-		$AuditHashTable,		
+		$AuditTable,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("cp")]		
+		$ComputerParams,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -4713,6 +4900,7 @@ Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
 Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject
+Export-ModuleMember New-PISysAuditError
 Export-ModuleMember New-PISysAudit_PasswordOnDisk
 Export-ModuleMember New-PISysAuditComputerParams
 Export-ModuleMember New-PISysAuditReport

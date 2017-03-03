@@ -33,6 +33,7 @@ AU30004 - PI AF Server: Plugin Verify Level
 AU30005 - PI AF Server: File Extension Whitelist
 AU30006 - PI AF Server: Version
 AU30007 - PI AF Server: Service Principal Name
+AU30008 - PI AF Server: Admin Right
 AU40001 - SQL Server: xp_CmdShell
 AU40002 - SQL Server: Adhoc Queries
 AU40003 - SQL Server: DB Mail XPs
