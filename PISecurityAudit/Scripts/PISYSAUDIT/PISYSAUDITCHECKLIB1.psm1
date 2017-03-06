@@ -227,7 +227,7 @@ function Get-PISysAudit_CheckFirewallEnabled
 {
 <#  
 .SYNOPSIS
-AU10003 - Firewall Enabled
+AU10003 - Windows Firewall Enabled
 .DESCRIPTION
 VALIDATION: verifies that the Windows host based firewall is enabled.<br/> 
 COMPLIANCE: enable the Windows firewall for Domain, Private and Public Scope.  
