@@ -917,7 +917,7 @@ function Get-PISysAudit_CheckPICollective
 .SYNOPSIS
 AU20009 - PI Collective
 .DESCRIPTION
-VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. 
+VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. <br/>
 COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
 	High Availability. <br/>
 #>
@@ -1075,10 +1075,11 @@ function Get-PISysAudit_CheckPIFirewall
 .SYNOPSIS
 AU20011 - PI Firewall Used
 .DESCRIPTION
-VALIDATION: Checks that PI Firewall is used.
+VALIDATION: Checks that PI Firewall is used. <br/>
 COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should 
 	be removed and replaced with specific IPs or subnets that may 
-	connect to the PI Data Archive.
+	connect to the PI Data Archive. For more information on PI Firewall,
+	see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
