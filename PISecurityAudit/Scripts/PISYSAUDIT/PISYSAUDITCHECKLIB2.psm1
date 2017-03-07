@@ -51,8 +51,15 @@ function Get-PISysAudit_FunctionsFromLibrary2
 {
 <#  
 .SYNOPSIS
-Get functions from PI Data Archive library.
+Get functions from PI Data Archive library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
 	$listOfFunctions = @()
@@ -68,8 +75,8 @@ Get functions from PI Data Archive library.
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
 				
-	# Return the list.
-	return $listOfFunctions	
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
 function Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
