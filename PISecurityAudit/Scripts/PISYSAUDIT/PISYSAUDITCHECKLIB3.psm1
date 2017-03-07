@@ -51,8 +51,15 @@ function Get-PISysAudit_FunctionsFromLibrary3
 {
 <#  
 .SYNOPSIS
-Get functions from PI AF Server library.
+Get functions from PI AF Server library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the PI AF Server compliance.
 	$listOfFunctions = @()
@@ -66,8 +73,8 @@ Get functions from PI AF Server library.
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 # AU30009
 
-	# Return the list.
-	return $listOfFunctions
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
 function Get-PISysAudit_CheckPIAFServiceConfiguredAccount

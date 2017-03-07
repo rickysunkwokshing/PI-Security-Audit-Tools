@@ -1234,6 +1234,10 @@ param(
 		[alias("cp")]
 		$ComputerParams,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)	
@@ -1247,7 +1251,7 @@ param(
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 		
 		# Get the list of functions to execute.
-		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary1				
+		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary1 -lvl $AuditLevelInt
 		# There is nothing to execute.
 		if($listOfFunctions.Count -eq 0)		
 		{
@@ -1319,6 +1323,10 @@ param(
 		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
 		[alias("cp")]		
 		$ComputerParams,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -1402,7 +1410,7 @@ param(
 		}
 		
 		# Get the list of functions to execute.
-		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary2
+		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary2 -lvl $AuditLevelInt
 		# There is nothing to execute.
 		if($listOfFunctions.Count -eq 0)		
 		{
@@ -1505,6 +1513,10 @@ param(
 		[alias("cp")]		
 		$ComputerParams,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)	
@@ -1531,7 +1543,7 @@ param(
 		}
 		
 		# Get the list of functions to execute.
-		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary3
+		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary3 -lvl $AuditLevelInt
 		# There is nothing to execute.
 		if($listOfFunctions.Count -eq 0)		
 		{
@@ -1640,7 +1652,11 @@ param(
 		$AuditTable,		
 		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
 		[alias("cp")]		
-		$ComputerParams,				
+		$ComputerParams,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -1708,7 +1724,7 @@ param(
 			}
 
 		# Get the list of functions to execute.
-		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary4
+		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary4 -lvl $AuditLevelInt
 		# There is nothing to execute.
 		if($listOfFunctions.Count -eq 0)		
 		{
@@ -1782,7 +1798,11 @@ param(
 		$AuditTable,		
 		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
 		[alias("cp")]		
-		$ComputerParams,				
+		$ComputerParams,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -1830,7 +1850,7 @@ param(
 		}
 		
 		# Get the list of functions to execute.
-		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary5
+		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary5 -lvl $AuditLevelInt
 		# There is nothing to execute.
 		if($listOfFunctions.Count -eq 0)		
 		{
@@ -4643,22 +4663,33 @@ New-PISysAuditReport [[-ComputerParamsTable | -cpt] <hashtable>]
 					 [[-DBGLevel | -dbgl] <int>]
 .INPUTS
 .OUTPUTS
-.PARAMETER cpt
+.PARAMETER ComputerParamsTable
+Alias: -cpt
 Parameter table defining which computers/servers
 to audit and for which PI System components. If a $null
 value is passed or the parameter is skipped, the cmdlet
 will assume to audit the local machine, unless cpf 
 specifies a CSV file.
-.PARAMETER cpf
+.PARAMETER ComputerParametersFile
+Alias: -cpf
 CSV file defining which computers/servers to audit and 
 for which PI System components. Headings must be included 
 in the CSV file.  See example 7 in the conceptual help.
-.PARAMETER obf
+.PARAMETER ObfuscateSensitiveData
+Alias: -obf
 Obfuscate or not the name of computers/servers
 exposed in the audit report.
-.PARAMETER showui
-Output messages on the command prompt or not.
-.PARAMETER dbglevel
+.PARAMETER ShowUI
+Enable or disable message output and progress bar on the command prompt.
+.PARAMETER DetailReport
+Alias: -dtl
+Enable or disable creation of detailed HTML report at end of audit.
+.PARAMETER AuditLevel
+Alias: -lvl
+Choose level of audit to be performed. Higher levels may result
+in slow runtimes.
+.PARAMETER DBGLevel
+Alias: -dbgl
 DebugLevel: 0 for no verbose, 1 for intermediary message
 to help debugging, 2 for full level of details
 .EXAMPLE
@@ -4668,9 +4699,10 @@ The -cpf switch can be used to load parameters from a CSV file
 The -obf switch deactivate the obfuscation of the server name.
 The -dbgl switch sets the debug level to 2 (full debugging)
 .EXAMPLE
-New-PISysAuditReport -cpt $cpt -dbgl 2
+New-PISysAuditReport -cpt $cpt -dbgl 2 -lvl Verbose
 -- See Example 1 for explanations of switch -cpt
 -- The -dbgl switch sets the debug level to 2 (full debugging)
+-- The -lvl switch sets the audit level to 'Verbose'
 .LINK
 https://pisquare.osisoft.com
 #>
@@ -4694,7 +4726,12 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dtl")]
 		[boolean]
-		$DetailReport = $true,				
+		$DetailReport = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[ValidateSet("Basic", "Verbose")]
+		[string]
+		$AuditLevel = "Basic",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[alias("dbgl")]
 		[int]
@@ -4725,6 +4762,14 @@ PROCESS
 	# Initialize some objects.
 	$ActivityMsg = "Launch analysis on PI System"
 	$statusMsgCompleted = "Completed"
+
+	# Map AuditLevel to the internal AuditLevelInt integer
+	switch($AuditLevel)
+	{
+		"Basic"   { $AuditLevelInt = 1 }
+		"Verbose" { $AuditLevelInt = 8 }
+		default   { $AuditLevelInt = 1 }
+	}
 	
 	# Write the first message in the log file.
 	$msg = "----- Start the audit -----"
@@ -4770,7 +4815,7 @@ PROCESS
 	# ............................................................................................................						
 	$totalCheckCount = $uniqueComputerParamsTable.Count + $ComputerParamsTable.Count
 	$currCheck = 1
-	$ActivityMsg = "Performing PI System Security Audit"
+	$ActivityMsg = "Performing $AuditLevel PI System Security Audit"
 	$statusMsgTemplate = "Checking Role {0}/{1}..."
 	$statusMsgCompleted = "Completed"
 	

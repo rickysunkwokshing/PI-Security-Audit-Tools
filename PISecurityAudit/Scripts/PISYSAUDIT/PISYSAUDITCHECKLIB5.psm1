@@ -50,8 +50,15 @@ function Get-PISysAudit_FunctionsFromLibrary5
 {
 <#  
 .SYNOPSIS
-Get functions from machine library.
+Get functions from Coresight library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	$listOfFunctions = @()
@@ -60,8 +67,8 @@ Get functions from machine library.
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CoresightSSLcheck"      1 # AU50003
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CoresightSPNcheck"      1 # AU50004
 	
-	# Return the list.
-	return $listOfFunctions
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
 function Get-PISysAudit_CheckCoresightVersion
