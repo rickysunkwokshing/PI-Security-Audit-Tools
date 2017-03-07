@@ -64,6 +64,7 @@ Get functions from PI AF Server library.
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerVersion"                 1 # AU30006
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFSPN"                           1 # AU30007
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 # AU30009
 
 	# Return the list.
 	return $listOfFunctions
@@ -950,6 +951,95 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckAFConnectionString
+{
+<#  
+.SYNOPSIS
+AU30009 - AF Connection to SQL
+.DESCRIPTION
+VERIFICATION: AF Service connects to the SQL Server with Windows authentication. <br/>
+COMPLIANCE: Ensure that the AF Application service connects to the SQL Server with
+	Windows Authentication. Windows Authentication is the preferred method, see:
+	<a href="https://msdn.microsoft.com/en-us/library/ms144284.aspx">https://msdn.microsoft.com/en-us/library/ms144284.aspx</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		# Read the afdiag.exe command output
+		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper 'Read'
+		
+		# Make regex object that supports matches across multiple lines, search for a match on afdiag output
+		$regex = New-Object Text.RegularExpressions.Regex "SQL Connection String.*\;\'", ('singleline', 'multiline')
+		$match = $regex.Match($outputFileContent)
+		if($match.Success)
+		{
+			# Sanitize connection string by removing white space
+			$connectStr = $match.Value -replace '\s', ''
+			if($connectStr.Contains('IntegratedSecurity=SSPI'))
+			{
+				$result = $true
+				$msg = "AF Service connects to SQL using Windows Integrated Security."
+			}
+			else
+			{
+				$result = $false
+				$msg = "AF Service connectes to SQL using SQL Server login."
+			}
+		}
+		else
+		{
+			$result = "N/A"
+			$msg = "Unable to parse connection string from AFDiag output."
+			Write-PISysAudit_LogMessage $msg "Error" $fn 
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30009" `
+										-ain "AF Connection to SQL" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1028,6 +1118,7 @@ Export-ModuleMember Get-PISysAudit_CheckFileExtensionWhitelist
 Export-ModuleMember Get-PISysAudit_CheckAFServerVersion
 Export-ModuleMember Get-PISysAudit_CheckAFSPN
 Export-ModuleMember Get-PISysAudit_CheckAFServerAdminRight
+Export-ModuleMember Get-PISysAudit_CheckAFConnectionString
 # </Do not remove>
 
 # ........................................................................
