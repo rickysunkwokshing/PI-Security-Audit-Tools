@@ -3162,18 +3162,16 @@ PROCESS
 			}
 
 			# Set the output folder.
-			$scriptTempFilesPath = (Get-Variable "scriptsPathTemp" -Scope "Global").Value 
-			# Define the arguments required by the afdiag.exe command						
-			$argListTemplate = "/ExeFile:`"{0}`""	                          			                                
+			$scriptTempFilesPath = (Get-Variable "scriptsPathTemp" -Scope "Global").Value                           			                                
 		}
 		else
 		{																		
 			$PIHome_path = Get-PISysAudit_EnvVariable "PIHOME" -lc $false -rcn $RemoteComputerName
 			# Set the PIPC\dat folder (64 bit).
-			$scriptTempFilesPath = PathConcat -ParentPath $PIHome_path -ChildPath "dat"		                                       						                                   					                                      
-			# Define the arguments required by the afdiag.exe command						
-			$argListTemplate = "/ExeFile:`"{0}`""	
+			$scriptTempFilesPath = PathConcat -ParentPath $PIHome_path -ChildPath "dat"	
 		}
+		# Define the arguments required by the afdiag.exe command
+		$argListTemplate = "/ExeFile:`"{0}`""
 		$argList = [string]::Format($ArgListTemplate, $pathToService)
 		
 		# Set the output for the CLU.
