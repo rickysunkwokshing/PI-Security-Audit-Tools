@@ -4663,22 +4663,33 @@ New-PISysAuditReport [[-ComputerParamsTable | -cpt] <hashtable>]
 					 [[-DBGLevel | -dbgl] <int>]
 .INPUTS
 .OUTPUTS
-.PARAMETER cpt
+.PARAMETER ComputerParamsTable
+Alias: -cpt
 Parameter table defining which computers/servers
 to audit and for which PI System components. If a $null
 value is passed or the parameter is skipped, the cmdlet
 will assume to audit the local machine, unless cpf 
 specifies a CSV file.
-.PARAMETER cpf
+.PARAMETER ComputerParametersFile
+Alias: -cpf
 CSV file defining which computers/servers to audit and 
 for which PI System components. Headings must be included 
 in the CSV file.  See example 7 in the conceptual help.
-.PARAMETER obf
+.PARAMETER ObfuscateSensitiveData
+Alias: -obf
 Obfuscate or not the name of computers/servers
 exposed in the audit report.
-.PARAMETER showui
-Output messages on the command prompt or not.
-.PARAMETER dbglevel
+.PARAMETER ShowUI
+Enable or disable message output and progress bar on the command prompt.
+.PARAMETER DetailReport
+Alias: -dtl
+Enable or disable creation of detailed HTML report at end of audit.
+.PARAMETER AuditLevel
+Alias: -lvl
+Choose level of audit to be performed. Higher levels may result
+in slow runtimes.
+.PARAMETER DBGLevel
+Alias: -dbgl
 DebugLevel: 0 for no verbose, 1 for intermediary message
 to help debugging, 2 for full level of details
 .EXAMPLE
@@ -4688,9 +4699,10 @@ The -cpf switch can be used to load parameters from a CSV file
 The -obf switch deactivate the obfuscation of the server name.
 The -dbgl switch sets the debug level to 2 (full debugging)
 .EXAMPLE
-New-PISysAuditReport -cpt $cpt -dbgl 2
+New-PISysAuditReport -cpt $cpt -dbgl 2 -lvl Verbose
 -- See Example 1 for explanations of switch -cpt
 -- The -dbgl switch sets the debug level to 2 (full debugging)
+-- The -lvl switch sets the audit level to 'Verbose'
 .LINK
 https://pisquare.osisoft.com
 #>
