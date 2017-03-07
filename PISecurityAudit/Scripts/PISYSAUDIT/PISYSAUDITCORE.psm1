@@ -539,118 +539,35 @@ param(
 
 	try
 	{	
-			
+			$scriptBlock = { 
+					param([string]$Operation, [string]$UtilityExecutable, [string]$ArgumentList, [string]$FilePath) 
+					if($Operation -eq "Default" -or $Operation -eq "Write"){
+						if(Test-Path $FilePath) { Remove-Item $FilePath }
+						Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -RedirectStandardOutput $FilePath -Wait -NoNewWindow
+					}
+					if($Operation -eq "Default" -or $Operation -eq "Read")
+					{
+						$FileContent = Get-Content -Path $FilePath
+					}
+					if($Operation -eq "Default" -or $Operation -eq "Delete")
+					{
+						if(Test-Path $FilePath) { Remove-Item $FilePath }
+					} 
+					if($Operation -eq "Default" -or $Operation -eq "Read"){return $FileContent}
+				}
+			# Verbose only if Debug Level is 2+
+			$msgTemplate = "Operation: {0}; Command: {1}; Target: {2}"
+			$msg = [string]::Format($msgTemplate, $Operation, $scriptBlock.ToString(), $RemoteComputerName)
+			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2	
+
 			if($LocalComputer)
 			{
-				if($Operation -eq "Default" -or $Operation -eq "Write")
-				{
-					#......................................................................................
-					# Delete any residual output file.
-					#......................................................................................
-					if(Test-Path $OutputFilePath) { Remove-Item $OutputFilePath }
-			
-					#......................................................................................
-					# Execute the command locally by calling another process.
-					#......................................................................................
-					Start-Process -FilePath $UtilityExec `
-									-ArgumentList $ArgList `
-									-RedirectStandardOutput $OutputFilePath `
-									-Wait -NoNewWindow				
-				}
-
-				if($Operation -eq "Default" -or $Operation -eq "Read")
-				{
-					#......................................................................................
-					# Read the content.			
-					#......................................................................................
-					$outputFileContent = Get-Content -Path $OutputFilePath
-				}
-
-				if($Operation -eq "Default" -or $Operation -eq "Delete")
-				{
-					#......................................................................................
-					# Delete output file.
-					#......................................................................................
-					if(Test-Path $OutputFilePath) { Remove-Item $OutputFilePath }
-				}
+				$outputFileContent = & $scriptBlock -Operation $Operation -UtilityExecutable $UtilityExec -ArgumentList $ArgList -FilePath $OutputFilePath
 			}
 			else
 			{
-				if($Operation -eq "Default" -or $Operation -eq "Write")
-				{
-					#......................................................................................			
-					# Delete (remotely) any residual output file.
-					# Write the script block template with '[' and ']' delimiter because the
-					# [string]::Format function will fail and then replace with the '{' and '}'
-					#......................................................................................
-					$scriptBlockCmdTemplate = "if(Test-Path `"{0}`") [ Remove-Item `"{0}`" ]"
-					$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $OutputFilePath)
-					$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")			
-			
-					# Verbose only if Debug Level is 2+
-					$msgTemplate = "Remote command to send to {0} is: {1}"
-					$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-					Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-					$scriptBlock = [scriptblock]::create( $scriptBlockCmd )										
-					# The script block returns the result but we are not interested, so send it
-					# to null.
-					Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock | Out-Null
-			
-					#......................................................................................
-					# Execute the command remotely.
-					#......................................................................................
-					$scriptBlockCmdTemplate = "Start-Process -FilePath `"{0}`" -ArgumentList {1} -RedirectStandardOutput `"{2}`" -Wait -NoNewWindow"
-					$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $UtilityExec, $ArgList, $OutputFilePath)											
-			
-					# Verbose only if Debug Level is 2+
-					$msgTemplate = "Remote command to send to {0} is: {1}"
-					$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-					Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-					$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-					Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-				}
-
-				if($Operation -eq "Default" -or $Operation -eq "Read")
-				{
-					#......................................................................................
-					# Read the content remotely.
-					#......................................................................................
-					$scriptBlockCmdTemplate = "Get-Content -Path ""{0}"""
-					$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $outputFilePath)									
-			
-					# Verbose only if Debug Level is 2+
-					$msgTemplate = "Remote command to send to {0} is: {1}"
-					$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-					Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-					$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-					$outputFileContent = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock	
-				}
-
-				if($Operation -eq "Default" -or $Operation -eq "Delete")
-				{
-					# Delete (remotely) output file.
-					# Write the script block template with '[' and ']' delimiter because the
-					# [string]::Format function will fail and then replace with the '{' and '}'
-					#......................................................................................
-					$scriptBlockCmdTemplate = "if(Test-Path `"{0}`") [ Remove-Item `"{0}`" ]"
-					$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $OutputFilePath)
-					$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")			
-			
-					# Verbose only if Debug Level is 2+
-					$msgTemplate = "Remote command to send to {0} is: {1}"
-					$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-					Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-					$scriptBlock = [scriptblock]::create( $scriptBlockCmd )				
-					# The script block returns the result but we are not interested, so send it
-					# to null.
-					Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock | Out-Null
-				}
+				$outputFileContent = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $Operation, $UtilityExec, $ArgList, $OutputFilePath
 			}
-
 			if($Operation -eq "Default" -or $Operation -eq "Read"){return $outputFileContent}
 	}
 	catch
@@ -3032,41 +2949,29 @@ Get the servers in the PI Data Archive or PI AF Server KST.
 	{
 		# Get PI Servers
 		$regpathKST = 'HKLM:\SOFTWARE\PISystem\PI-SDK\1.0\ServerHandles'
+		$scriptBlock = {param([string]$RegPath) Get-ChildItem $RegPath | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}}
 		if($LocalComputer)
-		{
-			$KnownServers = Get-ChildItem $regpathKST | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}
-		}
+		{ $KnownServers = & $scriptBlock -RegPath $regpathKST }
 		Else
-		{
-			$scriptBlockCmdTemplate = "Get-ChildItem `"{0}`" | ForEach-Object [ Get-ItemProperty `$_.pspath ] | where-object [ `$_.path ] | Foreach-Object [ `$_.path ]"
-			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $regpathKST)
-			$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")			
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )													
-			$KnownServers = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
-		}
+		{ $KnownServers = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $regpathKST }
 	}
 	Else
 	{
 		# Get AF Servers
 		$programDataWebServer = Get-PISysAudit_EnvVariable "ProgramData" -lc $LocalComputer -rcn $RemoteComputerName  -Target Process
 		$afsdkConfigPathWebServer = "$programDataWebServer\OSIsoft\AF\AFSDK.config"
+		
+		$scriptBlock = { param([string]$ConfigPath) Get-Content -Path $ConfigPath | Out-String }
+
+		# Verbose only if Debug Level is 2+
+		$msgTemplate = "Remote command to send to {0} is: {1}"
+		$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlock.ToString())
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 		if($LocalComputer)
-		{
-			$AFSDK = Get-Content -Path $afsdkConfigPathWebServer | Out-String
-		}
+		{ $AFSDK = & $scriptBlock -ConfigPath $afsdkConfigPathWebServer }
 		Else
-		{
-			$scriptBlockCmdTemplate = "Get-Content -Path ""{0}"" | Out-String"
-			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $afsdkConfigPathWebServer)									
-			
-			# Verbose only if Debug Level is 2+
-			$msgTemplate = "Remote command to send to {0} is: {1}"
-			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$AFSDK = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}
+		{ $AFSDK = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $afsdkConfigPathWebServer }
 		$KnownServers = [regex]::Matches($AFSDK, 'host=\"([^\"]*)')
 	}
 
@@ -3267,7 +3172,7 @@ PROCESS
 			# Set the PIPC\dat folder (64 bit).
 			$scriptTempFilesPath = PathConcat -ParentPath $PIHome_path -ChildPath "dat"		                                       						                                   					                                      
 			# Define the arguments required by the afdiag.exe command						
-			$argListTemplate = "'/ExeFile:`"{0}`"'"	
+			$argListTemplate = "/ExeFile:`"{0}`""	
 		}
 		$argList = [string]::Format($ArgListTemplate, $pathToService)
 		
