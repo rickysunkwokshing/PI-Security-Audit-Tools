@@ -65,6 +65,8 @@ Get functions from PI Data Archive library.
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 # AU20007
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 # AU20008
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
 				
 	# Return the list.
 	return $listOfFunctions	
@@ -915,7 +917,7 @@ function Get-PISysAudit_CheckPICollective
 .SYNOPSIS
 AU20009 - PI Collective
 .DESCRIPTION
-VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. 
+VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. <br/>
 COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
 	High Availability. <br/>
 #>
@@ -972,6 +974,167 @@ PROCESS
 										-ain "PI Collective" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
+										-Severity "Moderate"								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckInstalledClientSoftware
+{
+<#  
+.SYNOPSIS
+AU20010 - No Client Software
+.DESCRIPTION
+VALIDATION: Checks if common client software is installed on the PI Data Archive machine. <br/>
+COMPLIANCE: Ensure the PI Processbookt and Microsoft Office are not installed
+	on the PI Data Archive machine, as these programs should be used on client
+	machines only. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName	-dbgl $DBGLevel
+		$procBook = $installedPrograms | Where-Object DisplayName -Like 'PI Processbook*'
+		$msOffice = $installedPrograms | Where-Object DisplayName -Like 'Microsoft Office*'
+		if($procBook -and $msOffice)
+		{
+			$result = $false
+			$msg = "PI Processbook and MS Office installed on PI Data Archive machine."
+		}
+		elseif($procBook)
+		{
+			$result = $false
+			$msg = "PI Processbook installed on PI Data Archive machine."
+		}
+		elseif($msOffice)
+		{
+			$result = $false
+			$msg = "Microsoft Office installed on PI Data Archive machine."
+		}
+		else
+		{
+			$result = $true
+			$msg = "Did not detect client software on PI Data Archive machine."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20010" `
+										-ain "Client Software" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckPIFirewall
+{
+<#  
+.SYNOPSIS
+AU20011 - PI Firewall Used
+.DESCRIPTION
+VALIDATION: Checks that PI Firewall is used. <br/>
+COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should 
+	be removed and replaced with specific IPs or subnets that may 
+	connect to the PI Data Archive. For more information on PI Firewall,
+	see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$rules = Get-PIFirewall -Connection $global:PIDataArchiveConnection
+		$allowRules = $rules | Where-Object Access -EQ 'Allow'
+		$defaultRule = $allowRules | Where-Object Hostmask -EQ '*.*.*.*'
+		if($defaultRule)
+		{
+			$result = $false
+			$msg = "Detected Allow rule for *.*.*.* in PI Firewall."
+		}
+		else
+		{
+			$result = $true
+			$msg = "Allow rule for *.*.*.* has been removed in PI Firewall."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20011" `
+										-ain "PI Firewall Used" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity "Moderate"								
 }
 
@@ -1061,6 +1224,8 @@ Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
 Export-ModuleMember Get-PISysAudit_CheckExplicitLoginDisabled
 Export-ModuleMember Get-PISysAudit_CheckPISPN
 Export-ModuleMember Get-PISysAudit_CheckPICollective
+Export-ModuleMember Get-PISysAudit_CheckInstalledClientSoftware
+Export-ModuleMember Get-PISysAudit_CheckPIFirewall
 # </Do not remove>
 
 # ........................................................................

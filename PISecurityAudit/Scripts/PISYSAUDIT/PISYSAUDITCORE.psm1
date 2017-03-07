@@ -1231,9 +1231,8 @@ param(
 		[System.Collections.HashTable]
 		$AuditTable,		
 		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
-		[alias("cpt")]
-		[System.Collections.HashTable]
-		$ComputerParamsTable,
+		[alias("cp")]
+		$ComputerParams,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -1265,44 +1264,40 @@ param(
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
 		# Process.
-		foreach($item in $ComputerParamsTable.GetEnumerator())
-		{	
-			$i = 0	
-			# Read the object within the System.Collections.DictionaryEntry
-			$computerParams = $item.Value
+		$i = 0	
+		
+		# Set activity message.			
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)								
+
+		# Proceed with all the compliance checks.
+		foreach($function in $listOfFunctions.GetEnumerator())
+		{																									
+			# Set the progress.
+			if($ShowUI)
+			{
+				# Increment the counter.
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)
+				$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $ActivityMsg1 -Status $StatusMsg -ParentId 1 -PercentComplete $pctComplete
+			}
 			
-			# Set activity message.			
-			$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)								
-																										
-			# Proceed with all the compliance checks.
-			foreach($function in $listOfFunctions.GetEnumerator())
-			{																									
-				# Set the progress.
-				if($ShowUI)
-				{
-					# Increment the counter.
-					$i++
-					$auditItem = (Get-Help $function.Name).Synopsis
-					$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)
-					$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-					Write-Progress -activity $ActivityMsg1 -Status $StatusMsg	
-				}
-				
-				# ............................................................................................................
-				# Verbose at Debug Level 2+
-				# Show some extra messages.
-				# ............................................................................................................						
-				$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, `
-											$computerParams.IsLocal, $computerParams.ComputerName, $DBGLevel)
-				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-				
-				# Call the function.
-				& $function.Name $AuditTable -lc $computerParams.IsLocal -rcn $computerParams.ComputerName -dbgl $DBGLevel						
-			}			
-		}
+			# ............................................................................................................
+			# Verbose at Debug Level 2+
+			# Show some extra messages.
+			# ............................................................................................................						
+			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, `
+										$computerParams.IsLocal, $computerParams.ComputerName, $DBGLevel)
+			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+			
+			# Call the function.
+			& $function.Name $AuditTable -lc $computerParams.IsLocal -rcn $computerParams.ComputerName -dbgl $DBGLevel						
+		}			
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
+		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
 	}
 	catch
 	{
@@ -1435,7 +1430,8 @@ param(
 				$i++
 				$auditItem = (Get-Help $function.Name).Synopsis
 				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				Write-Progress -activity $activityMsg1 -Status $statusMsg
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
 			}
 			
 			# ............................................................................................................
@@ -1455,7 +1451,7 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
+		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
 	}
 	catch
 	{
@@ -1601,7 +1597,8 @@ param(
 				$i++
 				$auditItem = (Get-Help $function.Name).Synopsis
 				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				Write-Progress -activity $activityMsg1 -Status $statusMsg							
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete	
 			}
 			
 			# ............................................................................................................
@@ -1622,7 +1619,7 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
+		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
 	}
 	catch
 	{
@@ -1656,7 +1653,14 @@ param(
 	{
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-				
+
+		# If no password has been given and SQL Server security is in use,
+		# prompt for a password and store in the cache.
+		# This will avoid to ask many times to the user when a
+		# SQL query is performed.
+		if(($ComputerParams.IntegratedSecurity -eq $false) -and ($ComputerParams.PasswordFile -eq ""))
+		{ SetSQLAccountPasswordInCache $ComputerParams.ComputerName $ComputerParams.InstanceName $ComputerParams.SQLServerUserID}		
+			
 		# Validate the presence of a SQL Server
 			try
 			{
@@ -1722,14 +1726,7 @@ param(
 		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
 												+ " Audit Table = {1}, Server Name = {2}, SQL Server Instance Name = {3}," `
 												+ " Use Integrated Security  = {4}, User name = {5}, Password file = {6}, Debug Level = {7}"								
-
-		# If no password has been given and SQL Server security is in use,
-		# prompt for a password and store in the cache.
-		# This will avoid to ask many times to the user when a
-		# SQL query is performed.
-		if(($ComputerParams.IntegratedSecurity -eq $false) -and ($ComputerParams.PasswordFile -eq ""))
-		{ SetSQLAccountPasswordInCache $ComputerParams.ComputerName $ComputerParams.InstanceName $ComputerParams.SQLServerUserID}		
-				
+	
 		# Proceed with all the compliance checks.
 		$i = 0
 		foreach($function in $listOfFunctions.GetEnumerator())
@@ -1741,7 +1738,8 @@ param(
 				$i++
 				$auditItem = (Get-Help $function.Name).Synopsis
 				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				Write-Progress -activity $activityMsg1 -Status $statusMsg
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
 			}
 
 			# ............................................................................................................
@@ -1763,7 +1761,7 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
+		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
 	}
 	catch
 	{
@@ -1862,7 +1860,8 @@ param(
 				$i++
 				$auditItem = (Get-Help $function.Name).Synopsis
 				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				Write-Progress -activity $activityMsg1 -Status $statusMsg				
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
 			}
 
 			# ............................................................................................................
@@ -1877,7 +1876,7 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -completed }
+		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
 	}
 	catch
 	{
@@ -4765,6 +4764,15 @@ PROCESS
 	# Create a filtered list of computers
 	# ............................................................................................................						
 	$uniqueComputerParamsTable = GetFilteredListOfComputerParams $ComputerParamsTable
+
+	# ............................................................................................................
+	# Get total count of audit role checks to be performed, prep messages for progress bar
+	# ............................................................................................................						
+	$totalCheckCount = $uniqueComputerParamsTable.Count + $ComputerParamsTable.Count
+	$currCheck = 1
+	$ActivityMsg = "Performing PI System Security Audit"
+	$statusMsgTemplate = "Checking Role {0}/{1}..."
+	$statusMsgCompleted = "Completed"
 	
 	# ............................................................................................................
 	# Validate that WSMan or WS-Management (WinRM) service is running
@@ -4773,9 +4781,17 @@ PROCESS
 		
 	# ....................................................................................
 	# Perform Checks on computers
-	# ....................................................................................								
-	StartComputerAudit $auditHashTable $uniqueComputerParamsTable -dbgl $DBGLevel					
-	
+	# ....................................................................................				
+	foreach($item in $uniqueComputerParamsTable.GetEnumerator())
+	{
+		$computerParams = $item.Value
+		$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
+		$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
+		Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
+		StartComputerAudit $auditHashTable $computerParams -dbgl $DBGLevel
+		$currCheck++
+	}
+
 	# ....................................................................................
 	# Perform Checks on PI Data Archive, PI AF Server, SQL Server, etc.
 	# ....................................................................................						
@@ -4783,6 +4799,9 @@ PROCESS
 	{
 		# Read the object within the System.Collections.DictionaryEntry
 		$computerParams = $item.Value
+		$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
+		$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
+		Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
 		
 		# Proceed based on component type.
 		if($computerParams.PISystemComponentType -eq "PIDataArchive")
@@ -4793,15 +4812,18 @@ PROCESS
 		{ StartSQLServerAudit $auditHashTable $computerParams -dbgl $DBGLevel }
 		elseif($computerParams.PISystemComponentType -eq "PICoresightServer")
 		{ StartPICoresightServerAudit $auditHashTable $computerParams -dbgl $DBGLevel}
-	}	
+
+		$currCheck++
+	}
+	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
 
 	# ....................................................................................
 	# Show results.
 	# ....................................................................................		
 	$ActivityMsg = "Generate report"
-	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status "in progress..." }
+	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status "in progress..." -Id 1 }
 	$reportName = Write-PISysAuditReport $auditHashTable -obf $ObfuscateSensitiveData -dtl $DetailReport -dbgl $DBGLevel
-	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -completed }
+	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -completed }
 	
 	# ............................................................................................................
 	# Display that the analysis is completed and where the report can be found.
