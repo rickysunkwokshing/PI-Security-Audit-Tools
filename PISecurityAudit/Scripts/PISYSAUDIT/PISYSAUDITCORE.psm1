@@ -4736,7 +4736,7 @@ PROCESS
 		$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
 		$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
 		Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
-		StartComputerAudit $auditHashTable $computerParams -dbgl $DBGLevel
+		StartComputerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel
 		$currCheck++
 	}
 
@@ -4753,13 +4753,13 @@ PROCESS
 		
 		# Proceed based on component type.
 		if($computerParams.PISystemComponentType -eq "PIDataArchive")
-		{ StartPIDataArchiveAudit $auditHashTable $computerParams -dbgl $DBGLevel }		
+		{ StartPIDataArchiveAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel }		
 		elseif($computerParams.PISystemComponentType -eq "PIAFServer")
-		{ StartPIAFServerAudit $auditHashTable $computerParams -dbgl $DBGLevel }
+		{ StartPIAFServerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel }
 		elseif($computerParams.PISystemComponentType -eq "SQLServer")
-		{ StartSQLServerAudit $auditHashTable $computerParams -dbgl $DBGLevel }
+		{ StartSQLServerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel }
 		elseif($computerParams.PISystemComponentType -eq "PICoresightServer")
-		{ StartPICoresightServerAudit $auditHashTable $computerParams -dbgl $DBGLevel}
+		{ StartPICoresightServerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel}
 
 		$currCheck++
 	}
