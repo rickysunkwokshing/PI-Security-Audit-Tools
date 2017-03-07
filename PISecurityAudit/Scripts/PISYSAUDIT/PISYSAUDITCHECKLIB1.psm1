@@ -571,16 +571,14 @@ PROCESS
 			{
 				$agentVersion = $agent.DisplayVersion + '.0'
 				$agentConfigPath = [string]::Format("C:\ProgramData\OSIsoft\PI Agent\{0}\user.config", $agentVersion)
+				$scriptBlock = {param([string]$ConfigPath) [xml](Get-Content -Path $ConfigPath)}
 				if ($LocalComputer)
 				{
-					$agentConfig = [xml](Get-Content -Path $agentConfigPath)
+					$agentConfig = & $scriptBlock -ConfigPath $agentConfigPath
 				}
 				else
 				{
-					$scriptBlockCmd = "Get-Content -Path `"C:\ProgramData\OSIsoft\PI Agent\{0}\user.config`""
-					$scriptBlockCmd = [string]::Format($scriptBlockCmd, $agentVersion)
-					$scriptBlock = [scriptblock]::Create($scriptBlockCmd)
-					$agentConfig = [xml](Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock)
+					$agentConfig = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $agentConfigPath
 				}
 				$agentSettings = $agentConfig.configuration.userSettings.'SIS.Properties.Settings'.setting 
 				$agentRegistered = $agentSettings | Where-Object Name -EQ 'IsRegistered'
