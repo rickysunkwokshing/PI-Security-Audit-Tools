@@ -72,6 +72,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFSPN"                           1 # AU30007
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 # AU30009
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWorldIdentity"                 1 # AU30010
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -1047,6 +1048,119 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckAFWorldIdentity
+{
+<#  
+.SYNOPSIS
+AU30010 - Restrict AF World Identity
+.DESCRIPTION
+VERIFICATION: Ensures that the World Identity has been disabled or restricted <br/>
+COMPLIANCE: For best practice, disable the World Identity on the AF Server. 
+	Alternatively, remove the mapping to the \Everyone group and re-map it to 
+	an appropriate group with only users who need access to PI AF.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		{
+			$con = $global:AFServerConnection
+			$world = $con.SecurityIdentities | Where-Object Name -EQ 'World'
+			if($world)
+			{
+				if($world.IsEnabled)
+				{
+					# World identity exists and is enabled, check its mappings
+					$mappings = Get-AFSecurityMapping -AFServer $con
+					$worldMappings = $mappings | Where-Object { $_.SecurityIdentity.Name -eq 'World' }
+					# \Everyone = 'S-1-1-0'
+					$everyoneMapping = $worldMappings | Where-Object Account -eq 'S-1-1-0' 
+					if($everyoneMapping)
+					{
+						$result = $false
+						$msg = "World Identity is mapped to the Everyone group."
+					}
+					else
+					{
+						$result = $true
+						$msg = "World Identity is not mapped to the Everyone group."
+					}
+				}
+				else
+				{
+					$result = $true
+					$msg = "World Identity has been disabled."
+				}
+			}
+			else
+			{
+				# Check if any IDs were loaded, if they were then it is likely that
+				# World was deleted
+				if($con.SecurityIdentities)
+				{
+					$result = $true
+					$msg = "World Identity has been removed."
+				}
+				else
+				{
+					$result = "N/A"
+					$msg = "Failed to load any AF Identities."
+				}
+			}
+		}
+		else
+		{
+			$result = "N/A"
+			$msg = "Connection to AF Server using OSIsoft.Powershell is required."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30010" `
+										-ain "Restrict AF World" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1126,6 +1240,7 @@ Export-ModuleMember Get-PISysAudit_CheckAFServerVersion
 Export-ModuleMember Get-PISysAudit_CheckAFSPN
 Export-ModuleMember Get-PISysAudit_CheckAFServerAdminRight
 Export-ModuleMember Get-PISysAudit_CheckAFConnectionString
+Export-ModuleMember Get-PISysAudit_CheckAFWorldIdentity
 # </Do not remove>
 
 # ........................................................................
