@@ -1115,17 +1115,28 @@ PROCESS
 	try
 	{		
 		$rules = Get-PIFirewall -Connection $global:PIDataArchiveConnection
-		$allowRules = $rules | Where-Object Access -EQ 'Allow'
-		$defaultRule = $allowRules | Where-Object Hostmask -EQ '*.*.*.*'
-		if($defaultRule)
+		if($rules)
 		{
-			$result = $false
-			$msg = "Detected Allow rule for *.*.*.* in PI Firewall."
+			# Get-PIFirewall returns 'Unknown' if rule does not fit text "Allow" or "Disallow" 
+			#    exactly, case-sensitive. Include these in our search since a rule of 
+			#    "*.*.*.* Unknown" must be Allow or else all connections are being blocked.
+			$allowRules = $rules | Where-Object { $_.Access -eq 'Allow' -or $_.Access -eq 'Unknown' }
+			$defaultRule = $allowRules | Where-Object Hostmask -EQ '*.*.*.*'
+			if($defaultRule)
+			{
+				$result = $false
+				$msg = "Detected Allow rule for *.*.*.* in PI Firewall."
+			}
+			else
+			{
+				$result = $true
+				$msg = "Allow rule for *.*.*.* has been removed in PI Firewall."
+			}
 		}
 		else
 		{
-			$result = $true
-			$msg = "Allow rule for *.*.*.* has been removed in PI Firewall."
+			$result = "N/A"
+			$msg = "Unable to load PI Firewall or no rules returned."
 		}
 	}
 	catch
