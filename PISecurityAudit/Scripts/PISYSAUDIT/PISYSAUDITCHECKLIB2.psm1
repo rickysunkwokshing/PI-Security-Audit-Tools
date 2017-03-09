@@ -65,7 +65,7 @@ param(
 	$listOfFunctions = @()
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 # AU20001
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 # AU20002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerSubSysVersions"               1 # AU20003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerVersion"                      1 # AU20003
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 # AU20004
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 # AU20005
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 # AU20006
@@ -346,11 +346,11 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CheckPIServerSubSysVersions
+function Get-PISysAudit_CheckPIServerVersion
 {
 <#  
 .SYNOPSIS
-AU20003 - PI Data Archive SubSystem Version Check
+AU20003 - PI Data Archive Version
 .DESCRIPTION
 VALIDATION: verifies that the PI Data Archive is using the most recent release. <br/>  
 COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
@@ -384,23 +384,27 @@ PROCESS
 	$msg = ""
 	$Severity = "Unknown"
 	try
-	{					
-	
+	{
+		# Update these for subsequent releases
+		$latestVersion = '3.4.405.1198'
+		$readable = '2016 R2'
+
 		$installationVersion = $global:PIDataArchiveConnection.ServerVersion.ToString()
+		$versionInt = [int]($installationVersion -replace '\.', '')
+		$latestInt = [int]($latestVersion -replace '\.', '')
 		
-		$result = $false
-		$installVersionTokens = $installationVersion.Split(".")
-		# Form an integer value with all the version tokens.
-		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
-		$installVersionInt64 = [Convert]::ToInt64($temp)	
-		
-		# Not compliant if under 3.4.380.36 version
-		# Warn if 3.4.380.36 or 3.4.385.59 version	
-		$result = $true
-		$upgradeMessage = "Upgrading to 3.4.405.1198 is recommended."
-		if ($installVersionInt64 -ge 344051198) { $result = $true; $msg = "Version is compliant"; $Severity = "severe" }
-		elseif ($installVersionInt64 -ge 3438036 -and $installVersionInt64 -lt 344001162 ) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }	
-		elseif ($installVersionInt64 -lt 3438036) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }
+		if($versionInt -lt $latestInt)
+		{
+			$result = $false
+			$Severity = 'Severe'
+			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
+		}
+		else
+		{
+			$result = $true
+			$Severity = 'Severe'
+			$msg = "PI Data Archive version is compliant."
+		}
 	}
 	catch
 	{
@@ -413,9 +417,9 @@ PROCESS
 	# Define the results in the audit table
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20003" `
-										-ain "PI Data Archive SubSystem Versions" -aiv $result `
+										-ain "PI Data Archive Version" -aiv $result `
 										-aif $fn -msg $msg `
-										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "PI Subsystems" `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity $Severity									
 }
 
@@ -1235,7 +1239,7 @@ END {}
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary2
 Export-ModuleMember Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 Export-ModuleMember Get-PISysAudit_CheckPIAdminUsage
-Export-ModuleMember Get-PISysAudit_CheckPIServerSubSysVersions
+Export-ModuleMember Get-PISysAudit_CheckPIServerVersion
 Export-ModuleMember Get-PISysAudit_CheckEditDays
 Export-ModuleMember Get-PISysAudit_CheckAutoTrustConfig
 Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
