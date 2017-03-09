@@ -1088,47 +1088,57 @@ PROCESS
 		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
 		{
 			$con = $global:AFServerConnection
-			$world = $con.SecurityIdentities | Where-Object Name -EQ 'World'
-			if($world)
+			$version = [int]($con.ServerVersion -replace '\.', '')
+			if($version -ge 2700000)
 			{
-				if($world.IsEnabled)
+				$world = $con.SecurityIdentities | Where-Object Name -EQ 'World'
+				if($world)
 				{
-					# World identity exists and is enabled, check its mappings
-					$mappings = Get-AFSecurityMapping -AFServer $con
-					$worldMappings = $mappings | Where-Object { $_.SecurityIdentity.Name -eq 'World' }
-					# \Everyone = 'S-1-1-0'
-					$everyoneMapping = $worldMappings | Where-Object Account -eq 'S-1-1-0' 
-					if($everyoneMapping)
+					if($world.IsEnabled)
 					{
-						$result = $false
-						$msg = "World Identity is mapped to the Everyone group."
+						# World identity exists and is enabled, check its mappings
+						$mappings = Get-AFSecurityMapping -AFServer $con
+						$worldMappings = $mappings | Where-Object { $_.SecurityIdentity.Name -eq 'World' }
+						# \Everyone = 'S-1-1-0'
+						$everyoneMapping = $worldMappings | Where-Object Account -eq 'S-1-1-0' 
+						if($everyoneMapping)
+						{
+							$result = $false
+							$msg = "World Identity is mapped to the Everyone group."
+						}
+						else
+						{
+							$result = $true
+							$msg = "World Identity is not mapped to the Everyone group."
+						}
 					}
 					else
 					{
 						$result = $true
-						$msg = "World Identity is not mapped to the Everyone group."
+						$msg = "World Identity has been disabled."
 					}
 				}
 				else
 				{
-					$result = $true
-					$msg = "World Identity has been disabled."
+					# Check if any IDs were loaded, if they were then it is likely that
+					# World was deleted
+					if($con.SecurityIdentities)
+					{
+						$result = $true
+						$msg = "World Identity has been removed."
+					}
+					else
+					{
+						$result = "N/A"
+						$msg = "Failed to load any AF Identities."
+					}
 				}
 			}
 			else
 			{
-				# Check if any IDs were loaded, if they were then it is likely that
-				# World was deleted
-				if($con.SecurityIdentities)
-				{
-					$result = $true
-					$msg = "World Identity has been removed."
-				}
-				else
-				{
-					$result = "N/A"
-					$msg = "Failed to load any AF Identities."
-				}
+				$result = "N/A"
+				$msg = "PI AF Server 2.7 or later is required for this check."
+				Write-PISysAudit_LogMessage $msg "Error" $fn
 			}
 		}
 		else
