@@ -73,6 +73,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 # AU30009
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWorldIdentity"                 1 # AU30010
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWriteAccess"                   1 # AU30011
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -1161,6 +1162,172 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckAFWriteAccess
+{
+<#  
+.SYNOPSIS
+AU30011 - Restrict Write Access
+.DESCRIPTION
+VERIFICATION: Write access to objects should be limited to power users. <br/>
+COMPLIANCE: Database level write access should not be granted to any well-known, 
+	end user groups. Similarly, write access to analyses should be limited. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		{
+			$con = $global:AFServerConnection
+
+			$version = [int]($con.ServerVersion -replace '\.', '')
+			if($version -ge 2700000)
+			{
+				# ............................................................................................................
+				# Compile list of identities with any write access to server or a database
+				# ............................................................................................................
+				$writeIdentities = @() 
+
+				# Server access
+				$serverAccess = Get-AFSecurity -AFObject $con
+				# Filter for IDs with access the mentions Write OR Admin OR All
+				$tempIDs = $serverAccess | Where-Object { $_.AllowAccess -eq 'True' -and $_.Rights -match 'Write|Admin|All'}
+				foreach($ID in $tempIDs)
+				{
+					if($writeIdentities -notcontains $ID.Identity) { $writeIdentities += $ID.Identity }
+				}
+
+				# Database access
+				$databases = $con.Databases
+				foreach($db in $databases)
+				{
+					$dbAccess = Get-AFSecurity -AFObject $db
+					$tempIDs = $dbAccess | Where-Object { $_.AllowAccess -eq 'True' -and $_.Rights -match 'Write|Admin|All'}
+					foreach($ID in $tempIDs)
+					{
+						if($writeIdentities -notcontains $ID.Identity) { $writeIdentities += $ID.Identity }
+					}
+				}
+
+				# ............................................................................................................
+				# Compile list of mappings that grant write access to well-known accounts
+				# ............................................................................................................
+				$badWriteMappings = @()
+				$writeMappings = $con.SecurityMappings | Where-Object { $_.SecurityIdentity -in $writeIdentities }
+				foreach($mapping in $writeMappings)
+				{
+					$knownType = Test-PISysAudit_PrincipalOrGroupType -SID $mapping.Account
+					if($knownType -eq 'LowPrivileged')
+					{
+						$badWriteMappings += $mapping
+					}
+				}
+
+				# ............................................................................................................
+				# Evaluate audit results based on list of bad mappings
+				# ............................................................................................................
+
+				if($badWriteMappings)
+				{
+					# Output message will report number of risky mappings and up to four accounts found.
+					# Sample: "2 risky write access AF mapping(s) found for: Everyone, OSI\Domain Users."
+					$result = $false
+					$msg = "$($badWriteMappings.Count) risky write access AF mapping(s) found for: "
+					$i = 0
+					foreach($map in $badWriteMappings)
+					{
+						$i++
+						$msg += $map.Name + ', '
+						if($i -eq 4)
+						{
+							# add number of unlisted, pad with two characters (to be removed)
+							$msg += "and $($badWriteMappings.Count - 4) others.  "
+						}
+					}
+					# Trim extra comma and space
+					$msg = $msg.Substring(0, $msg.Length-2) + '.'
+				}
+				else
+				{
+					if((-not $con.SecurityIdentities) -or (-not $con.SecurityMappings))
+					{
+						$result = "N/A"
+						$msg = "There was a problem reading AF Identities or Mappings."
+						Write-PISysAudit_LogMessage $msg "Error" $fn
+					}
+					else
+					{
+						$result = $true
+						$msg = "No risky write access AF mappings found."
+					}
+				}
+				if(-not $con.Security.HasAdmin)
+				{
+					# Add warning if not connecting as Admin as we can't guarantee completeness
+					$msg += " WARNING: Not connected as AF Admin, results may not be reliable."
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+				}
+			}
+			else
+			{
+				$result = "N/A"
+				$msg = 'PI AF Server 2.7 or later is required for this check.'
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
+		}
+		else
+		{
+			$result = "N/A"
+			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+		}			
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30011" `
+										-ain "Restrict Write Access" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity "Severe"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1241,6 +1408,7 @@ Export-ModuleMember Get-PISysAudit_CheckAFSPN
 Export-ModuleMember Get-PISysAudit_CheckAFServerAdminRight
 Export-ModuleMember Get-PISysAudit_CheckAFConnectionString
 Export-ModuleMember Get-PISysAudit_CheckAFWorldIdentity
+Export-ModuleMember Get-PISysAudit_CheckAFWriteAccess
 # </Do not remove>
 
 # ........................................................................
