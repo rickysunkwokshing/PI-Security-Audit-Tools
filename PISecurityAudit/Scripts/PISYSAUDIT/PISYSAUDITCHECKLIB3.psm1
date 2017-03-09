@@ -836,95 +836,105 @@ PROCESS
 	try
 	{
 		if($global:ArePowerShellToolsAvailable)
-		{			
-			$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
-			# Get identities with Admin Right on the AF Server object
-			$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
-										| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
-										| Select-Object -ExpandProperty Identity
-			# Flag if more than one Identity is an AF super user 
-			$hasSingleIdentity = $false
-			If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
-
-			# Find all mappings to super user identities. 
-			$afAdminMappings = Get-AFSecurityMapping -AFServer $afserver `
-										| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
-										| Select-Object Name, SecurityIdentity, Account
-			# Flag if more than one mapping exists to the AF super user 
-			$hasSingleMapping = $false
-			If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
-
-			$endUserMappings = @{}
-			$osAdminMappings = @{}
-			$wellKnownMappings = @{}
-			ForEach($afAdminMapping in $afAdminMappings)
+		{
+			$version = [int]($global:AFServerConnection.ServerVersion -replace '\.', '')
+			if($version -ge 2700000)
 			{
-				$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
+				$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
+				# Get identities with Admin Right on the AF Server object
+				$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
+											| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
+											| Select-Object -ExpandProperty Identity
+				# Flag if more than one Identity is an AF super user 
+				$hasSingleIdentity = $false
+				If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
+
+				# Find all mappings to super user identities. 
+				$afAdminMappings = Get-AFSecurityMapping -AFServer $afserver `
+											| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
+											| Select-Object Name, SecurityIdentity, Account
+				# Flag if more than one mapping exists to the AF super user 
+				$hasSingleMapping = $false
+				If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
+
+				$endUserMappings = @{}
+				$osAdminMappings = @{}
+				$wellKnownMappings = @{}
+				ForEach($afAdminMapping in $afAdminMappings)
+				{
+					$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
 			
-				If($null -ne $accountType){
-					switch ($accountType)
-					{
-						'LowPrivileged' {
-											$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-											$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-										}
-						'Administrator' {
-											$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-											$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-										}
-						default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
+					If($null -ne $accountType){
+						switch ($accountType)
+						{
+							'LowPrivileged' {
+												$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+												$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+											}
+							'Administrator' {
+												$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+												$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+											}
+							default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
+						}
 					}
 				}
-			}
 
-			if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
-			{
-				if($hasSingleMapping) # Ideal case, a single compliant mapping
+				if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
 				{
-					$result = $true
-					$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
+					if($hasSingleMapping) # Ideal case, a single compliant mapping
+					{
+						$result = $true
+						$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
+					}
+					else # One Identity but multiple mappings which may not be necessary
+					{
+						$result = $false
+						$Severity = 'Low'
+						if($hasSingleIdentity)
+						{
+							$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
+						}
+						else # Multiple Identities should not have super user access
+						{
+							$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
+						}
+						foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
+					}	
 				}
-				else # One Identity but multiple mappings which may not be necessary
+				else # Evaluate well known accounts for severity
 				{
 					$result = $false
-					$Severity = 'Low'
-					if($hasSingleIdentity)
+					if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
 					{
-						$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
-					}
-					else # Multiple Identities should not have super user access
-					{
-						$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
-					}
-					foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
-				}	
-			}
-			else # Evaluate well known accounts for severity
-			{
-				$result = $false
-				if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
-				{
-					$Severity = 'severe'
-					$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
-					$priorityMappings = $endUserMappings
-				}
-				else
-				{
-					$Severity = 'moderate'
-					if($osAdminMappings.Count -gt 0)
-					{
-						$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
-						$priorityMappings = $osAdminMappings
+						$Severity = 'severe'
+						$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
+						$priorityMappings = $endUserMappings
 					}
 					else
 					{
-						$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
-						$priorityMappings = $wellKnownMappings
+						$Severity = 'moderate'
+						if($osAdminMappings.Count -gt 0)
+						{
+							$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
+							$priorityMappings = $osAdminMappings
+						}
+						else
+						{
+							$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
+							$priorityMappings = $wellKnownMappings
+						}
 					}
+					foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
 				}
-				foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
+				$msg = $msg.Trim('|')
 			}
-			$msg = $msg.Trim('|')
+			else
+			{
+				$result = "N/A"
+				$msg = "PI AF Server 2.7 or later is required for this check."
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
 		}
 		else
 		{
