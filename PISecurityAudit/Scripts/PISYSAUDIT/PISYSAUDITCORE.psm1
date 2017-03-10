@@ -2175,30 +2175,25 @@ PROCESS
 	
 	try
 	{
+		$scriptBlock = {
+				param([string]$Variable) 
+				Get-ChildItem -Path $('Env:' + $Variable) | Select-Object -ExpandProperty Value
+			}
 		# Execute the GetEnvironmentVariable method locally or remotely via the Invoke-Command cmdlet.
-		# Always use the Machine context to write the variable.
 		if($LocalComputer)
 		{
-			$value = [Environment]::GetEnvironmentVariable($VariableName, $Target)
+			$value = & $scriptBlock -Variable $VariableName
 		}
 		else
 		{			
-			$scriptBlockCmd = [string]::Format("[Environment]::GetEnvironmentVariable(`"{0}`", `"{1}`")", $VariableName, $Target)
-			
-			# Verbose if debug level is 2+
-			$msgTemplate = "Script block to execute against {0} machine is {1}"
-			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel	
-			
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock			
-			
-			# Verbose if debug level is 2+
-			$msgTemplate = "Value returned is {0}"
-			$msg = [string]::Format($msgTemplate, $value)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel				
+			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock	-ArgumentList $VariableName						
 		}
 		
+		# Verbose if debug level is 2+
+		$msgTemplate = "Value returned is {0}"
+		$msg = [string]::Format($msgTemplate, $value)
+		Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel
+
 		# Return the value found.
 		return $value
 	}	
