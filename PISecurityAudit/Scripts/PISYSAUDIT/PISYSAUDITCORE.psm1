@@ -796,50 +796,28 @@ param(
 	
 	try
 	{
+		$scriptBlock = {
+				param([string]$Namespace, [string]$WMIClassName, [parameter(Mandatory=$false)][string]$FilterExpression="") 
+				if($FilterExpression -eq "")
+				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName }
+				else 
+				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -Filter $FilterExpression }
+		}	
+
+		# Verbose only if Debug Level is 2+
+		$msgTemplate = "Local command to send is: {0}"
+		$msg = [string]::Format($msgTemplate, $scriptBlock.ToString())
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2	
+		
 		if($LocalComputer)
 		{		
-			# Perform the WMI Query via an Invoke-Command to be able
-			# to pass the Class under a variable.
-			if($FilterExpression -eq "")
-			{				
-				$scriptBlockCmdTemplate = "Get-WMIObject -Namespace {0} -Class {1}"
-				$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $Namespace, $WMIClassName)			
-			}
-			else
-			{
-				$scriptBlockCmdTemplate = "Get-WMIObject -Namespace {0} -Class {1} -filter `"{2}`""
-				$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $Namespace, $WMIClassName, $FilterExpression)			
-			}			
-						
-			# Verbose only if Debug Level is 2+
-			$msgTemplate = "Local command to send is: {0}"
-			$msg = [string]::Format($msgTemplate, $scriptBlockCmd)
-			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Create the script block to send via PS Remoting.
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$WMIObject = Invoke-Command -ScriptBlock $scriptBlock												
-			return $WMIObject			
+			$WMIObject = & $scriptBlock -Namespace $Namespace -WMIClassName $WMIClassName -FilterExpression $FilterExpression															
 		}
 		else
 		{												
-			# To avoid DCOM to be used with WMI queries, use PS Remoting technique to wrap
-			# the WMI call.			
-			# Call to perform remotely is...
-			# $serviceObject  = Get-WMIObject "Win32_Service" -filter $filterExpression
-			$scriptBlockCmdTemplate = "Get-WMIObject -Namespace {0} -Class {1} -filter `"{2}`""
-			$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $Namespace, $WMIClassName, $FilterExpression)
-			
-			# Verbose only if Debug Level is 2+
-			$msgTemplate = "Remote command to send to {0} is: {1}"
-			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Create the script block to send via PS Remoting.
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$WMIObject = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock									
-			return $WMIObject
+			$WMIObject = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock	-ArgumentList $Namespace, $WMIClassName, $FilterExpression						
 		}
+		return $WMIObject
 	}
 	catch
 	{
@@ -2519,10 +2497,10 @@ PROCESS
 	$fn = GetFunctionName
 	try
 	{
-		If ($UserString -eq "LocalSystem" -or $UserString -eq "NetworkService" `
-			-or $UserString -eq "NT AUTHORITY\LocalSystem" -or $UserString -eq "NT AUTHORITY\NetworkService" `
-			-or $UserString -eq "ApplicationPoolIdentity" `
-			-or $UserString -eq "NT SERVICE\AFService") 
+		If ($UserString.ToLower() -in 
+				@("localsystem", "networkservice", "localservice",
+					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
+					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
 			$parsingPosDL = $UserString.IndexOf('\')
@@ -2628,6 +2606,197 @@ PROCESS
 		$filterExpression = [string]::Format("name='{0}'", $ServiceName)
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
 		return ($WMIObject | Select-Object -ExpandProperty $Property)
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Execution of WMI Query has failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_AccountProperty
+{
+<#
+.SYNOPSIS
+(Core functionality) Get a property of a user on a given computer.
+.DESCRIPTION
+Get a property of a user on a given computer.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("an")]
+		[string]
+		$AccountName,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("ap")]
+		[ValidateSet("Caption", "SID", "Domain", "Name", "All")]
+		[string]
+		$AccountProperty,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+
+	$className = "Win32_UserAccount"
+	$namespace = "root\CIMV2"
+	
+	try
+	{
+		$Account = Get-PISysAudit_ParseDomainAndUserFromString -UserString $AccountName
+
+		$filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
+		if($Account.Domain -eq 'MACHINEACCOUNT')
+		{
+			$className = "Win32_SystemAccount"
+			switch ($Account.UserName)
+			{
+				"LocalSystem" { $Account.UserName = "SYSTEM" }
+				"LocalService" { $Account.UserName = "Local Service" }
+				"NetworkService" { $Account.UserName = "Network Service" }
+			}
+			$filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
+		}
+		elseif($Account.Domain -eq '.' -or $Account.Domain -eq '')
+		{
+			$filterExpression = [string]::Format("Name='{0}' AND LocalAccount='TRUE'", $Account.UserName)
+		}
+		else
+		{
+			$filterExpression = [string]::Format("Name='{0}' AND LocalAccount='FALSE' AND Domain='{1}'", $Account.UserName, $Account.Domain)
+		}
+
+		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel
+		
+		if ($UserAccountProperty -eq 'All') # Return the whole object
+		{ 
+			return $WMIObject 
+		}
+		else # Return the explicitly requested property
+		{ 
+			$Property = $AccountProperty 
+			return ($WMIObject | Select-Object -ExpandProperty $Property)
+		}	
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Execution of WMI Query has failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_GroupMembers
+{
+<#
+.SYNOPSIS
+(Core functionality) Return the members of a group.
+.DESCRIPTION
+Return the members of a group.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("gn")]
+		[string]
+		$GroupName,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("gd")]
+		[string]
+		$GroupDomain,
+		[parameter(Mandatory=$false, Position=1, ParameterSetName = "Default")]
+		[alias("cu")]
+		[string]
+		$CheckUser = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	$blnCheckUser = $CheckUser -ne ""
+	$className = "win32_GroupUser"
+	$namespace = "root\CIMV2"
+	try
+	{
+		if($blnCheckUser)
+		{ 
+			$CheckUserObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $CheckUser 
+			if($CheckUserObject.Domain -eq '.' -or $CheckUserObject.Domain -eq 'MACHINEACCOUNT')
+			{ $CheckUserObject.Domain = $RemoteComputerName.Split(".")[0] } # use the hostname
+		}
+		
+		if($GroupDomain.ToLower() -eq 'local')
+		{ $GroupDomain = $RemoteComputerName.Split(".")[0] } 
+		
+		$filterExpression = "GroupComponent=`"Win32_Group.Domain='$GroupDomain',Name='$GroupName'`""
+		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel	
+		
+		$GroupMembers = @()
+		Foreach($entry in $WMIObject)
+		{
+			# PartComponent always has the form below.
+			# \\<Machine>\root\cimv2:Win32_UserAccount.Domain="<Domain>",Name="<Name>"
+			$entry = $entry.PartComponent.Split(',').Split('=').Trim('"')
+			$Domain = $entry[1]
+			$Name = $entry[3]
+			if($blnCheckUser)
+			{
+				if($CheckUserObject.Domain -eq $Domain -and $CheckUserObject.UserName -eq $Name)
+				{ return $true }
+			}
+			else
+			{
+				$GroupMember = New-Object pscustomobject
+				$GroupMember | Add-Member -MemberType NoteProperty -Name 'Domain' -Value $Domain
+				$GroupMember | Add-Member -MemberType NoteProperty -Name 'Name' -Value $Name
+				$GroupMembers += $GroupMember
+			}
+		} 
+
+		if($blnCheckUser)
+		{ return $false }
+		else 
+		{ return $GroupMembers }
 	}
 	catch
 	{
@@ -3012,30 +3181,10 @@ Return the access token (security) of a process or service.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("priv")]		
-		[ValidateSet(
-			"All","SeAssignPrimaryTokenPrivilege", "SeAuditPrivilege", "SeBackupPrivilege", 
-			"SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", "SeCreatePagefilePrivilege", 
-			"SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", "SeCreateTokenPrivilege", 
-			"SeDebugPrivilege", "SeEnableDelegationPrivilege", "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege", 
-			"SeIncreaseQuotaPrivilege", "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege", 
-			"SeLockMemoryPrivilege", "SeMachineAccountPrivilege", "SeManageVolumePrivilege", 
-			"SeProfileSingleProcessPrivilege", "SeRelabelPrivilege", "SeRemoteShutdownPrivilege", 
-			"SeRestorePrivilege", "SeSecurityPrivilege", "SeShutdownPrivilege", "SeSyncAgentPrivilege", 
-			"SeSystemEnvironmentPrivilege", "SeSystemProfilePrivilege", "SeSystemtimePrivilege", 
-			"SeTakeOwnershipPrivilege", "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege", 
-			"SeUndockPrivilege", "SeUnsolicitedInputPrivilege")]
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("an")]
 		[string]
-		$Privilege,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("sn")]
-		[string]
-		$ServiceName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("pn")]
-		[string]
-		$ProcessName = "",		
+		$AccountName,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("lc")]
 		[boolean]		
@@ -3054,56 +3203,53 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{						
-		# Must validate against a service or a process.
-		if(($null -eq $ServiceName) -and ($null -eq $ProcessName))
+	{			
+		$AccountSID = Get-PISysAudit_AccountProperty -AccountName $AccountName -AccountProperty SID -lc $LocalComputer -rc $RemoteComputerName -DBGLevel $DBGLevel
+		if($null -eq $AccountSID)
 		{
 			# Return the error message.
-			$msg = "Reading privileges from the process failed. The syntax is: CheckProcessPrivilege.ps1 <Privilege Name> [<Service Name>] [<Process Name>]."
-					 + " Cannot process two items at a time!"		
-			Write-PISysAudit_LogMessage $msg "Error" $fn			
+			$msg = "Could not resolve the SID for $AccountName to evaluate the Privilege."
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 			return $null
-		}		
+		}
+		$scriptBlock = {
+					param([string]$SID) 
+					if(Test-Path $($env:ProgramData + "\OSIsoft")) 
+					{ 
+						$FilePathRoot = $($env:ProgramData + "\OSIsoft")
+					}
+					elseif(Test-Path $($env:pihome64 + "\dat"))
+					{
+						$FilePathRoot = $($env:pihome64 + "\dat")
+					}
+					else
+					{
+						return $null
+					}
+					$FilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege.CFG'
+					$UtilityExecutable = $env:Windir + '\system32\secedit.exe'
+					$ArgumentList = @('/export', '/areas USER_RIGHTS', $('/cfg "' + $FilePath + '"'))
+					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -Wait -NoNewWindow
+					$FileContent = Get-Content -Path $FilePath
+					if(Test-Path $FilePath) { Remove-Item $FilePath }
+					$Privs = @()
+					Foreach($Priv in $FileContent)
+					{
+						if($Priv -like "Se*=*" -and $Priv -like $('*' + $SID + '*'))
+						{
+							$Privs += $Priv.Split('=').Trim()[0]
+						}
+					}
+					return $Privs
+		}
 
-		# Set the path to the inner script.
-		$scriptsPath = (Get-Variable "scriptsPath" -Scope "Global").Value														
-		$checkProcessPrivilegePSScript = PathConcat -ParentPath $scriptsPath -ChildPath "CheckProcessPrivilege.ps1"																											
-		#......................................................................................
-		# Verbose only if Debug Level is 2+
-		#......................................................................................
-		$msgTemplate1 = "Command to execute is: {0}"
-		$msgTemplate2 = "Remote command to send to {0} is: {1}"		
-		$PS1ScriptFileExecTemplate1 = "CheckProcessPrivilege.ps1 `"{0}`" `"{1}`" `"`" {2}"
-		$PS1ScriptFileExecTemplate2 = "CheckProcessPrivilege.ps1 `"{0}`" `"`" `"{1}`" {2}"				
-		if($ProcessName -eq "")
-		{ $PS1ScriptFileExec = [string]::Format($PS1ScriptFileExecTemplate1, $Privilege, $ServiceName, $DBGLevel) }
-		if($ServiceName -eq "")
-		{ $PS1ScriptFileExec = [string]::Format($PS1ScriptFileExecTemplate2, $Privilege, $ProcessName, $DBGLevel) }		
-		
 		if($LocalComputer)
-		{ $msg = [string]::Format($msgTemplate1, $PS1ScriptFileExec) }
-		else
-		{ $msg = [string]::Format($msgTemplate2, $RemoteComputerName, $PS1ScriptFileExec) }				
-		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-		
-		#......................................................................................
-		# Launch the execution of the inner script
-		#......................................................................................
-		if($LocalComputer)
-		{ $result = & $checkProcessPrivilegePSScript $Privilege $ServiceName $ProcessName $DBGLevel }
+		{ $AccountPrivileges = & $scriptBlock -UserSID $AccountSID }
 		else
 		{ 
-			# Define the list of arguments (Remote execution only).
-			if(!($LocalComputer))
-			{
-				$argList = @()
-				$argList += $Privilege
-				$argList += $ServiceName
-				$argList += $ProcessName
-				$argList += $DBGLevel
-			}
-			$result = Invoke-Command -ComputerName $RemoteComputerName -FilePath $checkProcessPrivilegePSScript -ArgumentList $argList
+			$AccountPrivileges = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $AccountSID
 		}
+		return $AccountPrivileges
 	}
 	catch
 	{
@@ -4855,6 +5001,8 @@ Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceProperty
+Export-ModuleMember Get-PISysAudit_AccountProperty
+Export-ModuleMember Get-PISysAudit_GroupMembers
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
 Export-ModuleMember Get-PISysAudit_InstalledKBs
