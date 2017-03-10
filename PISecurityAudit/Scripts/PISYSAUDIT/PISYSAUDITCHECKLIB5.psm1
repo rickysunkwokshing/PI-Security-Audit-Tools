@@ -110,20 +110,26 @@ PROCESS
 			param([string]$Site, [string]$ProductName)
 			
 			Import-Module WebAdministration
-
+			
+			$Version = Get-ItemProperty -Path "HKLM:\Software\PISystem\Coresight" -Name "CurrentVersion" | Select-Object -ExpandProperty "CurrentVersion"
+			$MachineDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "ComputerName"
+			$Hostname = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
+			
 			$Bindings = Get-WebBinding -Name $Site
-
 			$UsingHTTPS = $Bindings.protocol -contains "https"
 			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
 			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/Coresight') -Filter system.webServer/security/access -Name "sslFlags"
-			
+			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site + '/Coresight') | select-object Value	
+
 			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.identitytype
 			$AdminAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'adminapppool') -Name processmodel.identitytype
 			$ServiceAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.username.value
 			$AdminAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'adminapppool') -Name processmodel.username.value
-			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site + '/Coresight') | select-object Value
 			
 			$Configuration = New-Object PSCustomObject
+			$Configuration | Add-Member -MemberType NoteProperty -Name Version -Value $Version
+			$Configuration | Add-Member -MemberType NoteProperty -Name Hostname -Value $Hostname
+			$Configuration | Add-Member -MemberType NoteProperty -Name MachineDomain -Value $MachineDomain
 			$Configuration | Add-Member -MemberType NoteProperty -Name WebSite -Value $Site
 			$Configuration | Add-Member -MemberType NoteProperty -Name Bindings -Value $Bindings
 			$Configuration | Add-Member -MemberType NoteProperty -Name ServiceAppPoolType -Value $ServiceAppPoolType
@@ -185,9 +191,7 @@ PROCESS
 	
 	try
 	{		
-		$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
-		$attribute = "CurrentVersion"
-		$installVersion = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -a $attribute -DBGLevel $DBGLevel		
+		$installVersion = $global:CoresightConfiguration.Version	
 		
 		$installVersionTokens = $installVersion.Split(".")
 		# Form an integer value with all the version tokens.
@@ -266,18 +270,11 @@ PROCESS
 	
 	try
 	{	
-		# Get the Identity Type of Coresight Service AppPool.
-		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType
-
-		# Get the Identity Type of Coresight Admin AppPool.
-		$AdminAppPoolType = $global:CoresightConfiguration.AdminAppPoolType
-
-		# Get the User running Coresight Service AppPool.
-		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser
-
-		# Get the User running Coresight Admin AppPool.
-		$AdminAppPoolUser = $global:CoresightConfiguration.AdminAppPoolUser
-
+		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType   # Service AppPool Identity Type
+		$AdminAppPoolType = $global:CoresightConfiguration.AdminAppPoolType       # Admin AppPool Identity Type 
+		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser   # Service AppPool User
+		$AdminAppPoolUser = $global:CoresightConfiguration.AdminAppPoolUser       # Admin AppPool User
+		
 		# Both Coresight AppPools must run under the same identity.
 		If ( $ServiceAppPoolType -eq $AdminAppPoolType -and $ServiceAppPoolUser -eq $AdminAppPoolUser ) 
 		{ 
@@ -297,7 +294,7 @@ PROCESS
 				{
 
 					# Get the hostname from registry.
-					$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+					$hostname = $global:CoresightConfiguration.Hostname
 					
 					# Get position of \ within the AppPool identity string.
 					$position = $ServiceAppPoolUser.IndexOf("\")
@@ -465,10 +462,10 @@ PROCESS
 				# SSL is correctly configured. Let's check whether the SSL certificate is issued by a CA.
 
 				# Get Domain info.
-				$MachineDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				$MachineDomain = $global:CoresightConfiguration.MachineDomain
 
 				# Get Hostname.
-				$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				$hostname = $global:CoresightConfiguration.Hostname
 
 				# Build FQDN using hostname and domain strings.
 				$fqdn = $hostname + "." + $machineDomain
@@ -499,7 +496,6 @@ PROCESS
 						 $result = $false 
 						 $severity = "Low"
 						 $msg = "The SSL certificate is self-signed."
-					 
 					 } 
 					 
 					 # Certificate is issued by a CA (barring false positive).
