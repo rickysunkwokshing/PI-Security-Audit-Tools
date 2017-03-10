@@ -2753,6 +2753,73 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_BoundCertificate
+{
+<#
+.SYNOPSIS
+(Core functionality) Determine what certificate is bould to a particular IP and Port.
+.DESCRIPTION
+Determine what certificate is bould to a particular IP and Port.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pt")]
+		[string]
+		$Port,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("ip")]
+		[string]
+		$IPAddress="0.0.0.0",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		$scriptBlock = { 
+			param([string]$IPPort)
+			netsh http show sslcert ipport=$($IPPort) | Out-String 
+		}
+
+		$IPPort = $IPAddress + ':' + $Port
+		
+		if($LocalComputer)
+		{ $value = & $scriptBlock -IPPort $IPPort }
+		else
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $IPPort }
+		
+		return $value
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Accessing certificate properties failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_GroupMembers
 {
 <#
@@ -5040,6 +5107,7 @@ Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceProperty
 Export-ModuleMember Get-PISysAudit_AccountProperty
 Export-ModuleMember Get-PISysAudit_CertificateProperty
+Export-ModuleMember Get-PISysAudit_BoundCertificate
 Export-ModuleMember Get-PISysAudit_GroupMembers
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
