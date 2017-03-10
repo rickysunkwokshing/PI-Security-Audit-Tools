@@ -2843,28 +2843,29 @@ PROCESS
 	
 	try
 	{				
+		# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
+		$mainNodeKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+		# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
+		$wow6432NodeKey = 'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+		$scriptBlock = { 
+			param([string]$RegKey) 
+			if($RegKey -like 'Wow6432') { $Action = 'SilentlyContinue' }
+			else { $Action = 'Continue' }
+			Get-ChildItem $RegKey -ErrorAction $Action | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") } 
+		}
+		
 		if($LocalComputer)
 		{
-			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
-			$unsortedAndUnfilteredResult = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
-			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
-			$wow6432NodeResult = Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
-			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
-			return $result
+			$unsortedAndUnfilteredResult = & $scriptBlock -RegKey $mainNodeKey
+			$wow6432NodeResult = & $scriptBlock -RegKey $wow6432NodeKey
 		}
-		else # Use PS Remoting script blocks
+		else
 		{	
-			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
-			$scriptBlockCmd = "Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
-			$scriptBlockCmd2 = "Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
-			$scriptBlock2 = [scriptblock]::create( $scriptBlockCmd2 )	
-			$wow6432NodeResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock2					
-			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
-			return $result			
+			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $mainNodeKey
+			$wow6432NodeResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $wow6432NodeKey
 		}	
+		$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
+		return $result
 	}
 	catch
 	{
