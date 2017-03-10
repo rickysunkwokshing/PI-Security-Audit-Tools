@@ -2255,19 +2255,16 @@ PROCESS
 	
 	try
 	{
-		$scriptBlockCmdTemplate = "(Get-ItemProperty -Path `"{0}`" -Name `"{1}`").{1}"
-		$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $RegKeyPath, $Attribute)
-		$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet.
+		$scriptBlock = { 
+				param([string]$Path, [string]$Name) 
+				$Value = Get-ItemProperty -Path $Path -Name $Name | Select-Object -ExpandProperty $Name 
+				return $Value
+			}
+
 		if($LocalComputer)
-		{						
-			# To only obtain the property of the registry key, it is easier to use a dynamic script.			
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
+		{ $value = & $scriptBlock -Path $RegKeyPath -Name $Attribute }
 		else
-		{			
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $RegKeyPath, $Attribute }
 	
 		# Return the value found.
 		return $value		
