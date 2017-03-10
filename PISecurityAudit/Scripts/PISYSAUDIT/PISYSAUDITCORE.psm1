@@ -720,9 +720,8 @@ param(
 		{ $filterExpression = [string]::Format("name='{0}'", "MSSQLSERVER") }
 		else
 		{
-			# Don't forget the escape character (2 times) in the name of the WMI query won't
-			# return anything.
-			$value = ("MSSQL``$" + $InstanceName).ToUpper()
+			# Don't forget the escape character so that the '$' is not interpreted as a variable
+			$value = ("MSSQL`$" + $InstanceName).ToUpper()
 			$filterExpression = [string]::Format("name='{0}'", $value)			
 		}
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
