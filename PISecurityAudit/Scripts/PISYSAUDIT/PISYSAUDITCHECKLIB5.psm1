@@ -477,9 +477,7 @@ PROCESS
 				foreach ($match in $matches) {
 
 					# Find SSL certificate for each binding of the PI Coresight Web Site.
-					$portCertTemplateQuery = "netsh http show sslcert ipport=0.0.0.0:`"{0}`""
-					$portCertQuery = [string]::Format($portCertTemplateQuery, $($match.Groups[1].Captures[0].Value))
-					$portCert = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $portCertQuery -DBGLevel $DBGLevel
+					$portCert = Get-PISysAudit_BoundCertificate -lc $LocalComputer -rcn $RemoteComputerName -Port $($match.Groups[1].Captures[0].Value) -DBGLevel $DBGLevel
 					
 					# Get the Thumbprint from all SSL certificates that have been found.
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
