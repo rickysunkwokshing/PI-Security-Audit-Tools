@@ -1728,7 +1728,22 @@ param(
 							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
 			return
 		}
-		
+
+		try
+		{
+			Get-PISysAudit_GlobalPICoresightConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+		}
+		catch
+		{
+			# Return the error message.
+			$msgTemplate = "An error occurred while accessing the global configuration of PI Coresight on {0}"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+			return
+		}
+
 		# Get the list of functions to execute.
 		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary5 -lvl $AuditLevelInt
 		# There is nothing to execute.
@@ -2291,93 +2306,6 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_IISproperties
-{
-<#
-.SYNOPSIS
-(Core functionality) Enables use of the WebAdministration module.
-.DESCRIPTION
-Get IIS: properties.
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("qry")]
-		[string]
-		$query,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)		
-BEGIN {}
-PROCESS
-{			
-	$fn = GetFunctionName
-	
-	try
-	{
-		# This approach works, but can be optimized
-
-
-		# Get the query string and create a scriptblock
-		$scriptBlock = [scriptblock]::create( $query )
-
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet
-		if($LocalComputer)		
-		{						
-			
-			# Import the WebAdministration module
-			Import-Module -Name "WebAdministration"		
-			
-			# Execute the command locally	
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
-		else
-		{	
-					
-			# Establishing a new PS session on a remote computer		
-			$PSSession = New-PSSession -ComputerName $RemoteComputerName
-
-			# Importing WebAdministration module within the PS session
-			Invoke-Command -Session $PSSession -ScriptBlock {Import-Module WebAdministration}
-			
-			# Execute the command within a remote PS session
-			$value = Invoke-Command -Session $PSSession -ScriptBlock $scriptBlock
-			Remove-PSSession -ComputerName $RemoteComputerName
-		}
-	
-		# Return the value found.
-		return $value		
-	}
-	catch
-	{
-		# Return the error message.
-		$msgTemplate1 = "A problem occurred during the reading of IIS Property: {0} from local machine."
-		$msgTemplate2 = "A problem occurred during the reading of IIS Property: {0} from {1} machine."
-		if($LocalComputer)
-		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
-		else
-		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message) }
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
-		return $null
-	}
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
-
 function Get-PISysAudit_TestRegistryKey
 {
 <#
@@ -2793,7 +2721,7 @@ PROCESS
 	{
 		$scriptBlock = { 
 			param([string]$IPPort)
-			netsh http show sslcert ipport=$($IPPort) | Out-String 
+			netsh http show sslcert ipport=$($IPPort)
 		}
 
 		$IPPort = $IPAddress + ':' + $Port
@@ -5123,7 +5051,6 @@ Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
-Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject
 Export-ModuleMember New-PISysAuditError
 Export-ModuleMember New-PISysAudit_PasswordOnDisk
