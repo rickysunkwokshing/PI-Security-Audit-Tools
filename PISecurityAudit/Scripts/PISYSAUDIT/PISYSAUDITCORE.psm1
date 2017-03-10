@@ -1049,33 +1049,18 @@ PROCESS
 	$value = $false
 	try
 	{
-		$query = 'Test-Path IIS:\'
-		$scriptBlock = [scriptblock]::create( $query )
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet
-		if($LocalComputer)		
-		{						
-			
-			# Import the WebAdministration module
-			Import-Module -Name "WebAdministration"		
-			
-			# Execute the command locally	
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
-		else
-		{	
-					
-			# Establishing a new PS session on a remote computer		
-			$PSSession = New-PSSession -ComputerName $RemoteComputerName
+		# Sometimes the module is imported and the IIS drive is inaccessible
+		$scriptBlock = {
+				Import-Module -Name "WebAdministration"	
+				$value = Test-Path IIS:\
+				return $value
+			}
 
-			# Importing WebAdministration module within the PS session
-			Invoke-Command -Session $PSSession -ScriptBlock {Import-Module WebAdministration}
-			
-			# Execute the command within a remote PS session
-			$value = Invoke-Command -Session $PSSession -ScriptBlock $scriptBlock
-			Remove-PSSession -ComputerName $RemoteComputerName
-		}
-	
-		# Return the value found.
+		if($LocalComputer)		
+		{ $value = & $scriptBlock }
+		else
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+
 		return $value		
 	}
 	catch
