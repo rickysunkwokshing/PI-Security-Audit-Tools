@@ -71,6 +71,79 @@ param(
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
+function Get-PISysAudit_GlobalPICoresightConfiguration
+{
+<#  
+.SYNOPSIS
+Gathers global data for all Coresight checks.
+.DESCRIPTION
+Several checks reuse information.  This command puts the configuration information
+in a global object to reduce the number of remote calls, improving performance and 
+simplifying validation logic.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{
+	# Reset global config object.
+	$global:CoresightConfiguration = $null
+	$productName = 'Coresight'
+	# Get the name of PI Coresight Web Site.
+	$regKeyPath = "HKLM:\Software\PISystem\" + $productName
+	$attribute = "WebSite"
+	$webSite = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $regKeyPath -a $attribute -DBGLevel $DBGLevel
+
+	$scriptBlock = {
+			param([string]$Site)
+			$Bindings = Get-WebBinding -Name $Site
+
+			$UsingHTTPS = $Bindings.protocol -contains "https"
+			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
+			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/Coresight') -Filter system.webServer/security/access -Name "sslFlags"
+			
+			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $productName + 'serviceapppool') -Name processmodel.identitytype
+			$AdminAppPoolType = Get-ItemProperty $('iis:\apppools\' + $productName + 'adminapppool') -Name processmodel.identitytype
+			$ServiceAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $productName + 'serviceapppool') -Name processmodel.username.value
+			$AdminAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $productName + 'adminapppool') -Name processmodel.username.value
+			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site + '/Coresight') | select-object Value
+			
+			$Configuration = New-Object PSCustomObject
+			$Configuration | Add-Member -MemberType NoteProperty -Name WebSite -Value $Site
+			$Configuration | Add-Member -MemberType NoteProperty -Name Bindings -Value $Bindings
+			$Configuration | Add-Member -MemberType NoteProperty -Name ServiceAppPoolType -Value $ServiceAppPoolType
+			$Configuration | Add-Member -MemberType NoteProperty -Name AdminAppPoolType -Value $AdminAppPoolType
+			$Configuration | Add-Member -MemberType NoteProperty -Name ServiceAppPoolUser -Value $ServiceAppPoolUser
+			$Configuration | Add-Member -MemberType NoteProperty -Name AdminAppPoolUser -Value $AdminAppPoolUser
+			$Configuration | Add-Member -MemberType NoteProperty -Name BasicAuthEnabled -Value $BasicAuthEnabled
+			$Configuration | Add-Member -MemberType NoteProperty -Name UsingHTTPS -Value $UsingHTTPS
+			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsSite
+			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsApp
+			
+			return $Configuration
+		}
+
+	if($LocalComputer)
+	{ $global:CoresightConfiguration = & $scriptBlock -Site $webSite }
+	else
+	{ $global:CoresightConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $webSite }
+}
+END {}	
+
+}
+
 function Get-PISysAudit_CheckCoresightVersion
 {
 <#  
@@ -191,20 +264,16 @@ PROCESS
 	try
 	{	
 		# Get the Identity Type of Coresight Service AppPool.
-		$QuerySvcAppPool = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.identitytype"
-		$global:CSAppPoolSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcAppPool -DBGLevel $DBGLevel
+		$global:CSAppPoolSvc = $global:CoresightConfiguration.ServiceAppPoolType
 
 		# Get the Identity Type of Coresight Admin AppPool.
-		$QueryAdmAppPool = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.identitytype"
-		$CSAppPoolAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmAppPool -DBGLevel $DBGLevel
+		$CSAppPoolAdm = $global:CoresightConfiguration.AdminAppPoolType
 
 		# Get the User running Coresight Service AppPool.
-		$QuerySvcUser = "Get-ItemProperty iis:\apppools\coresightserviceapppool -Name processmodel.username.value"
-		$global:CSUserSvc = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QuerySvcUser -DBGLevel $DBGLevel
+		$global:CSUserSvc = $global:CoresightConfiguration.ServiceAppPoolUser
 
 		# Get the User running Coresight Admin AppPool.
-		$QueryAdmUser = "Get-ItemProperty iis:\apppools\coresightadminapppool -Name processmodel.username.value"
-		$CSUserAdm = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $QueryAdmUser -DBGLevel $DBGLevel
+		$CSUserAdm = $global:CoresightConfiguration.AdminAppPoolUser
 
 		# Both Coresight AppPools must run under the same identity.
 		If ( $global:CSAppPoolSvc -eq $CSAppPoolAdm -and $global:CSUserSvc -eq $CSUserAdm ) 
@@ -336,33 +405,13 @@ PROCESS
 	try
 	{	
 		# Get the name of PI Coresight Web Site.
-		$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
-		$attribute = "WebSite"
-		$CSwebSite = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -a $attribute -DBGLevel $DBGLevel	
+		$CSwebSite = $global:CoresightConfiguration.WebSite
 
 		# Get Coresight Web Site bindings.
-		$WebBindingsQueryTemplate = "Get-WebBinding -Name `"{0}`""
-		$WebBindingsQuery = [string]::Format($WebBindingsQueryTemplate, $CSwebSite)
-		$WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
+		$WebBindings = $global:CoresightConfiguration.Bindings
 
 		# Check if HTTPS binding is enabled.
-		$httpsBindingConfigured = $false
-
- 		# Handle PS Version 2.0 where the web bindings need to be treated as a collection and looped through.
- 		if($PSVersionTable.PSVersion.Major -eq 2)
- 		{
- 			foreach($WebBinding in $WebBindings)
- 			{
- 				if($WebBinding.protocol -contains "https"){
- 					$httpsBindingConfigured = $true
- 				}
- 			}
- 		}
-		# Modern PowerShell is used.
- 		else 
- 		{
- 			$httpsBindingConfigured = $WebBindings.protocol -contains "https"
- 		}
+		$httpsBindingConfigured = $global:CoresightConfiguration.UsingHTTPS
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
 		If ($httpsBindingConfigured = $false) 
@@ -376,9 +425,7 @@ PROCESS
 			$CSwebSiteAndName = $CSwebSite.ToString() + "/Coresight"
 
 			# Check if Basic Authentication is enabled.
-			$basicAuthQueryTemplate = "Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location `"{0}`" | select-object Value"
-			$basicAuthQuery = [string]::Format($basicAuthQueryTemplate, $CSwebSiteAndName)
-			$basicAuth = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $basicAuthQuery -DBGLevel $DBGLevel
+			$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled
 
 			# Basic Authentication is disabled.
 			If ($basicAuth.Value -eq $False) 
@@ -400,19 +447,14 @@ PROCESS
 		{ 
 			# Web Site level:
 			# Check SSL configuration.
-			$enforceSSLQueryTemplate_WebSite = "Get-WebConfigurationProperty -Location `"{0}`" -Filter `"system.webServer/security/access`" -Name `"sslFlags`""
-			$enforceSSLQuery_WebSite = [string]::Format($enforceSSLQueryTemplate_WebSite, $CSwebSite)
-			$SSLCheck_WebSite = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $enforceSSLQuery_WebSite -DBGLevel $DBGLevel
+			$SSLCheck_WebSite = $global:CoresightConfiguration.sslFlagsSite
 
 
 			# Web App level:
 			# Get full path to Coresight application.
 			$CSwebSiteAndName = $CSwebSite.ToString() + "/Coresight"
 
-			# Check SSL configuration.	
-			$enforceSSLQueryTemplate_WebApp = "Get-WebConfigurationProperty -Location `"{0}`" -Filter `"system.webServer/security/access`" -Name `"sslFlags`""
-			$enforceSSLQuery_WebApp = [string]::Format($enforceSSLQueryTemplate_WebApp, $CSwebSiteAndName)
-			$SSLCheck_WebApp = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $enforceSSLQuery_WebApp -DBGLevel $DBGLevel
+			$SSLCheck_WebApp = $global:CoresightConfiguration.sslFlagsApp
 
 			# If either the Web Site OR Web App allows only connections with SSL, it's OK.
 			If ($SSLCheck_WebSite.ToString() -eq "Ssl" -or $SSLCheck_WebApp.ToString() -eq "Ssl") 
@@ -442,7 +484,6 @@ PROCESS
 					# Get the Thumbprint from all SSL certificates that have been found.
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
 					
-					# Using the Thumbrpint, find the Issuer of the SSL certificate.
 					$sslissuerTemplateQuery = "(Get-ChildItem -Path Cert:\LocalMachine\My\`"{0}`" | Format-List -Property issuer| Out-String)"
 					$sslissuerQuery = [string]::Format($sslissuerTemplateQuery, $thumbprint)
 					$sslissuer = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $sslissuerQuery -DBGLevel $DBGLevel
@@ -482,17 +523,11 @@ PROCESS
 			Else 		
 			{ 
 				# Test fails.
-				$result = $false
-
 				# But how epic is the fail?
-
-				# Get full path to Coresight application.
-				$CSwebSiteAndName = $CSwebSite.ToString() + "/Coresight"
-
+				$result = $false
+				
 				# Check if Basic Authentication is enabled.
-				$basicAuthQueryTemplate = "Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location `"{0}`" | select-object Value"
-				$basicAuthQuery = [string]::Format($basicAuthQueryTemplate, $CSwebSiteAndName)
-				$basicAuth = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $basicAuthQuery -DBGLevel $DBGLevel
+				$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled
 
 				# Basic Authentication is disabled. Not too bad.
 				If ($basicAuth.Value -eq $False) 
@@ -573,14 +608,10 @@ PROCESS
 	{		
 
 		# Get the name of PI Coresight Web Site.
-		$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
-		$attribute = "WebSite"
-		$CSwebSite = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -a $attribute -DBGLevel $DBGLevel	
+		$CSwebSite = $global:CoresightConfiguration.WebSite
 
 		# Get Coresight Web Site bindings.
-		$WebBindingsQueryTemplate = "Get-WebBinding -Name `"{0}`""
-		$WebBindingsQuery = [string]::Format($WebBindingsQueryTemplate, $CSwebSite)
-		$WebBindings = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $WebBindingsQuery -DBGLevel $DBGLevel
+		$WebBindings = $global:CoresightConfiguration.Bindings
 
 		# Coresight is using the http service class.
 		$serviceType = "http"
