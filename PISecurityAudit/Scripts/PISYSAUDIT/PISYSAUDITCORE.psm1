@@ -144,78 +144,11 @@ param(
 		[object]
 		$AuditItem)
 	
-	$fn = GetFunctionName
-	
-	# Read from the global constant bag.
-	$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value							
-	
-	# Initialize.
-	$msg1 = ""
-	$msg2 = ""
-	$msg3 = ""
-	$msg4 = ""
-	
-	# Template
-	$msgTemplate1 = "A severe issue was found"
-	$msgTemplate2 = "A moderate issue was found"
-	$msgTemplate3 = "A low issue was found"
-	$msgTemplate4 = " on {0} server regarding {1} check (ID: {2}). See details on the generated report"
-	$defaultForegroundColor = "White"
-	$defaultBackgroundColor = "Black"
-			
-	# Process only if this item is not compliant.
 	if($AuditItem.AuditItemValue -eq $false)
-	{	
-		# Set the message.			
-		$msg2 = [string]::Format($msgTemplate4, $AuditItem.ServerName, $AuditItem.AuditItemName, $AuditItem.ID)
-		$msg3 = $msg2 + "."		
-			
-		if($AuditItem.Severity -eq "Severe")
-		{
-			# Set color and message.
-			$alertForegroundColor = "Red"
-			$alertBackgroundColor = "Gray"												
-			$msg1 = $msgTemplate1
-			
-			# Write to console with colors. This needs to be performed in 2 steps.
-			if($ShowUI -eq $true)
-			{											
-				Write-Host $msg1 -Foregroundcolor $alertForegroundColor -Backgroundcolor $alertBackgroundColor -nonewline
-				Write-Host $msg3 -Foregroundcolor $defaultForegroundColor -Backgroundcolor $defaultBackgroundColor
-			}
-		}
-		elseif($AuditItem.Severity -eq "Moderate")
-		{
-			# Set color and message.
-			$alertForegroundColor = "Magenta"
-			$alertBackgroundColor = "Gray"									
-			$msg1 = $msgTemplate2
-			
-			# Write to console with colors. This needs to be performed in 2 steps.
-			if($ShowUI -eq $true)
-			{				
-				Write-Host $msg1 -Foregroundcolor $alertForegroundColor -Backgroundcolor $alertBackgroundColor -nonewline
-				Write-Host $msg3 -Foregroundcolor $defaultForegroundColor -Backgroundcolor $defaultBackgroundColor
-			}
-		}	
-		elseif($AuditItem.Severity -eq "Low")
-		{
-			# Set color and message.
-			$alertForegroundColor = "DarkYellow"
-			$alertBackgroundColor = "Gray"									
-			$msg1 = $msgTemplate3
-			
-			# Write to console with colors. This needs to be performed in 2 steps.
-			if($ShowUI -eq $true)
-			{				
-				Write-Host $msg1 -Foregroundcolor $alertForegroundColor -Backgroundcolor $alertBackgroundColor -nonewline
-				Write-Host $msg3 -Foregroundcolor $defaultForegroundColor -Backgroundcolor $defaultBackgroundColor
-			}
-		}					
-						
-		# Write to the log file either.
-		$msg4 = $msg1 + $msg2
-		Write-PISysAudit_LogMessage $msg4 "Info" $fn
+	{
+		$a = $AuditItem # for brevity
+		$msg = "{0,-9} {1,-8} {2,-20} {3,40}"
+		Write-Host ($msg -f $a.Severity, $a.ID, $a.ServerName, $a.AuditItemName)
 	}
 }
 
@@ -2039,31 +1972,26 @@ PROCESS
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value							
 	
-		# Get current date
-		$ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+		# Get current date for log message prefix
+		$ts = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + ", "
 				
 		# Templates
-		$msgTemplate1 = "{0}, Function: {1}, Error: {2}."
-		$msgTemplate2 = "{0}, Function: {1}, Error: {2}, Details: {3}."
-		$msgTemplate3 = "{0}, Function: {1}, Line: {2}, Error: {3}, Details: {4}."
-		$msgTemplate4 = "{0}, Warning, {1}."
-		$msgTemplate5 = "{0}, Information, {1}."
-		$msgTemplate6 = "{0}, Function: {1}, Debug: {2}."				
+		$msgTemplate1 = "Function: {0}, Error: {1}."
+		$msgTemplate2 = "Function: {0}, Error: {1}, Details: {2}."
+		$msgTemplate3 = "Function: {0}, Line: {1}, Error: {2}, Details: {3}."
+		$msgTemplate4 = "Warning, {0}."
+		$msgTemplate5 = "Information, {0}."
+		$msgTemplate6 = "Function: {0}, Debug: {1}."
 		
 		# Message.
-		$extMessageFile = ""
-		$extMessageConsole = ""
-		
-		# Default Color
-		$defaultForegroundColor = "Gray"
-		$defaultBackgroundColor = "Black"
+		$msg = ""
 				
 		if($MessageType.ToLower() -eq "error")
 		{
 			# This type of message is always shown whatever the debug level.
 			# Form the message.
 			if($null -eq $ErrorObject)
-			{ $extMessageFile = [string]::Format($msgTemplate1, $ts, $FunctionName, $Message) }
+			{ $msg = $msgTemplate1 -f $FunctionName, $Message }
 			else
 			{				
 				# Remove the trailing period of the error message, template already contains
@@ -2073,47 +2001,52 @@ PROCESS
 				else
 				{ $modifiedErrorMessage = $ErrorObject.Exception.Message }
 				
-				$extMessageFile = [string]::Format($msgTemplate3, $ts, $FunctionName, `
-												$ErrorObject.InvocationInfo.ScriptLineNumber, `
-												$Message, $modifiedErrorMessage)
+				$msg = $msgTemplate3 -f $FunctionName, $ErrorObject.InvocationInfo.ScriptLineNumber, `
+												$Message, $modifiedErrorMessage
 			}
-			$extMessageConsole = $extMessageFile
 			
 			# Write the content.
-			Add-Content -Path $logPath -Value $extMessageFile -Encoding ASCII
+			Add-Content -Path $logPath -Value ($ts + $msg) -Encoding ASCII
 			
 			# Force to show on console.
 			$ShowToConsole = $true			
 			
 			# Set color.
-			$defaultForegroundColor = "Red"
+			$ForegroundColor = "Red"
+			$BackgroundColor = "Black"
+
+			if($ShowToConsole -and $ShowUI) { Write-Host $msg -ForeGroundColor $ForegroundColor -BackgroundColor $BackgroundColor }
 			
 		}
 		elseif($MessageType.ToLower() -eq "warning")
 		{						
 			# Form the message.
-			$extMessageFile = [string]::Format($msgTemplate4, $ts, $Message)
-			$extMessageConsole = $extMessageFile
+			$msg = $msgTemplate4 -f $Message
 			
 			# Write the content.
-			Add-Content -Path $logPath -Value $extMessageFile -Encoding ASCII
+			Add-Content -Path $logPath -Value ($ts + $msg) -Encoding ASCII
 			
 			# Force to show on console.
 			$ShowToConsole = $true			
 			
 			# Set color.
-			$defaultForegroundColor = "Yellow"
+			$ForegroundColor = "Yellow"
+			$BackgroundColor = "Black"
+
+			if($ShowToConsole -and $ShowUI) { Write-Host $msg -ForeGroundColor $ForegroundColor -BackgroundColor $BackgroundColor }
 		}
 		elseif($MessageType.ToLower() -eq "info")
 		{
 			if($Message -ne "")			
 			{
 				# Form the message.
-				$extMessageFile = [string]::Format($msgTemplate5, $ts, $Message)
-				$extMessageConsole = $Message
+				$msg = $msgTemplate5 -f $Message
+				$msgConsole = $Message
 			
 				# Write the content.
-				Add-Content -Path $logPath -Value $extMessageFile -Encoding ASCII						
+				Add-Content -Path $logPath -Value ($ts + $msg) -Encoding ASCII	
+				
+				if($ShowToConsole -and $ShowUI) { Write-Host $msgConsole }					
 			}
 		}
 		elseif($MessageType.ToLower() -eq "debug")
@@ -2122,27 +2055,27 @@ PROCESS
 			if($CurrentDBGLevel -ge $RequiredDBGLevel)
 			{			
 				# Form the message.
-				$extMessageFile = [string]::Format($msgTemplate6, $ts, $FunctionName, $Message)
-				$extMessageConsole = $extMessageFile
+				$msg = $msgTemplate6 -f $FunctionName, $Message
 				
 				# Write the content.
-				Add-Content -Path $logPath -Value $extMessageFile -Encoding ASCII								
+				Add-Content -Path $logPath -Value ($ts + $msg) -Encoding ASCII		
+				
+				if($ShowToConsole -and $ShowUI) { Write-Host $msg }						
 			}
 		}
 		else
 		{			
-			$extMessageFile = [string]::Format($msgTemplate1, $ts, $FunctionName, "An invalid level of message has been picked.")
-			$extMessageConsole = $extMessageFile			
+			$msg = $msgTemplate1 -f $FunctionName, "An invalid level of message has been picked."
 				
 			# Write the content.
-			Add-Content -Path $logPath -Value $extMessageFile -Encoding ASCII								
+			Add-Content -Path $logPath -Value ($ts + $msg) -Encoding ASCII								
 			
 			# Set color.
-			$defaultForegroundColor = "Red"						
+			$ForegroundColor = "Red"
+			$BackgroundColor = "Black"
+			
+			if($ShowToConsole -and $ShowUI) { Write-Host $msg -ForeGroundColor $ForegroundColor -BackgroundColor $BackgroundColor }	
 		}
-		
-		# Show at the console?.
-		if($ShowToConsole -and $ShowUI) { Write-Host $extMessageConsole -ForeGroundColor $defaultForegroundColor -BackgroundColor $defaultBackgroundColor }
 	}
 
 END {}
@@ -4823,9 +4756,14 @@ PROCESS
 	$msg = "----- Start the audit -----"
 	Write-PISysAudit_LogMessage $msg "Info" $fn		
 			
-	# Add a 5 lines to avoid hiding text under the progress bar.
+	# Add 1 line of padding before showing audit failure list
 	if($ShowUI)
-	{ Write-Host "`r`n`r`n`r`n`r`n`r`n"	}
+	{ Write-Host "`r`n"	}
+
+	# Write headers for issues that are found
+	$msg = "{0,-9} {1,-8} {2,-20} {3,40}"
+	Write-Host ($msg -f 'Severity','ID','Server','Audit Item Name')
+	Write-Host ('-' * 80)
 	
 	# ............................................................................................................
 	# Initialize the table of results
@@ -4910,6 +4848,9 @@ PROCESS
 	}
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
 
+	# Pad console ouput with one line
+	Write-Host "`r`n"
+
 	# ....................................................................................
 	# Show results.
 	# ....................................................................................		
@@ -4923,9 +4864,13 @@ PROCESS
 	# ............................................................................................................				
 	# Read from the global constant bag.
 	$exportPath = (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value										
-	$msgTemplate = "The audit is completed. See the generated report ({0}) under the folder: {1}"
-	$msg = [string]::Format($msgTemplate, $reportName, $exportPath)
-	Write-PISysAudit_LogMessage $msg "Info" $fn -sc $true		
+
+	$msg = "Report file:     $reportName"
+	Write-PISysAudit_LogMessage $msg "Info" $fn -sc $true
+	$msg = "Report location: $exportPath"
+	Write-PISysAudit_LogMessage $msg "Info" $fn -sc $true
+	$msg = "----- Audit Completed -----"
+	Write-PISysAudit_LogMessage $msg "Info" $fn 
 }
 
 END {}
