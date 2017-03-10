@@ -2733,6 +2733,10 @@ param(
 		[alias("gd")]
 		[string]
 		$GroupDomain,
+		[parameter(Mandatory=$false, Position=1, ParameterSetName = "Default")]
+		[alias("cu")]
+		[string]
+		$CheckUser = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("lc")]
 		[boolean]
@@ -2749,16 +2753,22 @@ BEGIN {}
 PROCESS		
 {		
 	$fn = GetFunctionName
-
+	$blnCheckUser = $CheckUser -ne ""
 	$className = "win32_GroupUser"
 	$namespace = "root\CIMV2"
 	try
 	{
+		if($blnCheckUser)
+		{ 
+			$CheckUserObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $CheckUser 
+			if($CheckUserObject.Domain -eq '.' -or $CheckUserObject.Domain -eq 'MACHINEACCOUNT')
+			{ $CheckUserObject.Domain = $RemoteComputerName.Split(".")[0] } # use the hostname
+		}
+		
 		if($GroupDomain.ToLower() -eq 'local')
-		{ $GroupDomain = $RemoteComputerName.Split(".")[0] } # use the hostname
+		{ $GroupDomain = $RemoteComputerName.Split(".")[0] } 
 		
 		$filterExpression = "GroupComponent=`"Win32_Group.Domain='$GroupDomain',Name='$GroupName'`""
-		
 		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel	
 		
 		$GroupMembers = @()
@@ -2767,13 +2777,26 @@ PROCESS
 			# PartComponent always has the form below.
 			# \\<Machine>\root\cimv2:Win32_UserAccount.Domain="<Domain>",Name="<Name>"
 			$entry = $entry.PartComponent.Split(',').Split('=').Trim('"')
-			$GroupMember = New-Object pscustomobject
-			$GroupMember | Add-Member -MemberType NoteProperty -Name 'Domain' -Value $entry[1]
-			$GroupMember | Add-Member -MemberType NoteProperty -Name 'Name' -Value $entry[3]
-			$GroupMembers += $GroupMember
+			$Domain = $entry[1]
+			$Name = $entry[3]
+			if($blnCheckUser)
+			{
+				if($CheckUserObject.Domain -eq $Domain -and $CheckUserObject.UserName -eq $Name)
+				{ return $true }
+			}
+			else
+			{
+				$GroupMember = New-Object pscustomobject
+				$GroupMember | Add-Member -MemberType NoteProperty -Name 'Domain' -Value $Domain
+				$GroupMember | Add-Member -MemberType NoteProperty -Name 'Name' -Value $Name
+				$GroupMembers += $GroupMember
+			}
 		} 
 
-		return $GroupMembers
+		if($blnCheckUser)
+		{ return $false }
+		else 
+		{ return $GroupMembers }
 	}
 	catch
 	{
