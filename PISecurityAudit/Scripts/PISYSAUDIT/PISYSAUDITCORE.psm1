@@ -2411,20 +2411,16 @@ PROCESS
 	
 	try
 	{
-		# To only obtain the property of the registry key, it is easier to use a dynamic script.			
-		$scriptBlockCmdTemplate = "`$(Test-Path `"{0}`")"
-		$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $RegKeyPath)
-		$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
+		$scriptBlock = {
+				param([string]$Path)
+				return $(Test-Path -Path $Path)
+			}
 
 		# Execute the Test-Path cmdlet method locally or remotely via the Invoke-Command cmdlet.
 		if($LocalComputer)
-		{						
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
+		{ $value = & $scriptBlock -Path $RegKeyPath }
 		else
-		{			
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $RegKeyPath }
 	
 		# Return the value found.
 		return $value		
