@@ -2497,10 +2497,10 @@ PROCESS
 	$fn = GetFunctionName
 	try
 	{
-		If ($UserString -in 
-				@("LocalSystem", "NetworkService", "LocalService",
-					"NT AUTHORITY\LocalSystem", "NT AUTHORITY\NetworkService", "NT Authority\LocalService",
-					 "ApplicationPoolIdentity", "NT SERVICE\AFService", "NT Service\piwebapi", "NT Service\picrawler" ))
+		If ($UserString.ToLower() -in 
+				@("localsystem", "networkservice", "localservice",
+					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
+					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
 			$parsingPosDL = $UserString.IndexOf('\')
@@ -3181,30 +3181,10 @@ Return the access token (security) of a process or service.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("priv")]		
-		[ValidateSet(
-			"All","SeAssignPrimaryTokenPrivilege", "SeAuditPrivilege", "SeBackupPrivilege", 
-			"SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", "SeCreatePagefilePrivilege", 
-			"SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", "SeCreateTokenPrivilege", 
-			"SeDebugPrivilege", "SeEnableDelegationPrivilege", "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege", 
-			"SeIncreaseQuotaPrivilege", "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege", 
-			"SeLockMemoryPrivilege", "SeMachineAccountPrivilege", "SeManageVolumePrivilege", 
-			"SeProfileSingleProcessPrivilege", "SeRelabelPrivilege", "SeRemoteShutdownPrivilege", 
-			"SeRestorePrivilege", "SeSecurityPrivilege", "SeShutdownPrivilege", "SeSyncAgentPrivilege", 
-			"SeSystemEnvironmentPrivilege", "SeSystemProfilePrivilege", "SeSystemtimePrivilege", 
-			"SeTakeOwnershipPrivilege", "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege", 
-			"SeUndockPrivilege", "SeUnsolicitedInputPrivilege")]
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("an")]
 		[string]
-		$Privilege,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("sn")]
-		[string]
-		$ServiceName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("pn")]
-		[string]
-		$ProcessName = "",		
+		$AccountName,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("lc")]
 		[boolean]		
@@ -3223,56 +3203,53 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{						
-		# Must validate against a service or a process.
-		if(($null -eq $ServiceName) -and ($null -eq $ProcessName))
+	{			
+		$AccountSID = Get-PISysAudit_AccountProperty -AccountName $AccountName -AccountProperty SID -lc $LocalComputer -rc $RemoteComputerName -DBGLevel $DBGLevel
+		if($null -eq $AccountSID)
 		{
 			# Return the error message.
-			$msg = "Reading privileges from the process failed. The syntax is: CheckProcessPrivilege.ps1 <Privilege Name> [<Service Name>] [<Process Name>]."
-					 + " Cannot process two items at a time!"		
-			Write-PISysAudit_LogMessage $msg "Error" $fn			
+			$msg = "Could not resolve the SID for $AccountName to evaluate the Privilege."
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 			return $null
-		}		
+		}
+		$scriptBlock = {
+					param([string]$SID) 
+					if(Test-Path $($env:ProgramData + "\OSIsoft")) 
+					{ 
+						$FilePathRoot = $($env:ProgramData + "\OSIsoft")
+					}
+					elseif(Test-Path $($env:pihome64 + "\dat"))
+					{
+						$FilePathRoot = $($env:pihome64 + "\dat")
+					}
+					else
+					{
+						return $null
+					}
+					$FilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege.CFG'
+					$UtilityExecutable = $env:Windir + '\system32\secedit.exe'
+					$ArgumentList = @('/export', '/areas USER_RIGHTS', $('/cfg "' + $FilePath + '"'))
+					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -Wait -NoNewWindow
+					$FileContent = Get-Content -Path $FilePath
+					if(Test-Path $FilePath) { Remove-Item $FilePath }
+					$Privs = @()
+					Foreach($Priv in $FileContent)
+					{
+						if($Priv -like "Se*=*" -and $Priv -like $('*' + $SID + '*'))
+						{
+							$Privs += $Priv.Split('=').Trim()[0]
+						}
+					}
+					return $Privs
+		}
 
-		# Set the path to the inner script.
-		$scriptsPath = (Get-Variable "scriptsPath" -Scope "Global").Value														
-		$checkProcessPrivilegePSScript = PathConcat -ParentPath $scriptsPath -ChildPath "CheckProcessPrivilege.ps1"																											
-		#......................................................................................
-		# Verbose only if Debug Level is 2+
-		#......................................................................................
-		$msgTemplate1 = "Command to execute is: {0}"
-		$msgTemplate2 = "Remote command to send to {0} is: {1}"		
-		$PS1ScriptFileExecTemplate1 = "CheckProcessPrivilege.ps1 `"{0}`" `"{1}`" `"`" {2}"
-		$PS1ScriptFileExecTemplate2 = "CheckProcessPrivilege.ps1 `"{0}`" `"`" `"{1}`" {2}"				
-		if($ProcessName -eq "")
-		{ $PS1ScriptFileExec = [string]::Format($PS1ScriptFileExecTemplate1, $Privilege, $ServiceName, $DBGLevel) }
-		if($ServiceName -eq "")
-		{ $PS1ScriptFileExec = [string]::Format($PS1ScriptFileExecTemplate2, $Privilege, $ProcessName, $DBGLevel) }		
-		
 		if($LocalComputer)
-		{ $msg = [string]::Format($msgTemplate1, $PS1ScriptFileExec) }
-		else
-		{ $msg = [string]::Format($msgTemplate2, $RemoteComputerName, $PS1ScriptFileExec) }				
-		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-		
-		#......................................................................................
-		# Launch the execution of the inner script
-		#......................................................................................
-		if($LocalComputer)
-		{ $result = & $checkProcessPrivilegePSScript $Privilege $ServiceName $ProcessName $DBGLevel }
+		{ $AccountPrivileges = & $scriptBlock -UserSID $AccountSID }
 		else
 		{ 
-			# Define the list of arguments (Remote execution only).
-			if(!($LocalComputer))
-			{
-				$argList = @()
-				$argList += $Privilege
-				$argList += $ServiceName
-				$argList += $ProcessName
-				$argList += $DBGLevel
-			}
-			$result = Invoke-Command -ComputerName $RemoteComputerName -FilePath $checkProcessPrivilegePSScript -ArgumentList $argList
+			$AccountPrivileges = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $AccountSID
 		}
+		return $AccountPrivileges
 	}
 	catch
 	{

@@ -313,10 +313,16 @@ PROCESS
 	$msg = ""
 	try
 	{										
-		$ServiceAccount = Get-PISysAudit_ServiceProperty -sn 'afservice' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		$ServiceName = 'afservice'
+		$ServiceAccount = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 		# No need to check specific privileges if the service account is an admin.
 		$IsServiceAccountLocalAdmin = Get-PISysAudit_GroupMembers -GroupName "Administrators" -GroupDomain "local" -LocalComputer $false -RemoteComputerName $RemoteComputerName -CheckUser $ServiceAccount
-		if($IsServiceAccountLocalAdmin)
+		if($ServiceAccount.ToLower() -eq $('nt service\' + $ServiceName))
+		{
+			$result = $true
+			$msg = "The service account is the default virtual account."
+		}
+		elseif($IsServiceAccountLocalAdmin)
 		{
 			$result = $false
 			$msg = "The service account is in the local Administrators group."
@@ -339,15 +345,14 @@ PROCESS
 				$privilegeFound = $false		
 		
 				# Get the service account.
-				$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -priv "All" -sn "AFService" -dbgl $DBGLevel					
-		
+				$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -an $ServiceAccount -dbgl $DBGLevel					
+				
 				# Read each line to find granted privileges.		
 				foreach($line in $listOfPrivileges)
 				{											
-					# Reset.
-					$securityWeakness = $false						
+					# Reset.					
 					$privilegeFound = $false			
-			
+					
 					# Skip any line not starting with 'SE'
 					if($line.ToUpper().StartsWith("SE")) 
 					{								
@@ -355,36 +360,18 @@ PROCESS
 						if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
 						if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
 						if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
-				
-						# Validate that the privilege is enabled, if yes a weakness was found.
-						if($privilegeFound -and ($line.ToUpper().Contains("ENABLED"))) { $securityWeakness = $true }
-					}							
-
-					# Increment the counter if a weakness has been discovered.
-					if($securityWeakness)
-					{
-						$securityWeaknessCounter++
-				
-						# Store the privilege found that might compromise security.
-						if($securityWeaknessCounter -eq 1)
-						{ $msg = $line.ToUpper() }
-						else
-						{ $msg = $msg + ", " + $line.ToUpper() }
-					}					
-				}
-		
-				# Check if the counter is 0 = compliant, 1 or more it is not compliant		
-				if($securityWeaknessCounter -gt 0)
+						if($privilegeFound){
+							$result = $false
+							$msg = $msg + ", " + $line.ToUpper()
+						}
+					}						
+				}	
+				if($result -eq $false)
 				{
-					$result = $false
-					if($securityWeaknessCounter -eq 1)
-					{ $msg = "The following privilege: " + $msg + " is enabled." }
-					else
-					{ $msg = "The following privileges: " + $msg + " are enabled." }
+					$msg = "The account has the following privileges: " + $msg + "." 
 				}
 				else 
 				{ 
-					$result = $true 
 					$msg = "No weaknesses were detected."
 				}
 			}
