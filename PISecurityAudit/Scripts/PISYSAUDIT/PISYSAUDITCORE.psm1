@@ -2687,6 +2687,72 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CertificateProperty
+{
+<#
+.SYNOPSIS
+(Core functionality) Get a property of a certificate on a given computer.
+.DESCRIPTION
+Get a property of a certificate on a given computer.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("ct")]
+		[string]
+		$CertificateThumbprint,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("cp")]
+		[ValidateSet("Issuer")]
+		[string]
+		$CertificateProperty,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		$scriptBlock = { 
+			param([string]$Thumbprint, [string]$Property)
+			Get-ChildItem -Path $('Cert:\LocalMachine\My\' + $Thumbprint) | Format-List -Property $Property | Out-String 
+		}
+		
+		if($LocalComputer)
+		{ $value = & $scriptBlock -Thumbprint $CertificateThumbprint -Property $CertificateProperty }
+		else
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $CertificateThumbprint, $CertificateProperty }
+		
+		return $value
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Accessing certificate properties failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_GroupMembers
 {
 <#
@@ -4973,6 +5039,7 @@ Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceProperty
 Export-ModuleMember Get-PISysAudit_AccountProperty
+Export-ModuleMember Get-PISysAudit_CertificateProperty
 Export-ModuleMember Get-PISysAudit_GroupMembers
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
