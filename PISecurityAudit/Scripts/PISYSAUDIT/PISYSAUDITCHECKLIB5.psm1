@@ -107,17 +107,20 @@ PROCESS
 	$webSite = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $regKeyPath -a $attribute -DBGLevel $DBGLevel
 
 	$scriptBlock = {
-			param([string]$Site)
+			param([string]$Site, [string]$ProductName)
+			
+			Import-Module WebAdministration
+
 			$Bindings = Get-WebBinding -Name $Site
 
 			$UsingHTTPS = $Bindings.protocol -contains "https"
 			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
 			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/Coresight') -Filter system.webServer/security/access -Name "sslFlags"
 			
-			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $productName + 'serviceapppool') -Name processmodel.identitytype
-			$AdminAppPoolType = Get-ItemProperty $('iis:\apppools\' + $productName + 'adminapppool') -Name processmodel.identitytype
-			$ServiceAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $productName + 'serviceapppool') -Name processmodel.username.value
-			$AdminAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $productName + 'adminapppool') -Name processmodel.username.value
+			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.identitytype
+			$AdminAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'adminapppool') -Name processmodel.identitytype
+			$ServiceAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.username.value
+			$AdminAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'adminapppool') -Name processmodel.username.value
 			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site + '/Coresight') | select-object Value
 			
 			$Configuration = New-Object PSCustomObject
@@ -130,15 +133,15 @@ PROCESS
 			$Configuration | Add-Member -MemberType NoteProperty -Name BasicAuthEnabled -Value $BasicAuthEnabled
 			$Configuration | Add-Member -MemberType NoteProperty -Name UsingHTTPS -Value $UsingHTTPS
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsSite
-			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsApp
+			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsApp -Value $sslFlagsApp
 			
 			return $Configuration
 		}
 
 	if($LocalComputer)
-	{ $global:CoresightConfiguration = & $scriptBlock -Site $webSite }
+	{ $global:CoresightConfiguration = & $scriptBlock -Site $webSite -ProductName $productName }
 	else
-	{ $global:CoresightConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $webSite }
+	{ $global:CoresightConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $webSite, $productName }
 }
 END {}	
 
@@ -401,7 +404,7 @@ PROCESS
 {		
 	# Get and store the function Name.
 	$fn = GetFunctionName
-	
+	$severity = "Unknown"
 	try
 	{	
 		# Get the name of PI Coresight Web Site.
@@ -763,6 +766,7 @@ END {}
 # Export Module Member
 # ........................................................................
 # <Do not remove>
+Export-ModuleMember Get-PISysAudit_GlobalPICoresightConfiguration
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary5
 Export-ModuleMember Get-PISysAudit_CheckCoresightVersion
 Export-ModuleMember Get-PISysAudit_CheckCoresightAppPools
