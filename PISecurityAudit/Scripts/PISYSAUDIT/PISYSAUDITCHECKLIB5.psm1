@@ -484,9 +484,7 @@ PROCESS
 					# Get the Thumbprint from all SSL certificates that have been found.
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
 					
-					$sslissuerTemplateQuery = "(Get-ChildItem -Path Cert:\LocalMachine\My\`"{0}`" | Format-List -Property issuer| Out-String)"
-					$sslissuerQuery = [string]::Format($sslissuerTemplateQuery, $thumbprint)
-					$sslissuer = Get-PISysAudit_IISproperties -lc $LocalComputer -rcn $RemoteComputerName -qry $sslissuerQuery -DBGLevel $DBGLevel
+					$sslissuer = Get-PISysAudit_CertificateProperty -lc $LocalComputer -rcn $RemoteComputerName -ct $Thumbprint -cp Issuer -DBGLevel $DBGLevel
 					
 					# Trim and only get the actual SSL issuer in a single string.
 					$pos = $sslissuer.IndexOf("=")
