@@ -3074,12 +3074,10 @@ PROCESS
 	
 	try
 	{									
-		$scriptBlockCmd = " if(`$PSVersionTable.PSVersion.Major -ge 3) [Get-AppLockerPolicy -Effective -XML] else [`$null] "
-		$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")	
-		$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
+		$scriptBlock = { if($PSVersionTable.PSVersion.Major -ge 3) { Get-AppLockerPolicy -Effective -XML } else { $null } }
 		if($LocalComputer)
 		{			                    			
-			$appLockerPolicy = Invoke-Command -ScriptBlock $scriptBlock
+			$appLockerPolicy = & $scriptBlock
 		}
 		else
 		{                            				
