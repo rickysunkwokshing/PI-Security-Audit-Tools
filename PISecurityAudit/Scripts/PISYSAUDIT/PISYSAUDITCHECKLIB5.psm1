@@ -267,26 +267,26 @@ PROCESS
 	try
 	{	
 		# Get the Identity Type of Coresight Service AppPool.
-		$global:CSAppPoolSvc = $global:CoresightConfiguration.ServiceAppPoolType
+		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType
 
 		# Get the Identity Type of Coresight Admin AppPool.
-		$CSAppPoolAdm = $global:CoresightConfiguration.AdminAppPoolType
+		$AdminAppPoolType = $global:CoresightConfiguration.AdminAppPoolType
 
 		# Get the User running Coresight Service AppPool.
-		$global:CSUserSvc = $global:CoresightConfiguration.ServiceAppPoolUser
+		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser
 
 		# Get the User running Coresight Admin AppPool.
-		$CSUserAdm = $global:CoresightConfiguration.AdminAppPoolUser
+		$AdminAppPoolUser = $global:CoresightConfiguration.AdminAppPoolUser
 
 		# Both Coresight AppPools must run under the same identity.
-		If ( $global:CSAppPoolSvc -eq $CSAppPoolAdm -and $global:CSUserSvc -eq $CSUserAdm ) 
+		If ( $ServiceAppPoolType -eq $AdminAppPoolType -and $ServiceAppPoolUser -eq $AdminAppPoolUser ) 
 		{ 
 
 			# If a custom account is used, we need to distinguish between a local and domain account.
-			If ( $global:CSAppPoolSvc -eq "SpecificUser") 
+			If ( $ServiceAppPoolType -eq "SpecificUser") 
 			{
 				# Local user would use ".\user" format.
-				If ($global:CSUserSvc -contains ".\" ) 
+				If ($ServiceAppPoolUser -contains ".\" ) 
 				{ 
 					$result = $false
 					$msg =  "Local User is running Coresight AppPools. Please use a custom domain account."
@@ -300,10 +300,10 @@ PROCESS
 					$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 					
 					# Get position of \ within the AppPool identity string.
-					$position = $global:CSUserSvc.IndexOf("\")
+					$position = $ServiceAppPoolUser.IndexOf("\")
 					
 					# Remove the \username part from the AppPool identity string.
-					$LsplitName = $global:CSUserSvc.Substring(0, $position)
+					$LsplitName = $ServiceAppPoolUser.Substring(0, $position)
 
 					# Detect local user.
 					If ($hostname -eq $LsplitName )
@@ -322,7 +322,7 @@ PROCESS
 
 			}
 			# LocalSystem is running the Coresight AppPools. That's a bad idea.
-			ElseIf ($global:CSAppPoolSvc -eq "LocalSystem" ) 
+			ElseIf ($ServiceAppPoolType -eq "LocalSystem" ) 
 			{ 
 				$result = $false
 				$msg =  "Local System is running both Coresight AppPools. Use a custom domain account instead."
@@ -332,7 +332,7 @@ PROCESS
 			Else 
 			{
 				$result = $true
-				$msg =  $global:CSAppPoolSvc + " is running the Coresight AppPools. Use a custom domain account instead."
+				$msg =  $ServiceAppPoolType + " is running the Coresight AppPools. Use a custom domain account instead."
 
 			}
 		}
@@ -606,6 +606,12 @@ PROCESS
 	try
 	{		
 
+		# Get the Identity Type of Coresight Service AppPool.
+		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType
+
+		# Get the User running Coresight Service AppPool.
+		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser
+
 		# Get the name of PI Coresight Web Site.
 		$CSwebSite = $global:CoresightConfiguration.WebSite
 
@@ -637,16 +643,15 @@ PROCESS
 		}
 
 		# Coresight is running under a custom domain account.
-		# Using the global variables $global:CSAppPoolSvc and $global:CSUserSvc to reduce the overhead.
-		If ( $global:CSAppPoolSvc -eq "SpecificUser") 
+		If ( $ServiceAppPoolType -eq "SpecificUser") 
 		{ 
-			$csappPool = $global:CSUserSvc 
+			$csappPool = $ServiceAppPoolUser 
 		} 
 
 		# Coresight is running under a machine account.
 		Else 
 		{ 
-			$csappPool = $global:CSAppPoolSvc
+			$csappPool = $ServiceAppPoolType
 
 			# Machine accounts don't need HTTP service class - it's already included in the HOST service class.
 			$serviceType = "host"
