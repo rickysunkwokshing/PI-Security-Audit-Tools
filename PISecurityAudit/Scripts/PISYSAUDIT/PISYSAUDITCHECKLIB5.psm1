@@ -80,6 +80,22 @@ Gathers global data for all Coresight checks.
 Several checks reuse information.  This command puts the configuration information
 in a global object to reduce the number of remote calls, improving performance and 
 simplifying validation logic.
+
+Information included in global configuration:
+	Version            - application version
+	Hostname           - web server hostname
+	MachineDomain      - web server machine domain
+	WebSite            - IIS site hosting application
+	Bindings           - bindings on hosting site
+	ServiceAppPoolType - type of user running the service app app pool
+	AdminAppPoolType   - type of user running the admin app app pool
+	ServiceAppPoolUser - user running the service app app pool
+	AdminAppPoolUser   - user running the admin app app pool
+	BasicAuthEnabled   - boolean indicating if site is using basic
+	UsingHTTPS         - boolean indicating if site is using https
+	sslFlagsSite       - SSL setting at the site level
+	sslFlagsApp        - SSL setting at the site app
+
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -746,7 +762,9 @@ PROCESS
 	
 	try
 	{		
-		# Enter routine.			
+		# Enter routine.
+		# Use information from $global:CoresightConfiguration whenever possible to 
+		# focus on validation simplify logic. 		
 	}
 	catch
 	{
