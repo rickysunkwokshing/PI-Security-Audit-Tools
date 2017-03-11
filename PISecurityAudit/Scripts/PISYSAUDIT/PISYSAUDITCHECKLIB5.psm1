@@ -304,7 +304,6 @@ PROCESS
 		# Both Coresight AppPools must run under the same identity.
 		If ( $ServiceAppPoolType -eq $AdminAppPoolType -and $ServiceAppPoolUser -eq $AdminAppPoolUser ) 
 		{ 
-
 			# If a custom account is used, we need to distinguish between a local and domain account.
 			If ( $ServiceAppPoolType -eq "SpecificUser") 
 			{
@@ -314,29 +313,19 @@ PROCESS
 					$result = $false
 					$msg =  "Local User is running Coresight AppPools. Please use a custom domain account."
 				}
-
-				# At this point, it's either a domain account or local account using "HOSTNAME\user" format.
-				Else 
+				Else # At this point, it's either a domain account or local account using "HOSTNAME\user" format. 
 				{
-
-					# Get the hostname from registry.
-					$hostname = $global:CoresightConfiguration.Hostname
-					
-					# Get position of \ within the AppPool identity string.
-					$position = $ServiceAppPoolUser.IndexOf("\")
-					
-					# Remove the \username part from the AppPool identity string.
-					$LsplitName = $ServiceAppPoolUser.Substring(0, $position)
+					$hostname = $global:CoresightConfiguration.Hostname # Web Server Hostname
+					# Extract the domain part from the AppPool identity string.
+					$ServiceAppPoolUserDomain = $ServiceAppPoolUser.Split("\")[0]
 
 					# Detect local user.
-					If ($hostname -eq $LsplitName )
+					If ($hostname -eq $ServiceAppPoolUserDomain)
 					{
 						$result = $false
 						$msg =  "Local User is running Coresight AppPools. Please use a custom domain account."
 					}
-
-					# A custom domain account is used.
-					Else 
+					Else # A custom domain account is used. 
 					{
 						$result = $true
 						$msg =  "A custom domain account is running both Coresight AppPools"
@@ -344,30 +333,23 @@ PROCESS
 				}
 
 			}
-			# LocalSystem is running the Coresight AppPools. That's a bad idea.
-			ElseIf ($ServiceAppPoolType -eq "LocalSystem" ) 
+			ElseIf ($ServiceAppPoolType -eq "LocalSystem" ) # LocalSystem is running the Coresight AppPools. That's a bad idea.
 			{ 
 				$result = $false
 				$msg =  "Local System is running both Coresight AppPools. Use a custom domain account instead."
 			}
-			# The only other options are: LocalService, NetworkService and AppPoolIdentity.
-			# Let's keep it at Pass for now, but recommend using a custom domain account.
-			Else 
+			Else # The only other options are: LocalService, NetworkService and AppPoolIdentity.  Pass and recommend domain account.
 			{
 				$result = $true
 				$msg =  $ServiceAppPoolType + " is running the Coresight AppPools. Use a custom domain account instead."
 
 			}
 		}
-
-		# For technical reasons, both Coresight AppPools must run under the same identity.
-		Else
+		Else # For technical reasons, both Coresight AppPools must run under the same identity.
 		{
 			$result = $false
 			$msg = "Both Coresight AppPools must run under the same identity."
 		}
-
-
 	}
 	catch
 	{
@@ -430,68 +412,40 @@ PROCESS
 	$severity = "Unknown"
 	try
 	{	
-		# Get the name of PI Coresight Web Site.
-		$CSwebSite = $global:CoresightConfiguration.WebSite
-
-		# Get Coresight Web Site bindings.
-		$WebBindings = $global:CoresightConfiguration.Bindings
-
-		# Check if HTTPS binding is enabled.
-		$httpsBindingConfigured = $global:CoresightConfiguration.UsingHTTPS
+		$CSwebSite = $global:CoresightConfiguration.WebSite # Web Site name
+		$WebBindings = $global:CoresightConfiguration.Bindings # Web Site bindings
+		$httpsBindingConfigured = $global:CoresightConfiguration.UsingHTTPS # Check if HTTPS binding is enabled.
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
 		If ($httpsBindingConfigured = $false) 
 		{ 
-			# Test fails.
+			# Test fails, but how epic is the fail?
 			$result = $false
 
-			# But how epic is the fail?
-
-			# Get full path to Coresight application.
-			$CSwebSiteAndName = $CSwebSite.ToString() + "/Coresight"
-
-			# Check if Basic Authentication is enabled.
-			$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled
-
+			$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled # Check if Basic Authentication is enabled.
 			# Basic Authentication is disabled.
 			If ($basicAuth.Value -eq $False) 
 			{ 
 				$severity = "Moderate" 
 				$msg = "HTTPS binding is not enabled."
 			} 
-
-			# Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
-			Else 
+			Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 			{ 
 				$severity = "Severe"
 				$msg = "Basic Authentication is enabled, but HTTPS binding is not enabled. User credentials sent over the wire are not encrypted!"
 			}
 		} 
-
-		# HTTPS binding is enabled.
-		Else 
+		Else # HTTPS binding is enabled.
 		{ 
-			# Web Site level:
-			# Check SSL configuration.
-			$SSLCheck_WebSite = $global:CoresightConfiguration.sslFlagsSite
-
-
-			# Web App level:
-			# Get full path to Coresight application.
-			$CSwebSiteAndName = $CSwebSite.ToString() + "/Coresight"
-
-			$SSLCheck_WebApp = $global:CoresightConfiguration.sslFlagsApp
+			$SSLCheck_WebSite = $global:CoresightConfiguration.sslFlagsSite # SSL setting at Web Site level
+			$SSLCheck_WebApp = $global:CoresightConfiguration.sslFlagsApp # SSL setting at Web App level
 
 			# If either the Web Site OR Web App allows only connections with SSL, it's OK.
 			If ($SSLCheck_WebSite.ToString() -eq "Ssl" -or $SSLCheck_WebApp.ToString() -eq "Ssl") 
 			{ 
 				# SSL is correctly configured. Let's check whether the SSL certificate is issued by a CA.
-
-				# Get Domain info.
-				$MachineDomain = $global:CoresightConfiguration.MachineDomain
-
-				# Get Hostname.
-				$hostname = $global:CoresightConfiguration.Hostname
+				$MachineDomain = $global:CoresightConfiguration.MachineDomain # Web Server Machine Domain
+				$hostname = $global:CoresightConfiguration.Hostname # Web Server Hostname.
 
 				# Build FQDN using hostname and domain strings.
 				$fqdn = $hostname + "." + $machineDomain
@@ -502,63 +456,46 @@ PROCESS
 				# Go through all bindings.
 				foreach ($match in $matches) {
 
+					$port = $($match.Groups[1].Captures[0].Value)
 					# Find SSL certificate for each binding of the PI Coresight Web Site.
-					$portCert = Get-PISysAudit_BoundCertificate -lc $LocalComputer -rcn $RemoteComputerName -Port $($match.Groups[1].Captures[0].Value) -DBGLevel $DBGLevel
+					$portCert = Get-PISysAudit_BoundCertificate -lc $LocalComputer -rcn $RemoteComputerName -Port $port -DBGLevel $DBGLevel
 					
 					# Get the Thumbprint from all SSL certificates that have been found.
 					$Thumbprint = $portCert[5].Split(":")[1].Trim()
 					
 					$sslissuer = Get-PISysAudit_CertificateProperty -lc $LocalComputer -rcn $RemoteComputerName -ct $Thumbprint -cp Issuer -DBGLevel $DBGLevel
 					
-					# Trim and only get the actual SSL issuer in a single string.
-					$pos = $sslissuer.IndexOf("=")
-					$sslissuerTrim = $sslissuer.Substring($pos+1).Trim()
-					
 					 # Certificate is self-signed (barring false positive).
-					 
-					# The Issuer is compared with the FQDN of the machine. This can lead to false positives (e.g. a leftover certificate from before the machine was renamed etc.)
-					 If ($sslissuerTrim.ToLower() -eq $fqdn.ToLower()) 
+					 # The Issuer is compared with the FQDN of the machine. This can lead to false positives (e.g. a leftover certificate from before the machine was renamed etc.)
+					 If ($sslissuer.ToLower() -eq $fqdn.ToLower()) 
 					 { 
 						 $result = $false 
 						 $severity = "Low"
 						 $msg = "The SSL certificate is self-signed."
 					 } 
-					 
-					 # Certificate is issued by a CA (barring false positive).
-					 Else 
-					 
+					 Else # Certificate is issued by a CA (barring false positive).
 					 { 
 						 $result = $true 
 						 $severity = "N/A"
 						 $msg = "SSL is configured properly."
 					 }
 
-					If ( $result ) # If at least one certificate is issued by a CA, pass.
-					 { 
-						 break 
-					 }
-					}
+					If ( $result ) { break } # If at least one certificate is issued by a CA, pass.
+				}
 			} 	
-
-			# HTTPS binding is enabled, but connections without SSL are allowed.
-			Else 		
+			Else # HTTPS binding is enabled, but connections without SSL are allowed.
 			{ 
-				# Test fails.
-				# But how epic is the fail?
+				# Test fails, but how epic is the fail?
 				$result = $false
 				
-				# Check if Basic Authentication is enabled.
-				$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled
-
+				$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled # Check if Basic Authentication is enabled.
 				# Basic Authentication is disabled. Not too bad.
 				If ($basicAuth.Value -eq $False) 
 				{ 
 					$severity = "Moderate" 
 					$msg = "Connections without SSL are allowed."
 				} 
-
-				# Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
-				Else 
+				Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 				{ 
 					$severity = "Severe" 
 					$msg = "Basic Authentication is enabled, but connections without SSL are allowed. User credentials sent over the wire may not be encrypted!"
@@ -627,18 +564,10 @@ PROCESS
 	
 	try
 	{		
-
-		# Get the Identity Type of Coresight Service AppPool.
-		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType
-
-		# Get the User running Coresight Service AppPool.
-		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser
-
-		# Get the name of PI Coresight Web Site.
-		$CSwebSite = $global:CoresightConfiguration.WebSite
-
-		# Get Coresight Web Site bindings.
-		$WebBindings = $global:CoresightConfiguration.Bindings
+		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType  # Service AppPool Identity Type 
+		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser  # Service AppPool User
+		$CSwebSite = $global:CoresightConfiguration.WebSite  # Web Site Name
+		$WebBindings = $global:CoresightConfiguration.Bindings # Web Site bindings.
 
 		# Coresight is using the http service class.
 		$serviceType = "http"
@@ -669,7 +598,6 @@ PROCESS
 		{ 
 			$csappPool = $ServiceAppPoolUser 
 		} 
-
 		# Coresight is running under a machine account.
 		Else 
 		{ 

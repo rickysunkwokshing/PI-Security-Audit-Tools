@@ -2663,6 +2663,9 @@ PROCESS
 		else
 		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $CertificateThumbprint, $CertificateProperty }
 		
+		# Only return the value, otherwise every check will have to massage it
+		$value = $value.Split('=')[1].Trim()
+		
 		return $value
 	}
 	catch
