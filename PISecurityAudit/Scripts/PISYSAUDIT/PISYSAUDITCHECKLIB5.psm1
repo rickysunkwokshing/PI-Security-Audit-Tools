@@ -98,34 +98,35 @@ param(
 BEGIN {}
 PROCESS
 {
+	$fn = GetFunctionName
+
 	# Reset global config object.
 	$global:CoresightConfiguration = $null
-	$productName = 'Coresight'
-	# Get the name of PI Coresight Web Site.
-	$regKeyPath = "HKLM:\Software\PISystem\" + $productName
-	$attribute = "WebSite"
-	$webSite = Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -rkp $regKeyPath -a $attribute -DBGLevel $DBGLevel
-
+	
 	$scriptBlock = {
-			param([string]$Site, [string]$ProductName)
-			
+			$ProductName = 'Coresight'
 			Import-Module WebAdministration
 			
+			# Registry keys
 			$Version = Get-ItemProperty -Path "HKLM:\Software\PISystem\Coresight" -Name "CurrentVersion" | Select-Object -ExpandProperty "CurrentVersion"
-			$MachineDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "ComputerName"
+			$MachineDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
 			$Hostname = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
+			$Site = Get-ItemProperty -Path $("HKLM:\Software\PISystem\" + $ProductName) -Name "WebSite" | Select-Object -ExpandProperty "WebSite"
 			
+			# IIS Configuration
 			$Bindings = Get-WebBinding -Name $Site
 			$UsingHTTPS = $Bindings.protocol -contains "https"
 			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
 			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/Coresight') -Filter system.webServer/security/access -Name "sslFlags"
 			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site + '/Coresight') | select-object Value	
-
+			
+			# App Pool Info 
 			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.identitytype
 			$AdminAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'adminapppool') -Name processmodel.identitytype
 			$ServiceAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.username.value
 			$AdminAppPoolUser = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'adminapppool') -Name processmodel.username.value
 			
+			# Construct a custom object to store the config information
 			$Configuration = New-Object PSCustomObject
 			$Configuration | Add-Member -MemberType NoteProperty -Name Version -Value $Version
 			$Configuration | Add-Member -MemberType NoteProperty -Name Hostname -Value $Hostname
@@ -143,11 +144,20 @@ PROCESS
 			
 			return $Configuration
 		}
-
-	if($LocalComputer)
-	{ $global:CoresightConfiguration = & $scriptBlock -Site $webSite -ProductName $productName }
-	else
-	{ $global:CoresightConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $webSite, $productName }
+	try
+	{
+		if($LocalComputer)
+		{ $global:CoresightConfiguration = & $scriptBlock }
+		else
+		{ $global:CoresightConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the retrieval of the Global Coresight configuration."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
 }
 END {}	
 
