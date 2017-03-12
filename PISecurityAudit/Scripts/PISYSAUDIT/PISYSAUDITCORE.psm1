@@ -982,33 +982,18 @@ PROCESS
 	$value = $false
 	try
 	{
-		$query = 'Test-Path IIS:\'
-		$scriptBlock = [scriptblock]::create( $query )
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet
-		if($LocalComputer)		
-		{						
-			
-			# Import the WebAdministration module
-			Import-Module -Name "WebAdministration"		
-			
-			# Execute the command locally	
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
-		else
-		{	
-					
-			# Establishing a new PS session on a remote computer		
-			$PSSession = New-PSSession -ComputerName $RemoteComputerName
+		# Sometimes the module is imported and the IIS drive is inaccessible
+		$scriptBlock = {
+				Import-Module -Name "WebAdministration"	
+				$value = Test-Path IIS:\
+				return $value
+			}
 
-			# Importing WebAdministration module within the PS session
-			Invoke-Command -Session $PSSession -ScriptBlock {Import-Module WebAdministration}
-			
-			# Execute the command within a remote PS session
-			$value = Invoke-Command -Session $PSSession -ScriptBlock $scriptBlock
-			Remove-PSSession -ComputerName $RemoteComputerName
-		}
-	
-		# Return the value found.
+		if($LocalComputer)		
+		{ $value = & $scriptBlock }
+		else
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+
 		return $value		
 	}
 	catch
@@ -1675,7 +1660,22 @@ param(
 							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
 			return
 		}
-		
+
+		try
+		{
+			Get-PISysAudit_GlobalPICoresightConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+		}
+		catch
+		{
+			# Return the error message.
+			$msgTemplate = "An error occurred while accessing the global configuration of PI Coresight on {0}"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+			return
+		}
+
 		# Get the list of functions to execute.
 		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary5 -lvl $AuditLevelInt
 		# There is nothing to execute.
@@ -2123,30 +2123,25 @@ PROCESS
 	
 	try
 	{
+		$scriptBlock = {
+				param([string]$Variable) 
+				Get-ChildItem -Path $('Env:' + $Variable) | Select-Object -ExpandProperty Value
+			}
 		# Execute the GetEnvironmentVariable method locally or remotely via the Invoke-Command cmdlet.
-		# Always use the Machine context to write the variable.
 		if($LocalComputer)
 		{
-			$value = [Environment]::GetEnvironmentVariable($VariableName, $Target)
+			$value = & $scriptBlock -Variable $VariableName
 		}
 		else
 		{			
-			$scriptBlockCmd = [string]::Format("[Environment]::GetEnvironmentVariable(`"{0}`", `"{1}`")", $VariableName, $Target)
-			
-			# Verbose if debug level is 2+
-			$msgTemplate = "Script block to execute against {0} machine is {1}"
-			$msg = [string]::Format($msgTemplate, $RemoteComputerName, $scriptBlockCmd)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel	
-			
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock			
-			
-			# Verbose if debug level is 2+
-			$msgTemplate = "Value returned is {0}"
-			$msg = [string]::Format($msgTemplate, $value)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel				
+			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock	-ArgumentList $VariableName						
 		}
 		
+		# Verbose if debug level is 2+
+		$msgTemplate = "Value returned is {0}"
+		$msg = [string]::Format($msgTemplate, $value)
+		Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel
+
 		# Return the value found.
 		return $value
 	}	
@@ -2208,19 +2203,16 @@ PROCESS
 	
 	try
 	{
-		$scriptBlockCmdTemplate = "(Get-ItemProperty -Path `"{0}`" -Name `"{1}`").{1}"
-		$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $RegKeyPath, $Attribute)
-		$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet.
+		$scriptBlock = { 
+				param([string]$Path, [string]$Name) 
+				$Value = Get-ItemProperty -Path $Path -Name $Name | Select-Object -ExpandProperty $Name 
+				return $Value
+			}
+
 		if($LocalComputer)
-		{						
-			# To only obtain the property of the registry key, it is easier to use a dynamic script.			
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
+		{ $value = & $scriptBlock -Path $RegKeyPath -Name $Attribute }
 		else
-		{			
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $RegKeyPath, $Attribute }
 	
 		# Return the value found.
 		return $value		
@@ -2234,93 +2226,6 @@ PROCESS
 		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
 		else
 		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message, $RemoteComputerName) }
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
-		return $null
-	}
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
-
-function Get-PISysAudit_IISproperties
-{
-<#
-.SYNOPSIS
-(Core functionality) Enables use of the WebAdministration module.
-.DESCRIPTION
-Get IIS: properties.
-#>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("qry")]
-		[string]
-		$query,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("lc")]
-		[boolean]
-		$LocalComputer = $true,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("rcn")]
-		[string]
-		$RemoteComputerName = "",
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)		
-BEGIN {}
-PROCESS
-{			
-	$fn = GetFunctionName
-	
-	try
-	{
-		# This approach works, but can be optimized
-
-
-		# Get the query string and create a scriptblock
-		$scriptBlock = [scriptblock]::create( $query )
-
-		# Execute the Get-ItemProperty cmdlet method locally or remotely via the Invoke-Command cmdlet
-		if($LocalComputer)		
-		{						
-			
-			# Import the WebAdministration module
-			Import-Module -Name "WebAdministration"		
-			
-			# Execute the command locally	
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
-		else
-		{	
-					
-			# Establishing a new PS session on a remote computer		
-			$PSSession = New-PSSession -ComputerName $RemoteComputerName
-
-			# Importing WebAdministration module within the PS session
-			Invoke-Command -Session $PSSession -ScriptBlock {Import-Module WebAdministration}
-			
-			# Execute the command within a remote PS session
-			$value = Invoke-Command -Session $PSSession -ScriptBlock $scriptBlock
-			Remove-PSSession -ComputerName $RemoteComputerName
-		}
-	
-		# Return the value found.
-		return $value		
-	}
-	catch
-	{
-		# Return the error message.
-		$msgTemplate1 = "A problem occurred during the reading of IIS Property: {0} from local machine."
-		$msgTemplate2 = "A problem occurred during the reading of IIS Property: {0} from {1} machine."
-		if($LocalComputer)
-		{ $msg = [string]::Format($msgTemplate1, $_.Exception.Message) }
-		else
-		{ $msg = [string]::Format($msgTemplate2, $_.Exception.Message) }
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return $null
 	}
@@ -2366,20 +2271,16 @@ PROCESS
 	
 	try
 	{
-		# To only obtain the property of the registry key, it is easier to use a dynamic script.			
-		$scriptBlockCmdTemplate = "`$(Test-Path `"{0}`")"
-		$scriptBlockCmd = [string]::Format($scriptBlockCmdTemplate, $RegKeyPath)
-		$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
+		$scriptBlock = {
+				param([string]$Path)
+				return $(Test-Path -Path $Path)
+			}
 
 		# Execute the Test-Path cmdlet method locally or remotely via the Invoke-Command cmdlet.
 		if($LocalComputer)
-		{						
-			$value = Invoke-Command -ScriptBlock $scriptBlock			
-		}
+		{ $value = & $scriptBlock -Path $RegKeyPath }
 		else
-		{			
-			$value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-		}
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $RegKeyPath }
 	
 		# Return the value found.
 		return $value		
@@ -2647,6 +2548,142 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CertificateProperty
+{
+<#
+.SYNOPSIS
+(Core functionality) Get a property of a certificate on a given computer.
+.DESCRIPTION
+Get a property of a certificate on a given computer.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("ct")]
+		[string]
+		$CertificateThumbprint,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("cp")]
+		[ValidateSet("Issuer")]
+		[string]
+		$CertificateProperty,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		$scriptBlock = { 
+			param([string]$Thumbprint, [string]$Property)
+			Get-ChildItem -Path $('Cert:\LocalMachine\My\' + $Thumbprint) | Format-List -Property $Property | Out-String 
+		}
+		
+		if($LocalComputer)
+		{ $value = & $scriptBlock -Thumbprint $CertificateThumbprint -Property $CertificateProperty }
+		else
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $CertificateThumbprint, $CertificateProperty }
+		
+		# Only return the value, otherwise every check will have to massage it
+		$value = $value.Split('=')[1].Trim()
+		
+		return $value
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Accessing certificate properties failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_BoundCertificate
+{
+<#
+.SYNOPSIS
+(Core functionality) Determine what certificate is bould to a particular IP and Port.
+.DESCRIPTION
+Determine what certificate is bould to a particular IP and Port.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pt")]
+		[string]
+		$Port,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("ip")]
+		[string]
+		$IPAddress="0.0.0.0",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		$scriptBlock = { 
+			param([string]$IPPort)
+			netsh http show sslcert ipport=$($IPPort)
+		}
+
+		$IPPort = $IPAddress + ':' + $Port
+		
+		if($LocalComputer)
+		{ $value = & $scriptBlock -IPPort $IPPort }
+		else
+		{ $value = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $IPPort }
+		
+		return $value
+	}
+	catch
+	{
+		
+		# Return the error message.
+		Write-PISysAudit_LogMessage "Accessing certificate properties failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_GroupMembers
 {
 <#
@@ -2775,28 +2812,29 @@ PROCESS
 	
 	try
 	{				
+		# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
+		$mainNodeKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
+		# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
+		$wow6432NodeKey = 'HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
+		$scriptBlock = { 
+			param([string]$RegKey) 
+			if($RegKey -like 'Wow6432') { $Action = 'SilentlyContinue' }
+			else { $Action = 'Continue' }
+			Get-ChildItem $RegKey -ErrorAction $Action | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") } 
+		}
+		
 		if($LocalComputer)
 		{
-			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
-			$unsortedAndUnfilteredResult = Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
-			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
-			$wow6432NodeResult = Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
-			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
-			return $result
+			$unsortedAndUnfilteredResult = & $scriptBlock -RegKey $mainNodeKey
+			$wow6432NodeResult = & $scriptBlock -RegKey $wow6432NodeKey
 		}
-		else # Use PS Remoting script blocks
+		else
 		{	
-			# Retrieve installed 64-bit programs (or all programs on 32-bit machines)
-			$scriptBlockCmd = "Get-ChildItem HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
-			$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
-			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock
-			# If it exists, also get 32-bit programs from the corresponding Wow6432Node keys
-			$scriptBlockCmd2 = "Get-ChildItem HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty `$_.PsPath } | Where-Object { `$_.Displayname -and (`$_.Displayname -match `".*`") }"
-			$scriptBlock2 = [scriptblock]::create( $scriptBlockCmd2 )	
-			$wow6432NodeResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock2					
-			$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
-			return $result			
+			$unsortedAndUnfilteredResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $mainNodeKey
+			$wow6432NodeResult = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $wow6432NodeKey
 		}	
+		$result = $unsortedAndUnfilteredResult + $wow6432NodeResult | Sort-Object Displayname | Select-Object DisplayName, Publisher, DisplayVersion, InstallDate
+		return $result
 	}
 	catch
 	{
@@ -3005,12 +3043,10 @@ PROCESS
 	
 	try
 	{									
-		$scriptBlockCmd = " if(`$PSVersionTable.PSVersion.Major -ge 3) [Get-AppLockerPolicy -Effective -XML] else [`$null] "
-		$scriptBlockCmd = ($scriptBlockCmd.Replace("[", "{")).Replace("]", "}")	
-		$scriptBlock = [scriptblock]::create( $scriptBlockCmd )
+		$scriptBlock = { if($PSVersionTable.PSVersion.Major -ge 3) { Get-AppLockerPolicy -Effective -XML } else { $null } }
 		if($LocalComputer)
 		{			                    			
-			$appLockerPolicy = Invoke-Command -ScriptBlock $scriptBlock
+			$appLockerPolicy = & $scriptBlock
 		}
 		else
 		{                            				
@@ -4946,6 +4982,8 @@ Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceProperty
 Export-ModuleMember Get-PISysAudit_AccountProperty
+Export-ModuleMember Get-PISysAudit_CertificateProperty
+Export-ModuleMember Get-PISysAudit_BoundCertificate
 Export-ModuleMember Get-PISysAudit_GroupMembers
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
@@ -4960,7 +4998,6 @@ Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
-Export-ModuleMember Get-PISysAudit_IISproperties
 Export-ModuleMember New-PISysAuditObject
 Export-ModuleMember New-PISysAuditError
 Export-ModuleMember New-PISysAudit_PasswordOnDisk
