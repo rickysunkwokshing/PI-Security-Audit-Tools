@@ -165,8 +165,19 @@ param(
 	
 	try
 	{
-		$windowsPrinciple = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-		return $windowsPrinciple.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)         
+		if($ExecutionContext.SessionState.LanguageMode -eq "ConstrainedLanguage")
+		{
+			# sfc utility requires admin to run on all supported OSes
+			# when run elevated, it will return the list of arguments
+			# if not run elevated, it will return a message stating 
+			# the user must be admin.
+			return ($(sfc /? | Out-String) -like '*/*')
+		}
+		else
+		{
+			$windowsPrinciple = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
+			return $windowsPrinciple.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+		}         
 	}
 	catch
 	{
@@ -1163,19 +1174,24 @@ param(
 			return
 		}
 
-		# Verify that the PI Data Archive is accessible over port 5450, if not, checks will not complete
-		try
+		# Only core types supported in constrained language mode. 5450 check is not
+		# essential since the powershell tools test for successful connection.
+		if($ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage')
 		{
-			$testConnection = New-Object net.sockets.tcpclient
-			$testConnection.Connect($ComputerParams.ComputerName, 5450)
-		}
-		catch
-		{
-			# Return the error message.
-			$msgTemplate = "The PI Data Archive {0} is not accessible over port 5450"
-			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-			return
+			# Verify that the PI Data Archive is accessible over port 5450, if not, checks will not complete
+			try
+			{
+				$testConnection = New-Object net.sockets.tcpclient
+				$testConnection.Connect($ComputerParams.ComputerName, 5450)
+			}
+			catch
+			{
+				# Return the error message.
+				$msgTemplate = "The PI Data Archive {0} is not accessible over port 5450"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+				return
+			}
 		}
 
 		# Check for availability of PowerShell Tools for the PI System
