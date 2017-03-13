@@ -165,8 +165,19 @@ param(
 	
 	try
 	{
-		$windowsPrinciple = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-		return $windowsPrinciple.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)         
+		if($ExecutionContext.SessionState.LanguageMode -eq "ConstrainedLanguage")
+		{
+			# sfc utility requires admin to run on all supported OSes
+			# when run elevated, it will return the list of arguments
+			# if not run elevated, it will return a message stating 
+			# the user must be admin.
+			return ($(sfc /? | Out-String) -like '*/*')
+		}
+		else
+		{
+			$windowsPrinciple = new-object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
+			return $windowsPrinciple.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+		}         
 	}
 	catch
 	{
@@ -1163,21 +1174,6 @@ param(
 			return
 		}
 
-		# Verify that the PI Data Archive is accessible over port 5450, if not, checks will not complete
-		try
-		{
-			$testConnection = New-Object net.sockets.tcpclient
-			$testConnection.Connect($ComputerParams.ComputerName, 5450)
-		}
-		catch
-		{
-			# Return the error message.
-			$msgTemplate = "The PI Data Archive {0} is not accessible over port 5450"
-			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-			return
-		}
-
 		# Check for availability of PowerShell Tools for the PI System
 		Test-PowerShellToolsForPISystemAvailable
 
@@ -1193,7 +1189,22 @@ param(
 				}
 				else
 				{
-					$msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user. Terminating PI Data Archive audit"
+					$portOpen = $true
+					if($PSVersionTable.PSVersion.Major -ge 4){
+						$portOpen = $(Test-NetConnection -ComputerName $ComputerParams.ComputerName -Port 5450 -InformationLevel Quiet -WarningAction SilentlyContinue)
+					}
+					elseif($PSVersionTable.PSVersion.Major -lt 4 -and $ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage'){
+						try
+						{
+							$testPort = new-object net.sockets.tcpclient
+							$testPort.Connect($ComputerParams.ComputerName, 5450)
+						}
+						catch { $portOpen = $false }
+					}
+					if($portOpen -eq $false)
+					{ $msgTemplate = "The PI Data Archive {0} is not accessible over port 5450" }
+					else
+					{ $msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user. Terminating PI Data Archive audit" }
 					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 					Write-PISysAudit_LogMessage $msg "Error" $fn
 					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
