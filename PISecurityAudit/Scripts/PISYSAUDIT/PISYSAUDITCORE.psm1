@@ -2882,6 +2882,11 @@ param(
 		[string]
 		$RemoteComputerName = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("tp")]
+		[ValidateSet('HotFix','Reliability','All')]
+		[string]
+		$Type = 'All',
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)
@@ -2892,11 +2897,24 @@ PROCESS
 	
 	try
 	{									
-		$className = "Win32_quickfixengineering"
 		$namespace = "root\CIMV2"
-		$filterExpression = ""
-		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		return $WMIObject | Sort-Object HotFixID | Select-Object HotFixID, InstalledOn						
+		$WMIObject = @()
+		if($Type -eq 'HotFix' -or $Type -eq 'All')
+		{
+			$className = "Win32_quickfixengineering"
+			$filterExpression = ""
+			$WMIObject += ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel `
+											| Select-Object @{LABEL = "Name";EXPRESSION={$_.HotFixID}}, InstalledOn
+		}
+		if($Type -eq 'Reliability' -or $Type -eq 'All')
+		{
+			$className = 'win32_reliabilityRecords'
+			$filterExpression = "sourcename='Microsoft-Windows-WindowsUpdateClient'"
+			$WMIObject += ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel `
+											| Select-Object @{LABEL = "Name";EXPRESSION={$_.ProductName}}, @{LABEL="InstalledOn";EXPRESSION={$_.ConvertToDateTime($_.TimeGenerated)}}
+		}
+			
+		return $WMIObject | Sort-Object Name					
 	}
 	catch
 	{
