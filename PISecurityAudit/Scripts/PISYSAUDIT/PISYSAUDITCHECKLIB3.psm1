@@ -996,29 +996,38 @@ PROCESS
 	$msg = ""
 	try
 	{
-		# Make regex object that supports matches across multiple lines, search for a match on afdiag output
-		$regex = New-Object Text.RegularExpressions.Regex "SQL Connection String.*\;\'", ('singleline', 'multiline')
-		$match = $regex.Match($global:AFDiagOutput)
-		if($match.Success)
+		if($null -eq $global:AFDiagOutput)
 		{
-			# Sanitize connection string by removing white space
-			$connectStr = $match.Value -replace '\s', ''
-			if($connectStr.Contains('IntegratedSecurity=SSPI'))
-			{
-				$result = $true
-				$msg = "AF Service connects to SQL using Windows Integrated Security."
-			}
-			else
-			{
-				$result = $false
-				$msg = "AF Service connectes to SQL using SQL Server login."
-			}
+			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$result = "N/A"
 		}
 		else
 		{
-			$result = "N/A"
-			$msg = "Unable to parse connection string from AFDiag output."
-			Write-PISysAudit_LogMessage $msg "Error" $fn 
+			# Make regex object that supports matches across multiple lines, search for a match on afdiag output
+			$regex = New-Object Text.RegularExpressions.Regex "SQL Connection String.*\;\'", ('singleline', 'multiline')
+			$match = $regex.Match($global:AFDiagOutput)
+			if($match.Success)
+			{
+				# Sanitize connection string by removing white space
+				$connectStr = $match.Value -replace '\s', ''
+				if($connectStr.Contains('IntegratedSecurity=SSPI'))
+				{
+					$result = $true
+					$msg = "AF Service connects to SQL using Windows Integrated Security."
+				}
+				else
+				{
+					$result = $false
+					$msg = "AF Service connectes to SQL using SQL Server login."
+				}
+			}
+			else
+			{
+				$result = "N/A"
+				$msg = "Unable to parse connection string from AFDiag output."
+				Write-PISysAudit_LogMessage $msg "Error" $fn 
+			}
 		}
 	}
 	catch
