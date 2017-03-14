@@ -765,63 +765,6 @@ param(
 	}
 }
 
-function GetFilteredListOfComputerParams
-{
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
-param(	
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("cpt")]
-		[System.Collections.HashTable]
-		$ComputerParamsTable,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)
-					
-	$fn = GetFunctionName
-	
-	try
-	{				
-		# Create a Hash table containing the unique computers to visit.
-		[System.Collections.HashTable]$validatedComputers = @{}
-		
-		# Process.
-		foreach($item in $ComputerParamsTable.GetEnumerator())
-		{			
-			# Get the current parameter
-			$computerParams = $item.Value
-			$addComputer = $false
-		
-			if($validatedComputers.Count -eq 0) { $addComputer = $true }
-			if($addComputer -eq $false)
-			{							
-				# Test if the computer is already part of the list,
-				# if not set the flag to true.
-				$item = $null
-				$item = $validatedComputers[$computerParams.ComputerName]
-				if($null -eq $item) { $addComputer = $true }				
-			}
-				
-			if($addComputer)
-			{				
-				# Maintain the list of already validated computer.			
-				$validatedComputers.Add($computerParams.ComputerName, $computerParams)
-			}					
-		}
-		
-		# Return the filtered list of computers.
-		return $validatedComputers
-	}
-	catch
-	{
-		# Return the error message.
-		$msg = "A problem has occurred during the generation of the filtered list of computers"						
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-		# Validation has failed.
-		return $null
-	}	
-}
-
 function ValidateWSMan
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
@@ -846,7 +789,7 @@ param(
 		{
 			# Get the current parameter
 			# Read the object within the System.Collections.DictionaryEntry
-			$computerParams = $item.Value
+			$computerParams = $item.Value | Where-Object AuditRoleType -EQ "Computer"
 			
 			# Test non-local computer to validate if WSMan is working.
 			if($computerParams.IsLocal)
@@ -4212,12 +4155,12 @@ PROCESS
 	# Validate if the server name refers to the local one	
 	if(($ComputerName -eq "") -or ($ComputerName.ToLower() -eq "localhost"))
 	{												
-		$resolvedComputerName = $localComputerName
+		$resolvedComputerName = $localComputerName.ToLower()
 		$localComputer = $true
 	}
 	elseif($localComputerName.ToLower() -eq $ComputerName.ToLower())
 	{									
-		$resolvedComputerName = $localComputerName			
+		$resolvedComputerName = $localComputerName.ToLower()
 		$localComputer = $true
 	}
 	else
@@ -4230,7 +4173,7 @@ PROCESS
 	# Create an object to manipulate that contains the directives on what to audit.
 	# ............................................................................................................	
 	# Create a custom object (PISysAuditComputerParams).
-	$tempObj = New-Object PSCustomObject					
+	$tempObj = New-Object PSCustomObject
 	
 	if(($PISystemComponentType.ToLower() -eq "piserver") -or `
 		($PISystemComponentType.ToLower() -eq "pidataarchive") -or `
@@ -4241,8 +4184,8 @@ PROCESS
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
 		# Use normalized type description as 'PIDataArchive'
-		$validatePISystemComponentType = "PIDataArchive"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PISystemComponentType" -Value $validatePISystemComponentType
+		$AuditRoleType = "PIDataArchive"
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
@@ -4257,8 +4200,8 @@ PROCESS
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
 		# Use normalized type description as 'PIAFServer'
-		$validatePISystemComponentType = "PIAFServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PISystemComponentType" -Value $validatePISystemComponentType
+		$AuditRoleType = "PIAFServer"
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
@@ -4271,8 +4214,8 @@ PROCESS
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
 		# Use normalized type description as 'SQLServer'
-		$validatePISystemComponentType = "SQLServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PISystemComponentType" -Value $validatePISystemComponentType
+		$AuditRoleType = "SQLServer"
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $InstanceName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $IntegratedSecurity	
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $SQLServerUserID
@@ -4327,8 +4270,8 @@ PROCESS
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
 		# Use normalized type description as 'PICoresightServer'
-		$validatePISystemComponentType = "PICoresightServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PISystemComponentType" -Value $validatePISystemComponentType
+		$AuditRoleType = "PICoresightServer"
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
 		# Nullify all of the MS SQL specific values
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
@@ -4336,17 +4279,29 @@ PROCESS
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
 	}
 
+	# Add hashtable item and computer audit if not already in params table
+	if(-not $ComputerParamsTable.Contains($resolvedComputerName))
+	{
+		# Build object for Computer audit
+		$computerObj = New-Object PSCustomObject
+		Add-Member -InputObject $computerObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
+		Add-Member -InputObject $computerObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer
+		Add-Member -InputObject $computerObj -MemberType NoteProperty -Name "AuditRoleType" -Value "Computer"
+
+		# Add computer audit as part of an array
+		$ComputerParamsTable[$resolvedComputerName] = @($computerObj)
+	}
+
 	# Skip the addition of the new parameter or not.
 	if($skipParam -eq $false)
-	{	
-		# Create an unique ID with the item ID and computer name.
-		$myKey = $ComputerName + "(" + $validatePISystemComponentType + ")"
-					
-		# Test if the key is already part of the list	
-		$item = $null	
-		$item = $ComputerParamsTable[$myKey]
-		if($null -eq $item) { $ComputerParamsTable.Add($myKey, $tempObj) }
-		else { $ComputerParamsTable[$myKey] = $tempObj }				
+	{
+		# Check for an existing check of this role on this machine
+		$existingCheck = $ComputerParamsTable[$resolvedComputerName] | Where-Object AuditRoleType -EQ $tempObj.AuditRoleType
+		
+		if($null -eq $existingCheck)
+		{
+			$ComputerParamsTable[$resolvedComputerName] += $tempObj
+		}
 	}
 		
 	# Return the computer parameters table.
@@ -4826,16 +4781,15 @@ PROCESS
 			$ComputerParamsTable = Import-PISysAuditComputerParamsFromCsv -cpf $ComputerParametersFile
 		}	
 	}
-	
-	# ............................................................................................................
-	# Create a filtered list of computers
-	# ............................................................................................................						
-	$uniqueComputerParamsTable = GetFilteredListOfComputerParams $ComputerParamsTable
 
 	# ............................................................................................................
 	# Get total count of audit role checks to be performed, prep messages for progress bar
 	# ............................................................................................................						
-	$totalCheckCount = $uniqueComputerParamsTable.Count + $ComputerParamsTable.Count
+	$totalCheckCount = 0
+	foreach($cpt in $ComputerParamsTable.GetEnumerator())
+	{
+		$totalCheckCount += $cpt.Value.Count
+	}
 	$currCheck = 1
 	$ActivityMsg = "Performing $AuditLevel PI System Security Audit"
 	$statusMsgTemplate = "Checking Role {0}/{1}..."
@@ -4844,43 +4798,34 @@ PROCESS
 	# ............................................................................................................
 	# Validate that WSMan or WS-Management (WinRM) service is running
 	# ............................................................................................................						
-	if((ValidateWSMan $uniqueComputerParamsTable -dbgl $DBGLevel) -eq $false) { return }		
-		
-	# ....................................................................................
-	# Perform Checks on computers
-	# ....................................................................................				
-	foreach($item in $uniqueComputerParamsTable.GetEnumerator())
-	{
-		$computerParams = $item.Value
-		$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
-		$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
-		Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
-		StartComputerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel
-		$currCheck++
-	}
+	if((ValidateWSMan $ComputerParamsTable -dbgl $DBGLevel) -eq $false) { return }		
 
 	# ....................................................................................
-	# Perform Checks on PI Data Archive, PI AF Server, SQL Server, etc.
+	# For each computer, perform checks for all roles
 	# ....................................................................................						
 	foreach($item in $ComputerParamsTable.GetEnumerator())
 	{
-		# Read the object within the System.Collections.DictionaryEntry
-		$computerParams = $item.Value
-		$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
-		$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
-		Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
+		foreach($role in $item.Value)
+		{
+			# Write status to progress bar
+			$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
+			$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
+			Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
 		
-		# Proceed based on component type.
-		if($computerParams.PISystemComponentType -eq "PIDataArchive")
-		{ StartPIDataArchiveAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel }		
-		elseif($computerParams.PISystemComponentType -eq "PIAFServer")
-		{ StartPIAFServerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel }
-		elseif($computerParams.PISystemComponentType -eq "SQLServer")
-		{ StartSQLServerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel }
-		elseif($computerParams.PISystemComponentType -eq "PICoresightServer")
-		{ StartPICoresightServerAudit $auditHashTable $computerParams -lvl $AuditLevelInt -dbgl $DBGLevel}
+			# Proceed based on component type.
+			if($role.AuditRoleType -eq "Computer")
+			{ StartComputerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+			elseif($role.AuditRoleType -eq "PIDataArchive")
+			{ StartPIDataArchiveAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }		
+			elseif($role.AuditRoleType -eq "PIAFServer")
+			{ StartPIAFServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+			elseif($role.AuditRoleType -eq "SQLServer")
+			{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+			elseif($role.AuditRoleType -eq "PICoresightServer")
+			{ StartPICoresightServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
 
-		$currCheck++
+			$currCheck++
+		}
 	}
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
 
