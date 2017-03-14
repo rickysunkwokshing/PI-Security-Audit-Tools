@@ -197,11 +197,8 @@ PROCESS
 	
 	try
 	{						
-		# Invoke the afdiag.exe command.		
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-		
 		# Verify that we can read AF Diag output.
-		if($null -eq $outputFileContent)
+		if($null -eq $global:AFDiagOutput)
 		{
 			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -234,7 +231,7 @@ PROCESS
 			# Read each line to find the one containing the token to replace.
 			# Check if the value is false = compliant, true it is not compliant
 			$result = $true
-			foreach($line in $outputFileContent)
+			foreach($line in $global:AFDiagOutput)
 			{								
 				if($line.ToLower().Contains("externaldatatablesallownonimpersonatedusers"))
 				{								
@@ -439,11 +436,8 @@ PROCESS
 	$msg = ""
 	try
 	{						
-		# Read the afdiag.exe command output.
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-
 		# Verify that we can read AF Diag output.
-		if($null -eq $outputFileContent)
+		if($null -eq $global:AFDiagOutput)
 		{
 			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -453,7 +447,7 @@ PROCESS
 		{
 			# Read each line to find the one containing the token to replace.
 			$result = $true
-			foreach($line in $outputFileContent)
+			foreach($line in $global:AFDiagOutput)
 			{								
 				if($line.ToLower().Contains("pluginverifylevel"))
 				{								
@@ -532,13 +526,10 @@ PROCESS
 	$msg = ""
 	try
 	{						
-		# Read the afdiag.exe command output.		
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-
 		# Read each line to find the one containing the token to replace.
 		$result = $true
 		
-		if($null -eq $outputFileContent)
+		if($null -eq $global:AFDiagOutput)
 		{
 			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -546,7 +537,7 @@ PROCESS
 		}
 		else
 		{
-			foreach($line in $outputFileContent)
+			foreach($line in $global:AFDiagOutput)
 			{								
 				# Locate FileExtensions parameter
 				if($line.ToLower().Contains("fileextensions"))
@@ -1004,13 +995,10 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{		
-		# Read the afdiag.exe command output
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper 'Read'
-		
+	{
 		# Make regex object that supports matches across multiple lines, search for a match on afdiag output
 		$regex = New-Object Text.RegularExpressions.Regex "SQL Connection String.*\;\'", ('singleline', 'multiline')
-		$match = $regex.Match($outputFileContent)
+		$match = $regex.Match($global:AFDiagOutput)
 		if($match.Success)
 		{
 			# Sanitize connection string by removing white space

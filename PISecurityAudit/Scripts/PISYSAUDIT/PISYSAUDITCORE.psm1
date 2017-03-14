@@ -445,6 +445,9 @@ param(
 }
 
 function ExecuteCommandLineUtility
+# Run a command line utility on the local or remote computer,
+# directing the output to a file. Read from the file, delete the
+# file, then delete the file and return the output.
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(									
@@ -467,12 +470,7 @@ param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("args")]
 		[string]
-		$ArgList,	
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
-		[ValidateSet("Read","Write","Delete","Default")]
-		[alias("oper")]
-		[string]
-		$Operation = "Default",	
+		$ArgList,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -484,35 +482,27 @@ param(
 	try
 	{	
 			$scriptBlock = { 
-					param([string]$Operation, [string]$UtilityExecutable, [string]$ArgumentList, [string]$FilePath) 
-					if($Operation -eq "Default" -or $Operation -eq "Write"){
-						if(Test-Path $FilePath) { Remove-Item $FilePath }
-						Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -RedirectStandardOutput $FilePath -Wait -NoNewWindow
-					}
-					if($Operation -eq "Default" -or $Operation -eq "Read")
-					{
-						$FileContent = Get-Content -Path $FilePath
-					}
-					if($Operation -eq "Default" -or $Operation -eq "Delete")
-					{
-						if(Test-Path $FilePath) { Remove-Item $FilePath }
-					} 
-					if($Operation -eq "Default" -or $Operation -eq "Read"){return $FileContent}
+				param([string]$UtilityExecutable, [string]$ArgumentList, [string]$FilePath) 
+					if(Test-Path $FilePath) { Remove-Item $FilePath }
+					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -RedirectStandardOutput $FilePath -Wait -NoNewWindow
+					$FileContent = Get-Content -Path $FilePath
+					if(Test-Path $FilePath) { Remove-Item $FilePath }
+					return $FileContent
 				}
 			# Verbose only if Debug Level is 2+
-			$msgTemplate = "Operation: {0}; Command: {1}; Target: {2}"
-			$msg = [string]::Format($msgTemplate, $Operation, $scriptBlock.ToString(), $RemoteComputerName)
+			$msgTemplate = "Command: {0}; Target: {1}"
+			$msg = [string]::Format($msgTemplate, $scriptBlock.ToString(), $RemoteComputerName)
 			Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2	
 
 			if($LocalComputer)
 			{
-				$outputFileContent = & $scriptBlock -Operation $Operation -UtilityExecutable $UtilityExec -ArgumentList $ArgList -FilePath $OutputFilePath
+				$outputFileContent = & $scriptBlock -UtilityExecutable $UtilityExec -ArgumentList $ArgList -FilePath $OutputFilePath
 			}
 			else
 			{
-				$outputFileContent = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $Operation, $UtilityExec, $ArgList, $OutputFilePath
+				$outputFileContent = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $UtilityExec, $ArgList, $OutputFilePath
 			}
-			if($Operation -eq "Default" -or $Operation -eq "Read"){return $outputFileContent}
+			return $outputFileContent
 	}
 	catch
 	{
@@ -1364,7 +1354,7 @@ param(
 				
 		# Prepare data required for multiple compliance checks
 
-		Invoke-PISysAudit_AFDiagCommand -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel -oper "Write"
+		$global:AFDiagOutput = Invoke-PISysAudit_AFDiagCommand -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
 										
 		# Proceed with all the compliance checks.
 		$i = 0
@@ -1392,10 +1382,6 @@ param(
 			# Call the function.
 			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
 		}
-
-		# Clean up data required for multiple compliance checks
-
-		Invoke-PISysAudit_AFDiagCommand -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel -oper "Delete"
 
 		# Set the progress.
 		if($ShowUI)
@@ -3233,12 +3219,7 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
-		$DBGLevel = 0,
-		[parameter(Mandatory=$true, ParameterSetName = "Default")]
-		[ValidateSet("Write","Read","Delete")]
-		[alias("oper")]
-		[string]
-		$Operation)
+		$DBGLevel = 0)
 BEGIN {}
 PROCESS		
 {						
@@ -3285,9 +3266,9 @@ PROCESS
 		# Set the output for the CLU.
         $outputFilePath = PathConcat -ParentPath $scriptTempFilesPath -ChildPath "afdiag_output.txt"
 		$outputFileContent = ExecuteCommandLineUtility -lc $LocalComputer -rcn $RemoteComputerName -UtilityExec $AFDiagExec `
-														-ArgList $argList -OutputFilePath $outputFilePath -Operation $Operation -DBGLevel $DBGLevel	
+														-ArgList $argList -OutputFilePath $outputFilePath -DBGLevel $DBGLevel	
 		
-		if($Operation -eq "Read"){ return $outputFileContent }			
+		return $outputFileContent		
 	}
 	catch
 	{
