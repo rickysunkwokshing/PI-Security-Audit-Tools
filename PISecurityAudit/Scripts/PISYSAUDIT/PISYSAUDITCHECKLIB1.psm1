@@ -70,6 +70,8 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1    # AU10005
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1    # AU10006
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1    # AU10007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdates"    1    # AU10008
+
 			
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -706,6 +708,103 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckSoftwareUpdates
+{
+<#  
+.SYNOPSIS
+AU10008 - Software Updates
+.DESCRIPTION
+VERIFICATION: Validates that the operating system and Microsoft applications 
+	receive updates <br/>
+COMPLIANCE: Ensure that the operating system and the Microsoft applications
+	have been updated in the last 60 days.
+	<a href="https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date">https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date</a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$cutoff = 60
+		$cutoffDate = (Get-Date).AddDays(-1*$cutoff).ToFileTimeUtc()
+		# Get most recent OS patch
+		$lastInstalledHotFix = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type HotFix `
+																| sort-object InstalledOn -Descending `
+																| select-object -ExpandProperty InstalledOn -First 1 
+		# Get most recent application patch
+		$lastInstalledReliability = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type Reliability `
+																| sort-object InstalledOn -Descending `
+																| select-object -ExpandProperty InstalledOn -First 1 
+		
+		function IsPatchLevelCurrent ($lastPatch, $cutoffDate)
+		{
+			if($null -eq $lastPatch) { return $false }
+			else
+			{ return $lastPatch.ToFileTimeUtc() -gt $cutoffDate }
+		}
+		
+		$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
+		$AreAppsPatched = IsPatchLevelCurrent $lastInstalledReliability $cutoffDate
+		
+		if($IsOSPatched -and $AreAppsPatched)
+		{
+			$result = $true
+			$msg = "Operating system and application updates have been applied to the server within the past $cutoff days."
+		}
+		else
+		{
+			$result = $false
+			if(!$IsOSPatched)
+			{$msg += "Operating system updates have NOT been applied in the last $cutoff days."}
+			if(!$AreAppsPatched)
+			{$msg += "Application updates have NOT been applied in the last $cutoff days."}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10008" `
+									-ain "Software Updates" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Severe"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -784,6 +883,7 @@ Export-ModuleMember Get-PISysAudit_CheckAppLockerEnabled
 Export-ModuleMember Get-PISysAudit_CheckUACEnabled
 Export-ModuleMember Get-PISysAudit_CheckManagedPI
 Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
+Export-ModuleMember Get-PISysAudit_CheckSoftwareUpdates
 # </Do not remove>
 
 # ........................................................................
