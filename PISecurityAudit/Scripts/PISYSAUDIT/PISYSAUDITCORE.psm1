@@ -1338,6 +1338,8 @@ param(
 					$msgTemplate = "Unable to access the PI AF Server {0} with PowerShell.  Check if there is a valid mapping for your user."
 					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI AF Server Audit" -fn $fn -msg $msg
 					return
 				}
 			}
@@ -4798,7 +4800,7 @@ PROCESS
 		# Initialize.
 		$ComputerParamsTable = @{}
 		
-		if($null -eq $ComputerParametersFile)
+		if($null -eq $ComputerParametersFile -or $ComputerParametersFile -eq "")
 		{
 			# This means an audit on the local computer is required only PI Data Archive and PI AF Server are checked by default.
 			# SQL Server checks ommitted by default as SQL Server will often require an instancename

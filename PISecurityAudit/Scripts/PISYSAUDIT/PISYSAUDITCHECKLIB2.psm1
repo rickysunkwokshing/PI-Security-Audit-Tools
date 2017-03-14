@@ -291,14 +291,14 @@ PROCESS
 			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
 			$result = $false	
 			$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
-			$Severity = "severe"
+			$Severity = "Severe"
 		}
 
 		if($noncompliantMappings){
 			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
 			$result = $false	
 			$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
-			$Severity = "severe"
+			$Severity = "Severe"
 		}
 
 		if($result -eq $true){
@@ -316,7 +316,7 @@ PROCESS
 			{
 					$result = $false 
 					$msg += "However, the piadmin user can still be assigned to a trust."
-					$Severity = "moderate"
+					$Severity = "Moderate"
 			}
 		}		
 	}
