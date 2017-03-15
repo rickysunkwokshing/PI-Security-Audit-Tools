@@ -771,9 +771,12 @@ function ValidateWSMan
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(	
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("vlc")]
+		[alias("cp")]		
+		$ComputerParams,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("at")]
 		[System.Collections.HashTable]
-		$ValidatedListOfComputers,
+		$AuditTable,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -782,48 +785,40 @@ param(
 	$fn = GetFunctionName
 	
 	try
-	{								
-		$problemCounter = 0
-		
-		# Process with the unique list.
-		foreach($item in $ValidatedListOfComputers.GetEnumerator())
-		{
-			# Get the current parameter
-			# Read the object within the System.Collections.DictionaryEntry
-			$computerParams = $item.Value | Where-Object AuditRoleType -EQ "Computer"
+	{
+		# Only need the 'Computer' role
+		$ComputerParams = $ComputerParams.Value | Where-Object AuditRoleType -EQ "Computer"
 			
-			# Test non-local computer to validate if WSMan is working.
-			if($computerParams.IsLocal)
-			{							
-				$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
-				$msg = [string]::Format($msgTemplate, $computerParams.ComputerName)
-				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
+		# Test non-local computer to validate if WSMan is working.
+		if($ComputerParams.IsLocal)
+		{							
+			$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
+		}
+		else
+		{								
+			$result = Test-WSMan -authentication default -ComputerName $ComputerParams.ComputerName -ErrorAction SilentlyContinue
+			if($null -eq $result)
+			{
+				$msgTemplate = "The server: {0} has a problem with WinRM communication"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+									-at $AuditTable -an 'Computer' -fn $fn -msg $msg
 			}
-			else
-			{								
-				$result = $null
-				$result = Test-WSMan -authentication default -ComputerName $computerParams.ComputerName
-				if($null -eq $result)
-				{
-					$problemCounter++
-					$msgTemplate = "The server: {0} has a problem with WinRM communication"
-					$msg = [string]::Format($msgTemplate, $computerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Error" $fn
-				}					
-			}
-		}						
+		}
 		
-		# At least a problem was found.
-		if($problemCounter -gt 0) { return $false }
-		
-		# Validation is a success.
-		return $true
+		if($result) { return $true }
+		else { return $false }
 	}
 	catch
 	{
 		# Return the error message.
 		$msg = "A problem has occurred during the validation with WSMan"						
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an 'Computer' -fn $fn -msg $msg
 		# Validation has failed.
 		return $false
 	}	
@@ -4805,38 +4800,42 @@ PROCESS
 	$currCheck = 1
 	$ActivityMsg = "Performing $AuditLevel PI System Security Audit"
 	$statusMsgTemplate = "Checking Role {0}/{1}..."
-	$statusMsgCompleted = "Completed"
-	
-	# ............................................................................................................
-	# Validate that WSMan or WS-Management (WinRM) service is running
-	# ............................................................................................................						
-	if((ValidateWSMan $ComputerParamsTable -dbgl $DBGLevel) -eq $false) { return }		
+	$statusMsgCompleted = "Completed"	
 
 	# ....................................................................................
 	# For each computer, perform checks for all roles
 	# ....................................................................................						
 	foreach($item in $ComputerParamsTable.GetEnumerator())
 	{
-		foreach($role in $item.Value)
+		# Run no checks if WSMan is not available
+		if((ValidateWSMan -cp $item -at $auditHashTable -dbgl $DBGLevel) -EQ $true)
 		{
-			# Write status to progress bar
-			$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
-			$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
-			Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
+			foreach($role in $item.Value)
+			{
+				# Write status to progress bar
+				$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
+				$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
+				Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
 		
-			# Proceed based on component type.
-			if($role.AuditRoleType -eq "Computer")
-			{ StartComputerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-			elseif($role.AuditRoleType -eq "PIDataArchive")
-			{ StartPIDataArchiveAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }		
-			elseif($role.AuditRoleType -eq "PIAFServer")
-			{ StartPIAFServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-			elseif($role.AuditRoleType -eq "SQLServer")
-			{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-			elseif($role.AuditRoleType -eq "PICoresightServer")
-			{ StartPICoresightServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
+				# Proceed based on component type.
+				if($role.AuditRoleType -eq "Computer")
+				{ StartComputerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "PIDataArchive")
+				{ StartPIDataArchiveAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }		
+				elseif($role.AuditRoleType -eq "PIAFServer")
+				{ StartPIAFServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "SQLServer")
+				{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "PICoresightServer")
+				{ StartPICoresightServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
 
-			$currCheck++
+				$currCheck++
+			}
+		}
+		else
+		{
+			# Skip progress bar ahead for these ckecks since WSman failed
+			$currCheck += $item.Value.Count
 		}
 	}
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
