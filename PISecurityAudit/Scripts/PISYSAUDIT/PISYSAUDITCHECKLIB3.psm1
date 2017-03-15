@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -42,21 +51,32 @@ function Get-PISysAudit_FunctionsFromLibrary3
 {
 <#  
 .SYNOPSIS
-Get functions from PI AF Server library.
+Get functions from PI AF Server library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the PI AF Server compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAFServiceConfiguredAccount", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPImpersonationModeForAFDataSets", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAFServicePrivileges", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPlugInVerifyLevel", 1)	
-	$listOfFunctions.Add("Get-PISysAudit_CheckFileExtensionWhitelist", 1)	
-	$listOfFunctions.Add("Get-PISysAudit_CheckAFServerVersion", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAFSPN", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAFServerAdminRight", 1)
-	# Return the list.
-	return $listOfFunctions
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServiceConfiguredAccount"    1 # AU30001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPImpersonationModeForAFDataSets" 1 # AU30002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServicePrivileges"           1 # AU30003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPlugInVerifyLevel"               1 # AU30004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFileExtensionWhitelist"          1 # AU30005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerVersion"                 1 # AU30006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFSPN"                           1 # AU30007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 # AU30009
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWorldIdentity"                 1 # AU30010
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWriteAccess"                   1 # AU30011
+
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
 function Get-PISysAudit_CheckPIAFServiceConfiguredAccount
@@ -177,11 +197,8 @@ PROCESS
 	
 	try
 	{						
-		# Invoke the afdiag.exe command.		
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-		
 		# Verify that we can read AF Diag output.
-		if($null -eq $outputFileContent)
+		if($null -eq $global:AFDiagOutput)
 		{
 			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -214,7 +231,7 @@ PROCESS
 			# Read each line to find the one containing the token to replace.
 			# Check if the value is false = compliant, true it is not compliant
 			$result = $true
-			foreach($line in $outputFileContent)
+			foreach($line in $global:AFDiagOutput)
 			{								
 				if($line.ToLower().Contains("externaldatatablesallownonimpersonatedusers"))
 				{								
@@ -293,71 +310,69 @@ PROCESS
 	$msg = ""
 	try
 	{										
-		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value
-		# Verify running elevated.
-		if(-not($IsElevated))
+		$ServiceName = 'afservice'
+		$ServiceAccount = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		# No need to check specific privileges if the service account is an admin.
+		$IsServiceAccountLocalAdmin = Get-PISysAudit_GroupMembers -GroupName "Administrators" -GroupDomain "local" -LocalComputer $false -RemoteComputerName $RemoteComputerName -CheckUser $ServiceAccount
+		if($ServiceAccount.ToLower() -eq $('nt service\' + $ServiceName))
 		{
-			$msg = "Elevation required to check process privilege.  Run Powershell as Administrator to complete these checks"
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
-			$result = "N/A"
+			$result = $true
+			$msg = "The service account is the default virtual account."
+		}
+		elseif($IsServiceAccountLocalAdmin)
+		{
+			$result = $false
+			$msg = "The service account is in the local Administrators group."
 		}
 		else
 		{
-			# Initialize objects.
-			$securityWeaknessCounter = 0	
-			$securityWeakness = $false
-			$privilegeFound = $false		
-		
-			# Get the service account.
-			$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -priv "All" -sn "AFService" -dbgl $DBGLevel					
-		
-			# Read each line to find granted privileges.		
-			foreach($line in $listOfPrivileges)
-			{											
-				# Reset.
-				$securityWeakness = $false						
-				$privilegeFound = $false			
-			
-				# Skip any line not starting with 'SE'
-				if($line.ToUpper().StartsWith("SE")) 
-				{								
-					# Validate that the tokens contains these privileges.
-					if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
-					if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
-					if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
-				
-					# Validate that the privilege is enabled, if yes a weakness was found.
-					if($privilegeFound -and ($line.ToUpper().Contains("ENABLED"))) { $securityWeakness = $true }
-				}							
-
-				# Increment the counter if a weakness has been discovered.
-				if($securityWeakness)
-				{
-					$securityWeaknessCounter++
-				
-					# Store the privilege found that might compromise security.
-					if($securityWeaknessCounter -eq 1)
-					{ $msg = $line.ToUpper() }
-					else
-					{ $msg = $msg + ", " + $line.ToUpper() }
-				}					
-			}
-		
-			# Check if the counter is 0 = compliant, 1 or more it is not compliant		
-			if($securityWeaknessCounter -gt 0)
+			$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value
+			# Verify running elevated.
+			if(-not($IsElevated))
 			{
-				$result = $false
-				if($securityWeaknessCounter -eq 1)
-				{ $msg = "The following privilege: " + $msg + " is enabled." }
-				else
-				{ $msg = "The following privileges: " + $msg + " are enabled." }
+				$msg = "Elevation required to check process privileges.  Run Powershell as Administrator to complete this check"
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				$result = "N/A"
 			}
-			else 
-			{ 
-				$result = $true 
-				$msg = "No weaknesses were detected."
+			else
+			{
+				# Initialize objects.
+				$securityWeaknessCounter = 0	
+				$securityWeakness = $false
+				$privilegeFound = $false		
+		
+				# Get the service account.
+				$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -an $ServiceAccount -dbgl $DBGLevel					
+				
+				# Read each line to find granted privileges.		
+				foreach($line in $listOfPrivileges)
+				{											
+					# Reset.					
+					$privilegeFound = $false			
+					
+					# Skip any line not starting with 'SE'
+					if($line.ToUpper().StartsWith("SE")) 
+					{								
+						# Validate that the tokens contains these privileges.
+						if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
+						if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
+						if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
+						if($privilegeFound){
+							$result = $false
+							$msg = $msg + ", " + $line.ToUpper()
+						}
+					}						
+				}	
+				if($result -eq $false)
+				{
+					$msg = "The account has the following privileges: " + $msg + "." 
+				}
+				else 
+				{ 
+					$msg = "No weaknesses were detected."
+				}
 			}
-		}
+		}	
 	}
 	catch
 	{
@@ -421,11 +436,8 @@ PROCESS
 	$msg = ""
 	try
 	{						
-		# Read the afdiag.exe command output.
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-
 		# Verify that we can read AF Diag output.
-		if($null -eq $outputFileContent)
+		if($null -eq $global:AFDiagOutput)
 		{
 			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -435,7 +447,7 @@ PROCESS
 		{
 			# Read each line to find the one containing the token to replace.
 			$result = $true
-			foreach($line in $outputFileContent)
+			foreach($line in $global:AFDiagOutput)
 			{								
 				if($line.ToLower().Contains("pluginverifylevel"))
 				{								
@@ -514,13 +526,10 @@ PROCESS
 	$msg = ""
 	try
 	{						
-		# Read the afdiag.exe command output.		
-		$outputFileContent = Invoke-PISysAudit_AFDiagCommand -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -oper "Read"
-
 		# Read each line to find the one containing the token to replace.
 		$result = $true
 		
-		if($null -eq $outputFileContent)
+		if($null -eq $global:AFDiagOutput)
 		{
 			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -528,7 +537,7 @@ PROCESS
 		}
 		else
 		{
-			foreach($line in $outputFileContent)
+			foreach($line in $global:AFDiagOutput)
 			{								
 				# Locate FileExtensions parameter
 				if($line.ToLower().Contains("fileextensions"))
@@ -634,35 +643,45 @@ PROCESS
 	$msg = ""
 	$installVersion = $null
 	try
-	{						
-		# Get install version via PowerShell
-		$installVersion = $global:AFServerConnection.ServerVersion
-		
-		# Perform logic on install version
-		if($null -ne $installVersion)
+	{
+		if($global:ArePowershellToolsAvailable)
 		{
-			$installVersionTokens = $installVersion.Split(".")
-			# Form an integer value with all the version tokens.
-			[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
-			$installVersionInt64 = [Convert]::ToInt64($temp)
-			if($installVersionInt64 -gt 2850000)
+			# Get install version via PowerShell
+			$installVersion = $global:AFServerConnection.ServerVersion
+		
+			# Perform logic on install version
+			if($null -ne $installVersion)
 			{
-				$result = $true
-				$msg = "Server version is compliant."
+				$installVersionTokens = $installVersion.Split(".")
+				# Form an integer value with all the version tokens.
+				[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
+				$installVersionInt64 = [Convert]::ToInt64($temp)
+				if($installVersionInt64 -gt 2850000)
+				{
+					$result = $true
+					$msg = "Server version is compliant."
+				}
+				else
+				{
+					$result = $false
+					$msg = "Server version is non-compliant: {0}."
+					$msg = [string]::Format($msg, $installVersion)
+				}		
 			}
 			else
 			{
-				$result = $false
-				$msg = "Server version is non-compliant: {0}."
-				$msg = [string]::Format($msg, $installVersion)
-			}		
+				$msg = "AF version not found.  Cannot continue processing the validation check"
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				$result = "N/A"
+			}
 		}
 		else
 		{
-			$msg = "AF version not found.  Cannot continue processing the validation check"
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			# OSIsoft.Powershell not available
 			$result = "N/A"
-		}	
+			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+		}
 	}
 	catch
 	{
@@ -805,95 +824,115 @@ PROCESS
 	$Severity = 'Unknown'
 	
 	try
-	{						
-		$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
-		# Get identities with Admin Right on the AF Server object
-		$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
-									| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
-									| Select-Object -ExpandProperty Identity
-		# Flag if more than one Identity is an AF super user 
-		$hasSingleIdentity = $false
-		If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
-
-		# Find all mappings to super user identities. 
-		$afAdminMappings = Get-AFSecurityMapping -AFServer $afserver `
-									| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
-									| Select-Object Name, SecurityIdentity, Account
-		# Flag if more than one mapping exists to the AF super user 
-		$hasSingleMapping = $false
-		If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
-
-		$endUserMappings = @{}
-		$osAdminMappings = @{}
-		$wellKnownMappings = @{}
-		ForEach($afAdminMapping in $afAdminMappings)
+	{
+		if($global:ArePowerShellToolsAvailable)
 		{
-			$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
+			$version = [int]($global:AFServerConnection.ServerVersion -replace '\.', '')
+			if($version -ge 2700000)
+			{
+				$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
+				# Get identities with Admin Right on the AF Server object
+				$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
+											| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
+											| Select-Object -ExpandProperty Identity
+				# Flag if more than one Identity is an AF super user 
+				$hasSingleIdentity = $false
+				If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
+
+				# Find all mappings to super user identities. 
+				$afAdminMappings = Get-AFSecurityMapping -AFServer $afserver `
+											| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
+											| Select-Object Name, SecurityIdentity, Account
+				# Flag if more than one mapping exists to the AF super user 
+				$hasSingleMapping = $false
+				If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
+
+				$endUserMappings = @{}
+				$osAdminMappings = @{}
+				$wellKnownMappings = @{}
+				ForEach($afAdminMapping in $afAdminMappings)
+				{
+					$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
 			
-			If($null -ne $accountType){
-				switch ($accountType)
-				{
-					'LowPrivileged' {
-										$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-										$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-									}
-					'Administrator' {
-										$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-										$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-									}
-					default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
+					If($null -ne $accountType){
+						switch ($accountType)
+						{
+							'LowPrivileged' {
+												$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+												$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+											}
+							'Administrator' {
+												$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+												$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+											}
+							default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
+						}
+					}
 				}
-			}
-		}
 
-		if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
-		{
-			if($hasSingleMapping) # Ideal case, a single compliant mapping
-			{
-				$result = $true
-				$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
-			}
-			else # One Identity but multiple mappings which may not be necessary
-			{
-				$result = $false
-				$Severity = 'Low'
-				if($hasSingleIdentity)
+				if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
 				{
-					$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
+					if($hasSingleMapping) # Ideal case, a single compliant mapping
+					{
+						$result = $true
+						$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
+					}
+					else # One Identity but multiple mappings which may not be necessary
+					{
+						$result = $false
+						$Severity = 'Low'
+						if($hasSingleIdentity)
+						{
+							$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
+						}
+						else # Multiple Identities should not have super user access
+						{
+							$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
+						}
+						foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
+					}	
 				}
-				else # Multiple Identities should not have super user access
+				else # Evaluate well known accounts for severity
 				{
-					$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
+					$result = $false
+					if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
+					{
+						$Severity = 'severe'
+						$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
+						$priorityMappings = $endUserMappings
+					}
+					else
+					{
+						$Severity = 'moderate'
+						if($osAdminMappings.Count -gt 0)
+						{
+							$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
+							$priorityMappings = $osAdminMappings
+						}
+						else
+						{
+							$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
+							$priorityMappings = $wellKnownMappings
+						}
+					}
+					foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
 				}
-				foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
-			}	
-		}
-		else # Evaluate well known accounts for severity
-		{
-			$result = $false
-			if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
-			{
-				$Severity = 'severe'
-				$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
-				$priorityMappings = $endUserMappings
+				$msg = $msg.Trim('|')
 			}
 			else
 			{
-				$Severity = 'moderate'
-				if($osAdminMappings.Count -gt 0)
-				{
-					$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
-					$priorityMappings = $osAdminMappings
-				}
-				else
-				{
-					$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
-					$priorityMappings = $wellKnownMappings
-				}
+				$result = "N/A"
+				$msg = "PI AF Server 2.7 or later is required for this check."
+				Write-PISysAudit_LogMessage $msg "Error" $fn
 			}
-			foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
 		}
-		$msg = $msg.Trim('|')
+		else
+		{
+			# OSIsoft.Powershell not available
+			$result = "N/A"
+			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+		}
 	}
 	catch
 	{
@@ -911,6 +950,390 @@ PROCESS
 										-Group1 "PI System" -Group2 "PI AF Server" `
 										-Severity $Severity
 										
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckAFConnectionString
+{
+<#  
+.SYNOPSIS
+AU30009 - AF Connection to SQL
+.DESCRIPTION
+VERIFICATION: AF Service connects to the SQL Server with Windows authentication. <br/>
+COMPLIANCE: Ensure that the AF Application service connects to the SQL Server with
+	Windows Authentication. Windows Authentication is the preferred method, see:
+	<a href="https://msdn.microsoft.com/en-us/library/ms144284.aspx">https://msdn.microsoft.com/en-us/library/ms144284.aspx</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{
+		if($null -eq $global:AFDiagOutput)
+		{
+			$msg = "AFDiag output not found.  Cannot continue processing the validation check"
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$result = "N/A"
+		}
+		else
+		{
+			# Make regex object that supports matches across multiple lines, search for a match on afdiag output
+			$regex = New-Object Text.RegularExpressions.Regex "SQL Connection String.*\;\'", ('singleline', 'multiline')
+			$match = $regex.Match($global:AFDiagOutput)
+			if($match.Success)
+			{
+				# Sanitize connection string by removing white space
+				$connectStr = $match.Value -replace '\s', ''
+				if($connectStr.Contains('IntegratedSecurity=SSPI'))
+				{
+					$result = $true
+					$msg = "AF Service connects to SQL using Windows Integrated Security."
+				}
+				else
+				{
+					$result = $false
+					$msg = "AF Service connectes to SQL using SQL Server login."
+				}
+			}
+			else
+			{
+				$result = "N/A"
+				$msg = "Unable to parse connection string from AFDiag output."
+				Write-PISysAudit_LogMessage $msg "Error" $fn 
+			}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30009" `
+										-ain "AF Connection to SQL" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckAFWorldIdentity
+{
+<#  
+.SYNOPSIS
+AU30010 - Restrict AF World Identity
+.DESCRIPTION
+VERIFICATION: Ensures that the World Identity has been disabled or restricted <br/>
+COMPLIANCE: For best practice, disable the World Identity on the AF Server. 
+	Alternatively, remove the mapping to the \Everyone group and re-map it to 
+	an appropriate group with only users who need access to PI AF.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		{
+			$con = $global:AFServerConnection
+			$version = [int]($con.ServerVersion -replace '\.', '')
+			if($version -ge 2700000)
+			{
+				$world = $con.SecurityIdentities | Where-Object Name -EQ 'World'
+				if($world)
+				{
+					if($world.IsEnabled)
+					{
+						# World identity exists and is enabled, check its mappings
+						$mappings = Get-AFSecurityMapping -AFServer $con
+						$worldMappings = $mappings | Where-Object { $_.SecurityIdentity.Name -eq 'World' }
+						# \Everyone = 'S-1-1-0'
+						$everyoneMapping = $worldMappings | Where-Object Account -eq 'S-1-1-0' 
+						if($everyoneMapping)
+						{
+							$result = $false
+							$msg = "World Identity is mapped to the Everyone group."
+						}
+						else
+						{
+							$result = $true
+							$msg = "World Identity is not mapped to the Everyone group."
+						}
+					}
+					else
+					{
+						$result = $true
+						$msg = "World Identity has been disabled."
+					}
+				}
+				else
+				{
+					# Check if any IDs were loaded, if they were then it is likely that
+					# World was deleted
+					if($con.SecurityIdentities)
+					{
+						$result = $true
+						$msg = "World Identity has been removed."
+					}
+					else
+					{
+						$result = "N/A"
+						$msg = "Failed to load any AF Identities."
+					}
+				}
+			}
+			else
+			{
+				$result = "N/A"
+				$msg = "PI AF Server 2.7 or later is required for this check."
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
+		}
+		else
+		{
+			$result = "N/A"
+			$msg = "Connection to AF Server using OSIsoft.Powershell is required."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30010" `
+										-ain "Restrict AF World" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckAFWriteAccess
+{
+<#  
+.SYNOPSIS
+AU30011 - Restrict Write Access
+.DESCRIPTION
+VERIFICATION: Write access to objects should be limited to power users. <br/>
+COMPLIANCE: Database level write access should not be granted to any well-known, 
+	end user groups. Similarly, write access to analyses should be limited. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		{
+			$con = $global:AFServerConnection
+
+			$version = [int]($con.ServerVersion -replace '\.', '')
+			if($version -ge 2700000)
+			{
+				# ............................................................................................................
+				# Compile list of identities with any write access to server or a database
+				# ............................................................................................................
+				$writeIdentities = @() 
+
+				# Server access
+				$serverAccess = Get-AFSecurity -AFObject $con
+				# Filter for IDs with access the mentions Write OR Admin OR All
+				$tempIDs = $serverAccess | Where-Object { $_.AllowAccess -eq 'True' -and $_.Rights -match 'Write|Admin|All'}
+				foreach($ID in $tempIDs)
+				{
+					if($writeIdentities -notcontains $ID.Identity) { $writeIdentities += $ID.Identity }
+				}
+
+				# Database access
+				$databases = $con.Databases
+				foreach($db in $databases)
+				{
+					$dbAccess = Get-AFSecurity -AFObject $db
+					$tempIDs = $dbAccess | Where-Object { $_.AllowAccess -eq 'True' -and $_.Rights -match 'Write|Admin|All'}
+					foreach($ID in $tempIDs)
+					{
+						if($writeIdentities -notcontains $ID.Identity) { $writeIdentities += $ID.Identity }
+					}
+				}
+
+				# ............................................................................................................
+				# Compile list of mappings that grant write access to well-known accounts
+				# ............................................................................................................
+				$badWriteMappings = @()
+				$writeMappings = $con.SecurityMappings | Where-Object { $_.SecurityIdentity -in $writeIdentities }
+				foreach($mapping in $writeMappings)
+				{
+					$knownType = Test-PISysAudit_PrincipalOrGroupType -SID $mapping.Account
+					if($knownType -eq 'LowPrivileged')
+					{
+						$badWriteMappings += $mapping
+					}
+				}
+
+				# ............................................................................................................
+				# Evaluate audit results based on list of bad mappings
+				# ............................................................................................................
+
+				if($badWriteMappings)
+				{
+					# Output message will report number of risky mappings and up to four accounts found.
+					# Sample: "2 risky write access AF mapping(s) found for: Everyone, OSI\Domain Users."
+					$result = $false
+					$msg = "$($badWriteMappings.Count) risky write access AF mapping(s) found for: "
+					$i = 0
+					foreach($map in $badWriteMappings)
+					{
+						$i++
+						$msg += $map.Name + ', '
+						if($i -eq 4)
+						{
+							# add number of unlisted, pad with two characters (to be removed)
+							$msg += "and $($badWriteMappings.Count - 4) others.  "
+						}
+					}
+					# Trim extra comma and space
+					$msg = $msg.Substring(0, $msg.Length-2) + '.'
+				}
+				else
+				{
+					if((-not $con.SecurityIdentities) -or (-not $con.SecurityMappings))
+					{
+						$result = "N/A"
+						$msg = "There was a problem reading AF Identities or Mappings."
+						Write-PISysAudit_LogMessage $msg "Error" $fn
+					}
+					else
+					{
+						$result = $true
+						$msg = "No risky write access AF mappings found."
+					}
+				}
+				if(-not $con.Security.HasAdmin)
+				{
+					# Add warning if not connecting as Admin as we can't guarantee completeness
+					$msg += " WARNING: Not connected as AF Admin, results may not be reliable."
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+				}
+			}
+			else
+			{
+				$result = "N/A"
+				$msg = 'PI AF Server 2.7 or later is required for this check.'
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
+		}
+		else
+		{
+			$result = "N/A"
+			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+		}			
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table			
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU30011" `
+										-ain "Restrict Write Access" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI AF Server" `
+										-Severity "Severe"
 }
 
 END {}
@@ -998,6 +1421,9 @@ Export-ModuleMember Get-PISysAudit_CheckFileExtensionWhitelist
 Export-ModuleMember Get-PISysAudit_CheckAFServerVersion
 Export-ModuleMember Get-PISysAudit_CheckAFSPN
 Export-ModuleMember Get-PISysAudit_CheckAFServerAdminRight
+Export-ModuleMember Get-PISysAudit_CheckAFConnectionString
+Export-ModuleMember Get-PISysAudit_CheckAFWorldIdentity
+Export-ModuleMember Get-PISysAudit_CheckAFWriteAccess
 # </Do not remove>
 
 # ........................................................................

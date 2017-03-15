@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -42,22 +51,29 @@ function Get-PISysAudit_FunctionsFromLibrary4
 {
 <#  
 .SYNOPSIS
-Get functions from machine library.
+Get functions from SQL Server library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the SQL Server compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLXPCommandShell", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLAdHocQueries", 1) 
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLDBMailXPs", 1)			
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLOLEAutomationProcs", 1)			
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLsa", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLRemoteAccess", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLCrossDBOwnershipChaining", 1)			
-	$listOfFunctions.Add("Get-PISysAudit_CheckSQLCLR", 1)
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLXPCommandShell"           1 # AU40001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLAdHocQueries"             1 # AU40002 
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLDBMailXPs"                1 # AU40003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLOLEAutomationProcs"       1 # AU40004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLsa"                       1 # AU40005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLRemoteAccess"             1 # AU40006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLCrossDBOwnershipChaining" 1 # AU40007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLCLR"                      1 # AU40008
 
-	# Return the list.
-	return $listOfFunctions		
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt	
 }
 
 function Get-PISysAudit_CheckSQLXPCommandShell

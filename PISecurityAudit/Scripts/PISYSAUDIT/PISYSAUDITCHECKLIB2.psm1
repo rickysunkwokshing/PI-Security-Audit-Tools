@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -42,22 +51,32 @@ function Get-PISysAudit_FunctionsFromLibrary2
 {
 <#  
 .SYNOPSIS
-Get functions from PI Data Archive library.
+Get functions from PI Data Archive library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIAdminUsage", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPIServerSubSysVersions", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckEditDays", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAutoTrustConfig", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckExpensiveQueryProtection", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckExplicitLoginDisabled",1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckPISPN",1)
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 # AU20001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 # AU20002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerVersion"                      1 # AU20003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 # AU20004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 # AU20005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 # AU20006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 # AU20007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 # AU20008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
 				
-	# Return the list.
-	return $listOfFunctions	
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
 function Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
@@ -272,14 +291,14 @@ PROCESS
 			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
 			$result = $false	
 			$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
-			$Severity = "severe"
+			$Severity = "Severe"
 		}
 
 		if($noncompliantMappings){
 			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
 			$result = $false	
 			$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
-			$Severity = "severe"
+			$Severity = "Severe"
 		}
 
 		if($result -eq $true){
@@ -297,7 +316,7 @@ PROCESS
 			{
 					$result = $false 
 					$msg += "However, the piadmin user can still be assigned to a trust."
-					$Severity = "moderate"
+					$Severity = "Moderate"
 			}
 		}		
 	}
@@ -327,11 +346,11 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CheckPIServerSubSysVersions
+function Get-PISysAudit_CheckPIServerVersion
 {
 <#  
 .SYNOPSIS
-AU20003 - PI Data Archive SubSystem Version Check
+AU20003 - PI Data Archive Version
 .DESCRIPTION
 VALIDATION: verifies that the PI Data Archive is using the most recent release. <br/>  
 COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
@@ -365,23 +384,27 @@ PROCESS
 	$msg = ""
 	$Severity = "Unknown"
 	try
-	{					
-	
+	{
+		# Update these for subsequent releases
+		$latestVersion = '3.4.405.1198'
+		$readable = '2016 R2'
+
 		$installationVersion = $global:PIDataArchiveConnection.ServerVersion.ToString()
+		$versionInt = [int]($installationVersion -replace '\.', '')
+		$latestInt = [int]($latestVersion -replace '\.', '')
 		
-		$result = $false
-		$installVersionTokens = $installationVersion.Split(".")
-		# Form an integer value with all the version tokens.
-		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
-		$installVersionInt64 = [Convert]::ToInt64($temp)	
-		
-		# Not compliant if under 3.4.380.36 version
-		# Warn if 3.4.380.36 or 3.4.385.59 version	
-		$result = $true
-		$upgradeMessage = "Upgrading to 3.4.405.1198 is recommended."
-		if ($installVersionInt64 -ge 344051198) { $result = $true; $msg = "Version is compliant"; $Severity = "severe" }
-		elseif ($installVersionInt64 -ge 3438036 -and $installVersionInt64 -lt 344001162 ) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }	
-		elseif ($installVersionInt64 -lt 3438036) { $result = $false; $msg = $upgradeMessage; $Severity = "severe" }
+		if($versionInt -lt $latestInt)
+		{
+			$result = $false
+			$Severity = 'Severe'
+			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
+		}
+		else
+		{
+			$result = $true
+			$Severity = 'Severe'
+			$msg = "PI Data Archive version is compliant."
+		}
 	}
 	catch
 	{
@@ -394,9 +417,9 @@ PROCESS
 	# Define the results in the audit table
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable "AU20003" `
-										-ain "PI Data Archive SubSystem Versions" -aiv $result `
+										-ain "PI Data Archive Version" -aiv $result `
 										-aif $fn -msg $msg `
-										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "PI Subsystems" `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
 										-Severity $Severity									
 }
 
@@ -899,6 +922,251 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPICollective
+{
+<#  
+.SYNOPSIS
+AU20009 - PI Collective
+.DESCRIPTION
+VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. <br/>
+COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
+	High Availability. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{	
+		$serviceType = $global:PIDataArchiveConnection.Service.Type.ToString()
+		if ($serviceType.ToLower() -eq 'collective')
+		{
+			$result = $true
+			$msg = "PI Data Archive is a member of PI Collective '{0}'"
+			$msg = [string]::Format($msg, $global:PIDataArchiveConnection.Service.Name)
+		}
+		else
+		{
+			$msg = "PI Data Archive is not a member of a PI Collective"
+			$result = $false
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20009" `
+										-ain "PI Collective" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive"`
+										-Severity "Moderate"								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckInstalledClientSoftware
+{
+<#  
+.SYNOPSIS
+AU20010 - No Client Software
+.DESCRIPTION
+VALIDATION: Checks if common client software is installed on the PI Data Archive machine. <br/>
+COMPLIANCE: Ensure the PI Processbookt and Microsoft Office are not installed
+	on the PI Data Archive machine, as these programs should be used on client
+	machines only. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName	-dbgl $DBGLevel
+		$procBook = $installedPrograms | Where-Object DisplayName -Like 'PI Processbook*'
+		$msOffice = $installedPrograms | Where-Object DisplayName -Like 'Microsoft Office*'
+		if($procBook -and $msOffice)
+		{
+			$result = $false
+			$msg = "PI Processbook and MS Office installed on PI Data Archive machine."
+		}
+		elseif($procBook)
+		{
+			$result = $false
+			$msg = "PI Processbook installed on PI Data Archive machine."
+		}
+		elseif($msOffice)
+		{
+			$result = $false
+			$msg = "Microsoft Office installed on PI Data Archive machine."
+		}
+		else
+		{
+			$result = $true
+			$msg = "Did not detect client software on PI Data Archive machine."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20010" `
+										-ain "Client Software" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckPIFirewall
+{
+<#  
+.SYNOPSIS
+AU20011 - PI Firewall Used
+.DESCRIPTION
+VALIDATION: Checks that PI Firewall is used. <br/>
+COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should 
+	be removed and replaced with specific IPs or subnets that may 
+	connect to the PI Data Archive. For more information on PI Firewall,
+	see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$rules = Get-PIFirewall -Connection $global:PIDataArchiveConnection
+		if($rules)
+		{
+			# Get-PIFirewall returns 'Unknown' if rule does not fit text "Allow" or "Disallow" 
+			#    exactly, case-sensitive. Include these in our search since a rule of 
+			#    "*.*.*.* Unknown" must be Allow or else all connections are being blocked.
+			$allowRules = $rules | Where-Object { $_.Access -eq 'Allow' -or $_.Access -eq 'Unknown' }
+			$defaultRule = $allowRules | Where-Object Hostmask -EQ '*.*.*.*'
+			if($defaultRule)
+			{
+				$result = $false
+				$msg = "Detected Allow rule for *.*.*.* in PI Firewall."
+			}
+			else
+			{
+				$result = $true
+				$msg = "Allow rule for *.*.*.* has been removed in PI Firewall."
+			}
+		}
+		else
+		{
+			$result = "N/A"
+			$msg = "Unable to load PI Firewall or no rules returned."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20011" `
+										-ain "PI Firewall Used" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity "Moderate"								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -971,12 +1239,15 @@ END {}
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary2
 Export-ModuleMember Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 Export-ModuleMember Get-PISysAudit_CheckPIAdminUsage
-Export-ModuleMember Get-PISysAudit_CheckPIServerSubSysVersions
+Export-ModuleMember Get-PISysAudit_CheckPIServerVersion
 Export-ModuleMember Get-PISysAudit_CheckEditDays
 Export-ModuleMember Get-PISysAudit_CheckAutoTrustConfig
 Export-ModuleMember Get-PISysAudit_CheckExpensiveQueryProtection
 Export-ModuleMember Get-PISysAudit_CheckExplicitLoginDisabled
 Export-ModuleMember Get-PISysAudit_CheckPISPN
+Export-ModuleMember Get-PISysAudit_CheckPICollective
+Export-ModuleMember Get-PISysAudit_CheckInstalledClientSoftware
+Export-ModuleMember Get-PISysAudit_CheckPIFirewall
 # </Do not remove>
 
 # ........................................................................

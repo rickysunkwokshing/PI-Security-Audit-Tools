@@ -35,6 +35,15 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
+function NewAuditFunction
+{
+    Param($name, $level)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    return $obj
+}
+
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -42,19 +51,30 @@ function Get-PISysAudit_FunctionsFromLibrary1
 {
 <#  
 .SYNOPSIS
-Get functions from machine library.
+Get functions from machine library at or below the specified level.
 #>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1)
+
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
-	[System.Collections.HashTable]$listOfFunctions = @{}	
-	$listOfFunctions.Add("Get-PISysAudit_CheckDomainMemberShip", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckOSInstallationType", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckFirewallEnabled", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckAppLockerEnabled", 1)
-	$listOfFunctions.Add("Get-PISysAudit_CheckUACEnabled", 1)
+	$listOfFunctions = @()
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckDomainMemberShip"   1    # AU10001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckOSInstallationType" 1    # AU10002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFirewallEnabled"    1    # AU10003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAppLockerEnabled"   1    # AU10004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1    # AU10005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1    # AU10006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1    # AU10007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdates"    1    # AU10008
+
 			
-	# Return the list.
-	return $listOfFunctions
+	# Return all items at or below the specified AuditLevelInt
+	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
 function Get-PISysAudit_CheckDomainMemberShip
@@ -216,7 +236,7 @@ function Get-PISysAudit_CheckFirewallEnabled
 {
 <#  
 .SYNOPSIS
-AU10003 - Firewall Enabled
+AU10003 - Windows Firewall Enabled
 .DESCRIPTION
 VALIDATION: verifies that the Windows host based firewall is enabled.<br/> 
 COMPLIANCE: enable the Windows firewall for Domain, Private and Public Scope.  
@@ -494,6 +514,297 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckManagedPI
+{
+<#  
+.SYNOPSIS
+AU10006 - Monitored by OSIsoft NOC
+.DESCRIPTION
+VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled. <br/>
+COMPLIANCE: Ensure that PI Agent and PI Diagnostics are installed and running
+	on the machine so that the OSIsoft NOC will detect issues. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{
+		$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		$agent = $installedPrograms | Where-Object DisplayName -EQ 'PI Agent'
+		$diagnostics = $installedPrograms | Where-Object DisplayName -EQ 'PI Diagnostics'
+		if (-not ($agent -and $diagnostics))
+		{
+			$result = $false
+			$msg = "PI Agent and/or PI Diagnostics not installed."
+		}
+		else
+		{
+			$agentServiceState = Get-PISysAudit_ServiceProperty -sn 'OSISoftPIAgent' -sp State `
+					-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			$diagnosticsServiceState = Get-PISysAudit_ServiceProperty -sn 'PIDiagnosticsService' -sp State `
+					-lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			if (($agentServiceState -ne 'Running') -or ($diagnosticsServiceState -ne 'Running'))
+			{
+				$result = $false
+				$msg = "PI Agent and PI Diagnostics installed but one or both services are not running."
+			}
+			else
+			{
+				$agentVersion = $agent.DisplayVersion + '.0'
+				$agentConfigPath = [string]::Format("C:\ProgramData\OSIsoft\PI Agent\{0}\user.config", $agentVersion)
+				$scriptBlock = {param([string]$ConfigPath) [xml](Get-Content -Path $ConfigPath)}
+				if ($LocalComputer)
+				{
+					$agentConfig = & $scriptBlock -ConfigPath $agentConfigPath
+				}
+				else
+				{
+					$agentConfig = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $agentConfigPath
+				}
+				$agentSettings = $agentConfig.configuration.userSettings.'SIS.Properties.Settings'.setting 
+				$agentRegistered = $agentSettings | Where-Object Name -EQ 'IsRegistered'
+				if ($agentRegistered.value -eq 'True')
+				{
+					$result = $true
+					$msg = "Machine is registered with the OSIsoft NOC."
+				}
+				else
+				{
+					$result = $false
+					$msg = "PI Agent and PI Diagnostics installed and running, but not registered with OSIsoft NOC."
+				}
+			}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU10006" `
+										-ain "OSIsoft NOC Monitoring" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "Machine" -Group2 "Montitoring"`
+										-Severity "Moderate"								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckIEEnhancedSecurity
+{
+<#  
+.SYNOPSIS
+AU10007 - Internet Explorer Enhanced Security
+.DESCRIPTION
+VERIFICATION: Validates that IE Enhanced Security is enabled <br/>
+COMPLIANCE: Ensure that Internet Explorer Enhanced Security is enabled
+	for both Administrators and Users. More information is available at: 
+	<a href="https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx"> https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx </a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$adminKeyPath = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"	
+		$userKeyPath  = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+		# Attribute is 0 or 1 for enabled/disabled
+		$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+		$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+		if($adminIsEnabled -and $userIsEnabled)
+		{
+			$result = $true
+			$msg = "IE Enhanced Security is enabled for Users and Admins."
+		}
+		elseif($adminIsEnabled)
+		{
+			$result = $false
+			$msg = "IE Enhanced Security is disabled for Users."
+		}
+		elseif($userIsEnabled)
+		{
+			$result = $false
+			$msg = "IE Enhanced Security is disabled for Admins."
+		}
+		else
+		{
+			$result = $false
+			$msg = "IE Enhanced Security is disabled for Users and Admins."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10007" `
+									-ain "IE Enhanced Security" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Moderate"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckSoftwareUpdates
+{
+<#  
+.SYNOPSIS
+AU10008 - Software Updates
+.DESCRIPTION
+VERIFICATION: Validates that the operating system and Microsoft applications 
+	receive updates <br/>
+COMPLIANCE: Ensure that the operating system and the Microsoft applications
+	have been updated in the last 60 days.
+	<a href="https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date">https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date</a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$cutoff = 60
+		$cutoffDate = (Get-Date).AddDays(-1*$cutoff).ToFileTimeUtc()
+		# Get most recent OS patch
+		$lastInstalledHotFix = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type HotFix `
+																| sort-object InstalledOn -Descending `
+																| select-object -ExpandProperty InstalledOn -First 1 
+		# Get most recent application patch
+		$lastInstalledReliability = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type Reliability `
+																| sort-object InstalledOn -Descending `
+																| select-object -ExpandProperty InstalledOn -First 1 
+		
+		function IsPatchLevelCurrent ($lastPatch, $cutoffDate)
+		{
+			if($null -eq $lastPatch) { return $false }
+			else
+			{ return $lastPatch.ToFileTimeUtc() -gt $cutoffDate }
+		}
+		
+		$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
+		$AreAppsPatched = IsPatchLevelCurrent $lastInstalledReliability $cutoffDate
+		
+		if($IsOSPatched -and $AreAppsPatched)
+		{
+			$result = $true
+			$msg = "Operating system and application updates have been applied to the server within the past $cutoff days."
+		}
+		else
+		{
+			$result = $false
+			if(!$IsOSPatched)
+			{$msg += "Operating system updates have NOT been applied in the last $cutoff days."}
+			if(!$AreAppsPatched)
+			{$msg += "Application updates have NOT been applied in the last $cutoff days."}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10008" `
+									-ain "Software Updates" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Severe"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -570,6 +881,9 @@ Export-ModuleMember Get-PISysAudit_CheckOSInstallationType
 Export-ModuleMember Get-PISysAudit_CheckFirewallEnabled
 Export-ModuleMember Get-PISysAudit_CheckAppLockerEnabled
 Export-ModuleMember Get-PISysAudit_CheckUACEnabled
+Export-ModuleMember Get-PISysAudit_CheckManagedPI
+Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
+Export-ModuleMember Get-PISysAudit_CheckSoftwareUpdates
 # </Do not remove>
 
 # ........................................................................
