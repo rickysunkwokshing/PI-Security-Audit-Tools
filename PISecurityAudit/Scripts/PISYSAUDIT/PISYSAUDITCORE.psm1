@@ -2621,6 +2621,89 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_ResolveDnsName
+{
+<#
+.SYNOPSIS
+(Core functionality) Retrieves attributes of a DNS record 
+.DESCRIPTION
+Wraps nslookup or Resolve-DnsName depending on PS version used.  Currently
+only supports returning the Type of record.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("ln")]
+		[string]
+		$LookupName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("at")]
+		[ValidateSet('Type')]
+		[string]
+		$Attribute='Type',
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		if($PSVersionTable.PSVersion.Major -ge 4)
+		{
+			$record = Resolve-DnsName -Name $LookupName 
+			$recordObjectType = $record.GetType().Name
+			if($recordObjectType -eq 'Object[]') # Either CNAME and corresponding A records or collection of A and AAAA records
+			{
+				if($record[0].GetType().Name -eq 'DnsRecord_PTR')
+				{ $type = $record[0].Type }
+				else 
+				{ $type = 'A' } 
+			}
+			elseif($recordObjectType -in @('DnsRecord_A','DnsRecord_AAAA'))
+			{ $type = 'A' }
+			else
+			{ $type = $record.Type }
+		}
+		else
+		{
+			# non-authoritative answer returns an error with nslookup, but not with the more modern Resolve-DnsName
+			# for consistent implementation, sending error output to null for nslookup and noting error if not results
+			# are returned.
+			$record = nslookup $LookupName 2> $null 
+			if($null -eq $record){
+				$msgTemplate = "No results returned by nslookup for {0}"	
+				$msg = [string]::Format($msgTemplate, $LookupName)
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return $null
+			}
+			else
+			{
+				if($null -eq $($record -match 'Aliases:')) # A or AAAA
+				{ $type = 'A'	}
+				else # CNAME
+				{ $type = 'CNAME' }
+			}
+		}
+
+		return $type
+	}
+	catch
+	{
+		Write-PISysAudit_LogMessage "Accessing DNS record failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_GroupMembers
 {
 <#
@@ -3361,44 +3444,47 @@ PROCESS
 			}
 
 			# Deal with the custom header - run nslookup and capture the result.
-			$AliasTypeCheck = nslookup $CoresightHeader
+			$AliasTypeCheck = Get-PISysAudit_ResolveDnsName -LookupName $CoresightHeader -Attribute Type -DBGLevel $DBGLevel
 
 			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
-			If ($AliasTypeCheck -match "Aliases:") 
+			If ($AliasTypeCheck -eq 'CNAME') 
 			{ 
-			# Dealing with Alias (CNAME). 
-
-			# Verify hostnane AND FQDN SPNs are assigned to the service account.
-			#
-			# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
-			# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
-			#
-			# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
+				# Verify hostnane AND FQDN SPNs are assigned to the service account.
+				#
+				# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
+				# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
+				#
+				# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
 			
-			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
-			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
-			$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
-			$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
+				$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
+				$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+				$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
+				$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
 			
-			$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-															-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
-															-SPNShortAlias $csCustomHeaderSPN -SPNLongAlias $csCustomHeaderLongSPN `
-															-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
+				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
+																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
+																-SPNShortAlias $csCustomHeaderSPN -SPNLongAlias $csCustomHeaderLongSPN `
+																-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 						
-			return $result			
+				return $result			
 			} 			
-			Else 
+			ElseIf($AliasTypeCheck -eq 'A')
 			{ 
-			# Host (A) 
-			
-			$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
-			$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
+				$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
+				$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
 
-			$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-															-SPNShort $csCustomHeaderSPN -SPNLong $csCustomHeaderLongSPN `
-															-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
+				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
+																-SPNShort $csCustomHeaderSPN -SPNLong $csCustomHeaderLongSPN `
+																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 
-			return $result
+				return $result
+			}
+			Else
+			{
+				$msgTemplate = "Unexpected DNS record type: {0}"	
+				$msg = [string]::Format($msgTemplate, $AliasTypeCheck)
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				return $null
 			}
 		}	
 		# SPN Check is done for PI Coresight or other service
@@ -4940,6 +5026,7 @@ Export-ModuleMember Get-PISysAudit_ServiceProperty
 Export-ModuleMember Get-PISysAudit_AccountProperty
 Export-ModuleMember Get-PISysAudit_CertificateProperty
 Export-ModuleMember Get-PISysAudit_BoundCertificate
+Export-ModuleMember Get-PISysAudit_ResolveDnsName
 Export-ModuleMember Get-PISysAudit_GroupMembers
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
