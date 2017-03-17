@@ -3276,6 +3276,114 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_ProcessedPIConnectionStatistics 
+{
+<#
+.SYNOPSIS
+(Core functionality) Transpose and filter PI Connection Statistics.
+.DESCRIPTION
+Transpose and filter PI Connection Statistics.  Options to filter returned results by
+protocol and whether the connection is local or remote.  
+#>
+    [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+    param(							
+        [parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pics")]
+		[object]
+		$PIConnectionStats,
+        [parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [ValidateSet('Windows','Trust','ExplicitLogin','SubSystem','Any')]
+        [alias("ap")]
+        [string]
+        $ProtocolFilter="Any",
+        [parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("ro")]
+        [boolean]
+        $RemoteOnly=$false,	
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("so")]
+        [boolean]
+        $SuccessOnly=$true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0) 
+BEGIN {}
+PROCESS 
+{     
+	$fn = GetFunctionName
+
+	try
+	{
+		$transposedStats = @()
+		Foreach($stat in $PIConnectionStats) 
+		{
+			# Determine properties included in the connection statistic 
+			$hasProperty = @()
+			foreach($property in $stat.StatisticType)
+			{
+				if($stat.StatisticType -contains $property -and "" -ne $stat.Item($property).Value.ToString())
+				{ $hasProperty += $property }
+			}
+        
+			# Identify the Authentication Protocol
+			$statAuthProtocol = "Unknown"
+			if(($hasProperty -contains 'ConnectionType') -and ($hasProperty -contains 'ConnectionStatus'))
+			{
+				# Only include active connections
+				if($Stat.Item('ConnectionStatus').Value -eq '[0] Success' -or ($SuccessOnly -eq $false))
+				{
+					if($hasProperty -contains 'Trust') 
+					{ $statAuthProtocol = 'Trust' }
+					elseif($hasProperty -contains 'OSUser')
+					{ $statAuthProtocol = 'Windows' }
+					elseif($hasProperty -contains 'User')
+					{ $statAuthProtocol = 'ExplicitLogin' }
+					elseif($Stat.Item('ConnectionType').Value -eq 'Local Connection')
+					{ $statAuthProtocol = 'SubSystem' }
+				}   
+			}
+			elseif($hasProperty -contains 'ServerID') # PINetMgr is a special case
+			{ $statAuthProtocol = 'SubSystem' }
+
+			# Determine whether or not the connection is remote.
+			$IsRemote = $false
+			if($hasProperty -contains 'ConnectionType')
+			{
+				if($Stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
+				($Stat.Item('ConnectionType').Value -eq 'PI-API Connection' -and $Stat.Item('PeerAddress').Value -notin ('127.0.0.1','')))
+				{ $IsRemote = $true }
+			}
+        
+			# Apply protocol and RemoteOnly filters if applicable
+			if(($statAuthProtocol -eq $ProtocolFilter -or $ProtocolFilter -eq 'Any') `
+					-and ($IsRemote -or $RemoteOnly -eq $false))
+			{ 
+				$transposedStat = New-Object PSObject
+				# Add an authentication protocol attribute for easy filtering
+				$transposedStat | Add-Member -MemberType NoteProperty -Name 'AuthenticationProtocol' -Value $statAuthProtocol
+				# Transpose the object into PSObject with NoteProperties
+				Foreach($property in $stat.StatisticType){ $transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $stat.Item($property).Value }
+				$transposedStats += $transposedStat 
+			}
+		}
+
+		return $transposedStats
+	}
+	catch
+	{
+		$msg = "A problem occurred while processing PI Connection Statistics."		
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		return $null
+	}
+}
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Invoke-PISysAudit_AFDiagCommand
 {
 <#
@@ -5035,6 +5143,7 @@ Export-ModuleMember Get-PISysAudit_InstalledWin32Feature
 Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
+Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
