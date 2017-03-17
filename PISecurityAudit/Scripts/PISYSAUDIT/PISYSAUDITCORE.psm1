@@ -3347,7 +3347,7 @@ PROCESS
 			{ $statAuthProtocol = 'SubSystem' }
 
 			# Determine whether or not the connection is remote.
-			$IsRemote = $false
+			[boolean]$IsRemote = $false
 			if($hasProperty -contains 'ConnectionType')
 			{
 				if($Stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
@@ -3362,6 +3362,7 @@ PROCESS
 				$transposedStat = New-Object PSObject
 				# Add an authentication protocol attribute for easy filtering
 				$transposedStat | Add-Member -MemberType NoteProperty -Name 'AuthenticationProtocol' -Value $statAuthProtocol
+				$transposedStat | Add-Member -MemberType NoteProperty -Name 'Remote' -Value $IsRemote.ToString()
 				# Transpose the object into PSObject with NoteProperties
 				Foreach($property in $stat.StatisticType){ $transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $stat.Item($property).Value }
 				$transposedStats += $transposedStat 
