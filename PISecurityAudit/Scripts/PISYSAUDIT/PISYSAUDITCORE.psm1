@@ -3642,6 +3642,103 @@ END {}
 #***************************
 }
 
+function Test-PISysAudit_SecurePIConnections
+{
+<#
+.SYNOPSIS
+(Core functionality) Check if connections are protected by transport security
+.DESCRIPTION
+Check if connections are protected by transport security
+#>
+    param(
+        [parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[int[]]
+		$Ids,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("fct")]
+		[DateTime]
+		$FirstConnectTime,
+        [parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("lct")]
+		[DateTime]
+		$LastConnectTime,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pic")]
+		[object]
+		$PIDataArchiveConnection,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN{}
+PROCESS
+{
+    $fn = GetFunctionName
+
+	try
+	{
+		# Check Message Log Cutoff tuning parameter
+		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $con -Name 'MessageLog_DayLimit'
+		if($null -eq $messageLog_DayLimitParameter.Value)
+		{ $MessageLog_CutoffDate = $(Get-Date).AddDays(-1*$messageLog_DayLimitParameter.Default) }
+		else
+		{ $MessageLog_CutoffDate = $(Get-Date).AddDays(-1*$messageLog_DayLimitParameter.Value) }
+    
+		# Check against the query range
+		if( $($MessageLog_CutoffDate - $FirstConnectTime).TotalDays -lt 0 )
+		{
+			$msg = "The message log cutoff date is later than the start time for the message query.  Not all connections can be audited."
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+		}
+    
+		# Get WIS connection messages for the range specified.
+		$connectionMessages = Get-PIMessage -StartTime $FirstConnectTime -EndTime $LastConnectTime -Id 7082 -Program pinetmgr
+    
+		$IsSecuredHashTable = @{}
+		foreach($message in $connectionMessages)
+		{
+			# Extract the connection ID
+			$startID = $message.Message.IndexOf('ID:') + 3
+			$endID = $message.Message.IndexOf('. Address:')
+			[int]$connectionId = $message.Message.Substring($startID,$endID - $startID).Trim()
+			# Check ID against the set of connections
+			if($connectionId -in $Ids)
+			{
+				# Remove the connection from the list now that it has been found
+				$Ids = $Ids | Where-Object { $_ -ne $connectionId }
+				# Parse the Method attribute out of the message text
+				$startMethod = $message.Message.IndexOf('. Method:') + 9
+				$connectionMethod = $message.Message.Substring($startMethod).Trim()
+				# Check for Windows Login and HMAC to indicate the ciphers are present
+				if($connectionMethod -match 'Windows Login' -and $connectionMethod -match 'HMAC')
+				{ $IsSecuredHashTable.Add($connectionId, $true) }
+				else
+				{ $IsSecuredHashTable.Add($connectionId, $false) }
+				# Once the array is empty, we are done.
+				if($Ids.Count -eq 0)
+				{ break }
+			}
+		}
+		# If connections aren't found, it means we can't guarantee they are secure
+		if($Ids.Count -gt 0)
+		{ $Ids | Foreach{ $IsSecuredHashTable.Add($_, $false) } }
+
+		return $IsSecuredHashTable
+	}
+	catch
+	{
+		$msg = "A problem occurred while verifying transport security on connections: {0}" -f $_.Exception.Message
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_		
+		return $null
+	}			
+}
+END{}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Test-PISysAudit_ServicePrincipalName
 {
 <#
@@ -5146,6 +5243,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
+Export-ModuleMember Test-PISysAudit_SecurePIConnections
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
