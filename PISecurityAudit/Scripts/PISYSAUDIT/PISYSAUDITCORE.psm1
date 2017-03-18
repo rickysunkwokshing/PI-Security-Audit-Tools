@@ -3685,7 +3685,7 @@ PROCESS
 		{ $MessageLog_CutoffDate = $(Get-Date).AddDays(-1*$messageLog_DayLimitParameter.Value) }
     
 		# Check against the query range
-		if( $($MessageLog_CutoffDate - $FirstConnectTime).TotalDays -lt 0 )
+		if( $($MessageLog_CutoffDate - $FirstConnectTime).TotalDays -gt 0 )
 		{
 			$msg = "The message log cutoff date is later than the start time for the message query.  Not all connections can be audited."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -3710,10 +3710,18 @@ PROCESS
 				$startMethod = $message.Message.IndexOf('. Method:') + 9
 				$connectionMethod = $message.Message.Substring($startMethod).Trim()
 				# Check for Windows Login and HMAC to indicate the ciphers are present
-				if($connectionMethod -match 'Windows Login' -and $connectionMethod -match 'HMAC')
-				{ $IsSecuredHashTable.Add($connectionId, $true) }
+				if($connectionMethod -match 'Windows Login')
+				{ 
+					$startCipher = $connectionMethod.IndexOf('(') + 1
+					$endCipher = $connectionMethod.IndexOf(')')
+					$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+					if ($connectionMethod -match 'HMAC')
+					{ $IsSecuredHashTable.Add($connectionId, $("Secure: " + $cipherInfo)) }
+					else
+					{ $IsSecuredHashTable.Add($connectionId, $("Not Secure: " + $cipherInfo)) }
+				}
 				else
-				{ $IsSecuredHashTable.Add($connectionId, $false) }
+				{ $IsSecuredHashTable.Add($connectionId, "Not Secure") }
 				# Once the array is empty, we are done.
 				if($Ids.Count -eq 0)
 				{ break }
@@ -3721,7 +3729,7 @@ PROCESS
 		}
 		# If connections aren't found, it means we can't guarantee they are secure
 		if($Ids.Count -gt 0)
-		{ $Ids | Foreach{ $IsSecuredHashTable.Add($_, $false) } }
+		{ $Ids | Foreach{ $IsSecuredHashTable.Add($_, "Not Secure") } }
 
 		return $IsSecuredHashTable
 	}
