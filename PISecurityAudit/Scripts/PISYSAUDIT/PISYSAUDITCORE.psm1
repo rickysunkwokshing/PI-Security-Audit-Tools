@@ -791,7 +791,8 @@ param(
 			
 		# Test non-local computer to validate if WSMan is working.
 		if($ComputerParams.IsLocal)
-		{							
+		{
+			$result = $true
 			$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
