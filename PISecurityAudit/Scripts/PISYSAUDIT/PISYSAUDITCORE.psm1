@@ -4594,7 +4594,10 @@ PROCESS
 		}
 		
 		# Export to .csv but sort the results table first to have Failed items on the top sorted by Severity 
-		$results = $results | Sort-Object @{Expression="AuditItemValue";Descending=$false},@{Expression="Severity";Descending=$true},@{Expression="ID";Descending=$false}
+		$results = $results | Sort-Object   @{Expression="AuditItemValue";Descending=$false}, `
+											@{Expression="Severity";Descending=$true}, `
+											@{Expression="ServerName";Descending=$false}, `
+											@{Expression="ID";Descending=$false}
 		$results | Export-Csv -Path $fileToExport -Encoding ASCII -NoType
 	
 		
