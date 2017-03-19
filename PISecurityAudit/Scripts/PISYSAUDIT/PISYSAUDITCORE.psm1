@@ -3288,7 +3288,11 @@ protocol and whether the connection is local or remote.
 #>
     [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
     param(							
-        [parameter(Mandatory=$true, ParameterSetName = "Default")]
+        [parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("pic")]
+		[object]
+		$PIDataArchiveConnection,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("pics")]
 		[object]
 		$PIConnectionStats,
@@ -3305,6 +3309,10 @@ protocol and whether the connection is local or remote.
         [alias("so")]
         [boolean]
         $SuccessOnly=$true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("cts")]
+        [boolean]
+        $CheckTransportSecurity=$false,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -3357,8 +3365,7 @@ PROCESS
 			}
         
 			# Apply protocol and RemoteOnly filters if applicable
-			if(($statAuthProtocol -eq $ProtocolFilter -or $ProtocolFilter -eq 'Any') `
-					-and ($IsRemote -or $RemoteOnly -eq $false))
+			if(($statAuthProtocol -eq $ProtocolFilter -or $ProtocolFilter -eq 'Any') -and ($IsRemote -or $RemoteOnly -eq $false))
 			{ 
 				$transposedStat = New-Object PSObject
 				# Add an authentication protocol attribute for easy filtering
@@ -3369,6 +3376,9 @@ PROCESS
 				$transposedStats += $transposedStat 
 			}
 		}
+
+		if($CheckTransportSecurity)
+		{ $transposedStats = Test-PISysAudit_SecurePIConnections -PIDataArchiveConnection $PIDataArchiveConnection -PIConnections $transposedStats -DBGLevel $DBGLevel }
 
 		return $transposedStats
 	}
@@ -3648,24 +3658,25 @@ function Test-PISysAudit_SecurePIConnections
 .SYNOPSIS
 (Core functionality) Check if connections are protected by transport security
 .DESCRIPTION
-Check if connections are protected by transport security
+Check if connections are protected by transport security.  Adds SecureStatus and 
+SecureStatusDetail note properties to the connection objects checked
+.PARAMETER PIDataArchiveConnection
+Pass the PI Data Archive connection object for the connections you want to verify.
+.PARAMETER PIConnections
+You can use the output of the command Get-PISysAudit_ProcessedPIConnectionStatistics 
+directly.  Otherwise, requires the connecttime, ID and AuthenticationProtocol for each
+connection.
 #>
+	[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)] 
     param(
-        [parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[int[]]
-		$Ids,
-		[parameter(Mandatory=$true, ParameterSetName = "Default")]
-		[alias("fct")]
-		[DateTime]
-		$FirstConnectTime,
-        [parameter(Mandatory=$true, ParameterSetName = "Default")]
-		[alias("lct")]
-		[DateTime]
-		$LastConnectTime,
-		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
 		[alias("pic")]
 		[object]
 		$PIDataArchiveConnection,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("con")]
+		[Object[]]
+		$PIConnections,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -3677,61 +3688,83 @@ PROCESS
 
 	try
 	{
+		# Hashtable with all results
+		$IsSecureHashTable = @{}
+		$logCutoffExceeded = 0
+		$timeBuffer = 3 # Seconds
+
 		# Check Message Log Cutoff tuning parameter
-		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $con -Name 'MessageLog_DayLimit'
+		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $PIDataArchiveConnection -Name 'MessageLog_DayLimit'
+		$Now = Get-Date
 		if($null -eq $messageLog_DayLimitParameter.Value)
-		{ $MessageLog_CutoffDate = $(Get-Date).AddDays(-1*$messageLog_DayLimitParameter.Default) }
+		{ $MessageLog_CutoffDate = $Now.AddDays(-1*$messageLog_DayLimitParameter.Default) }
 		else
-		{ $MessageLog_CutoffDate = $(Get-Date).AddDays(-1*$messageLog_DayLimitParameter.Value) }
-    
-		# Check against the query range
-		if( $($MessageLog_CutoffDate - $FirstConnectTime).TotalDays -gt 0 )
+		{ $MessageLog_CutoffDate = $Now.AddDays(-1*$messageLog_DayLimitParameter.Value) }
+		
+		Foreach($PIConnection in $PIConnections)
 		{
-			$msg = "The message log cutoff date is later than the start time for the message query.  Not all connections can be audited."
+			$SecureStatus = "Unknown"
+			$SecureStatusDetail = "Connection not found."
+			if($PIConnection.AuthenticationProtocol -ne 'Windows') # Only Windows Connections can use transport security
+			{ 
+				$SecureStatus = "Not Secure"
+				$SecureStatusDetail = "Insecure Protocol ({0})" -f $PIConnection.AuthenticationProtocol
+			} 
+			elseif($MessageLog_CutoffDate -gt $PIConnection.ConnectedTime) # Remove connections too old to exist in the logs
+			{
+				$logCutoffExceeded++
+				$SecureStatus = "Unknown"
+				$SecureStatusDetail = "Connection precedes log cutoff date."
+			}
+			else # Verify remaining connections with successful connection message
+			{
+				$connectedTime = $(Get-Date $PIConnection.ConnectedTime)
+				$connectionMessages = Get-PIMessage -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
+				foreach($message in $connectionMessages)
+				{
+					
+					# Extract the connection ID
+					$startID = $message.Message.IndexOf('ID:') + 3
+					$endID = $message.Message.IndexOf('. Address:')
+					[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
+					
+					# Check ID against the set of connections
+					if($connectionId -eq $PIConnection.ID)
+					{
+						# Parse the Method attribute out of the message text
+						$startMethod = $message.Message.IndexOf('. Method:') + 9
+						$connectionMethod = $message.Message.Substring($startMethod).Trim()
+						
+						# Parse the cipher info
+						$startCipher = $connectionMethod.IndexOf('(') + 1
+						$endCipher = $connectionMethod.IndexOf(')')
+						$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+						
+						if($connectionMethod -match 'HMAC')
+						{ $IsSecureHashTable.Add($connectionId, $("Secure: " + $cipherInfo))
+							$SecureStatus = "Secure"
+							$SecureStatusDetail = $cipherInfo
+						}
+						else
+						{ 
+							$SecureStatus = "Not Secure"
+							$SecureStatusDetail = $cipherInfo
+						}
+					}
+				}
+			}
+			# Set the Security attributes on the connection
+			Add-Member -InputObject $PIConnection -MemberType NoteProperty -Name SecureStatus -Value $SecureStatus
+			Add-Member -InputObject $PIConnection -MemberType NoteProperty -Name SecureStatusDetail -Value $SecureStatusDetail
+		}
+
+		if($logCutoffExceeded -gt 0)
+		{
+			$msg = "The message log cutoff date {0} is later than some connect times. {1} connections will be skipped." -f $MessageLog_CutoffDate, $logCutoffExceeded
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 		}
-    
-		# Get WIS connection messages for the range specified.
-		$connectionMessages = Get-PIMessage -StartTime $FirstConnectTime -EndTime $LastConnectTime -Id 7082 -Program pinetmgr
-    
-		$IsSecuredHashTable = @{}
-		foreach($message in $connectionMessages)
-		{
-			# Extract the connection ID
-			$startID = $message.Message.IndexOf('ID:') + 3
-			$endID = $message.Message.IndexOf('. Address:')
-			[int]$connectionId = $message.Message.Substring($startID,$endID - $startID).Trim()
-			# Check ID against the set of connections
-			if($connectionId -in $Ids)
-			{
-				# Remove the connection from the list now that it has been found
-				$Ids = $Ids | Where-Object { $_ -ne $connectionId }
-				# Parse the Method attribute out of the message text
-				$startMethod = $message.Message.IndexOf('. Method:') + 9
-				$connectionMethod = $message.Message.Substring($startMethod).Trim()
-				# Check for Windows Login and HMAC to indicate the ciphers are present
-				if($connectionMethod -match 'Windows Login')
-				{ 
-					$startCipher = $connectionMethod.IndexOf('(') + 1
-					$endCipher = $connectionMethod.IndexOf(')')
-					$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
-					if ($connectionMethod -match 'HMAC')
-					{ $IsSecuredHashTable.Add($connectionId, $("Secure: " + $cipherInfo)) }
-					else
-					{ $IsSecuredHashTable.Add($connectionId, $("Not Secure: " + $cipherInfo)) }
-				}
-				else
-				{ $IsSecuredHashTable.Add($connectionId, "Not Secure") }
-				# Once the array is empty, we are done.
-				if($Ids.Count -eq 0)
-				{ break }
-			}
-		}
-		# If connections aren't found, it means we can't guarantee they are secure
-		if($Ids.Count -gt 0)
-		{ $Ids | Foreach{ $IsSecuredHashTable.Add($_, "Not Secure") } }
-
-		return $IsSecuredHashTable
+		
+		return $PIConnections
 	}
 	catch
 	{
