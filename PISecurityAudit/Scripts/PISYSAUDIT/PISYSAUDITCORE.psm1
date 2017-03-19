@@ -1710,7 +1710,7 @@ PROCESS
 		New-Variable -Name "PISysAuditIsElevated" -Scope "Global" -Visibility "Public" -Value $IsElevated
 
 		# Validate if used with PowerShell version 3.x and more	
-		$majorVersionPS = $Host.Version.Major	
+		$majorVersionPS = $PSVersionTable.PSVersion.Major	
 		if($majorVersionPS -lt 3)
 		{						
 			$msg = "This script won't execute under less than version 3.0 of PowerShell"
