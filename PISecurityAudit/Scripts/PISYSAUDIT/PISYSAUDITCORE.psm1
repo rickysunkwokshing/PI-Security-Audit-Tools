@@ -1710,7 +1710,7 @@ PROCESS
 		New-Variable -Name "PISysAuditIsElevated" -Scope "Global" -Visibility "Public" -Value $IsElevated
 
 		# Validate if used with PowerShell version 3.x and more	
-		$majorVersionPS = $Host.Version.Major	
+		$majorVersionPS = $PSVersionTable.PSVersion.Major	
 		if($majorVersionPS -lt 3)
 		{						
 			$msg = "This script won't execute under less than version 3.0 of PowerShell"
@@ -3288,7 +3288,11 @@ protocol and whether the connection is local or remote.
 #>
     [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
     param(							
-        [parameter(Mandatory=$true, ParameterSetName = "Default")]
+        [parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("pic")]
+		[object]
+		$PIDataArchiveConnection,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("pics")]
 		[object]
 		$PIConnectionStats,
@@ -3305,6 +3309,10 @@ protocol and whether the connection is local or remote.
         [alias("so")]
         [boolean]
         $SuccessOnly=$true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("cts")]
+        [boolean]
+        $CheckTransportSecurity=$false,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -3357,8 +3365,7 @@ PROCESS
 			}
         
 			# Apply protocol and RemoteOnly filters if applicable
-			if(($statAuthProtocol -eq $ProtocolFilter -or $ProtocolFilter -eq 'Any') `
-					-and ($IsRemote -or $RemoteOnly -eq $false))
+			if(($statAuthProtocol -eq $ProtocolFilter -or $ProtocolFilter -eq 'Any') -and ($IsRemote -or $RemoteOnly -eq $false))
 			{ 
 				$transposedStat = New-Object PSObject
 				# Add an authentication protocol attribute for easy filtering
@@ -3369,6 +3376,9 @@ PROCESS
 				$transposedStats += $transposedStat 
 			}
 		}
+
+		if($CheckTransportSecurity)
+		{ $transposedStats = Test-PISysAudit_SecurePIConnections -PIDataArchiveConnection $PIDataArchiveConnection -PIConnections $transposedStats -DBGLevel $DBGLevel }
 
 		return $transposedStats
 	}
@@ -3636,6 +3646,127 @@ PROCESS
 }
 
 END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Test-PISysAudit_SecurePIConnections
+{
+<#
+.SYNOPSIS
+(Core functionality) Check if connections are protected by transport security
+.DESCRIPTION
+Check if connections are protected by transport security.  Adds SecureStatus and 
+SecureStatusDetail note properties to the connection objects checked
+.PARAMETER PIDataArchiveConnection
+Pass the PI Data Archive connection object for the connections you want to verify.
+.PARAMETER PIConnections
+You can use the output of the command Get-PISysAudit_ProcessedPIConnectionStatistics 
+directly.  Otherwise, requires the connecttime, ID and AuthenticationProtocol for each
+connection.
+#>
+	[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)] 
+    param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("pic")]
+		[object]
+		$PIDataArchiveConnection,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("con")]
+		[Object[]]
+		$PIConnections,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN{}
+PROCESS
+{
+    $fn = GetFunctionName
+
+	try
+	{
+		$logCutoffExceeded = 0
+		$timeBuffer = 3 # Second buffer checking connection messages
+
+		# Check Message Log Cutoff tuning parameter
+		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $PIDataArchiveConnection -Name 'MessageLog_DayLimit'
+		$Now = Get-Date
+		if($null -eq $messageLog_DayLimitParameter.Value)
+		{ $MessageLog_CutoffDate = $Now.AddDays(-1*$messageLog_DayLimitParameter.Default) }
+		else
+		{ $MessageLog_CutoffDate = $Now.AddDays(-1*$messageLog_DayLimitParameter.Value) }
+		
+		Foreach($PIConnection in $PIConnections)
+		{
+			$SecureStatus = "Unknown"
+			$SecureStatusDetail = "Connection not found."
+			if($PIConnection.AuthenticationProtocol -ne 'Windows') # Only Windows Connections can use transport security
+			{ 
+				$SecureStatus = "Not Secure"
+				$SecureStatusDetail = "Insecure protocol ({0})" -f $PIConnection.AuthenticationProtocol
+			} 
+			elseif($MessageLog_CutoffDate -gt $PIConnection.ConnectedTime) # Remove connections too old to exist in the logs
+			{
+				$logCutoffExceeded++
+				$SecureStatus = "Unknown"
+				$SecureStatusDetail = "Connection before log cutoff date."
+			}
+			else # Verify remaining connections with successful connection message
+			{
+				$connectedTime = $(Get-Date $PIConnection.ConnectedTime)
+				# Message ID 7082 corresponds to a successful connection with Windows
+				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
+				foreach($message in $connectionMessages)
+				{
+					# Extract the connection ID
+					$startID = $message.Message.IndexOf('ID:') + 3
+					$endID = $message.Message.IndexOf('. Address:')
+					[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
+					
+					# Check ID against the set of connections
+					if($connectionId -eq $PIConnection.ID)
+					{
+						# Parse the Method attribute out of the message text
+						$startMethod = $message.Message.IndexOf('. Method:') + 9
+						$connectionMethod = $message.Message.Substring($startMethod).Trim()
+						
+						# Parse the cipher info
+						$startCipher = $connectionMethod.IndexOf('(') + 1
+						$endCipher = $connectionMethod.IndexOf(')')
+						$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+						
+						if($connectionMethod -match 'HMAC')
+						{ $SecureStatus = "Secure" }
+						else
+						{ $SecureStatus = "Not Secure" }
+						$SecureStatusDetail = $cipherInfo
+					}
+				}
+			}
+			# Set the Security attributes on the connection
+			Add-Member -InputObject $PIConnection -MemberType NoteProperty -Name SecureStatus -Value $SecureStatus
+			Add-Member -InputObject $PIConnection -MemberType NoteProperty -Name SecureStatusDetail -Value $SecureStatusDetail
+		}
+
+		if($logCutoffExceeded -gt 0)
+		{
+			$msg = "The message log cutoff date {0} is later than some connect times. {1} connections were be skipped." -f $MessageLog_CutoffDate, $logCutoffExceeded
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+		}
+		
+		return $PIConnections
+	}
+	catch
+	{
+		$msg = "A problem occurred while verifying transport security on connections: {0}" -f $_.Exception.Message
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_		
+		return $null
+	}			
+}
+END{}
 
 #***************************
 #End of exported function
@@ -5146,6 +5277,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
+Export-ModuleMember Test-PISysAudit_SecurePIConnections
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
