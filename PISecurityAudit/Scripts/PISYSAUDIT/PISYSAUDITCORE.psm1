@@ -3688,10 +3688,8 @@ PROCESS
 
 	try
 	{
-		# Hashtable with all results
-		$IsSecureHashTable = @{}
 		$logCutoffExceeded = 0
-		$timeBuffer = 3 # Seconds
+		$timeBuffer = 3 # Second buffer checking connection messages
 
 		# Check Message Log Cutoff tuning parameter
 		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $PIDataArchiveConnection -Name 'MessageLog_DayLimit'
@@ -3708,21 +3706,21 @@ PROCESS
 			if($PIConnection.AuthenticationProtocol -ne 'Windows') # Only Windows Connections can use transport security
 			{ 
 				$SecureStatus = "Not Secure"
-				$SecureStatusDetail = "Insecure Protocol ({0})" -f $PIConnection.AuthenticationProtocol
+				$SecureStatusDetail = "Insecure protocol ({0})" -f $PIConnection.AuthenticationProtocol
 			} 
 			elseif($MessageLog_CutoffDate -gt $PIConnection.ConnectedTime) # Remove connections too old to exist in the logs
 			{
 				$logCutoffExceeded++
 				$SecureStatus = "Unknown"
-				$SecureStatusDetail = "Connection precedes log cutoff date."
+				$SecureStatusDetail = "Connection before log cutoff date."
 			}
 			else # Verify remaining connections with successful connection message
 			{
 				$connectedTime = $(Get-Date $PIConnection.ConnectedTime)
+				# Message ID 7082 corresponds to a successful connection with Windows
 				$connectionMessages = Get-PIMessage -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
 				foreach($message in $connectionMessages)
 				{
-					
 					# Extract the connection ID
 					$startID = $message.Message.IndexOf('ID:') + 3
 					$endID = $message.Message.IndexOf('. Address:')
@@ -3741,15 +3739,10 @@ PROCESS
 						$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
 						
 						if($connectionMethod -match 'HMAC')
-						{ $IsSecureHashTable.Add($connectionId, $("Secure: " + $cipherInfo))
-							$SecureStatus = "Secure"
-							$SecureStatusDetail = $cipherInfo
-						}
+						{ $SecureStatus = "Secure" }
 						else
-						{ 
-							$SecureStatus = "Not Secure"
-							$SecureStatusDetail = $cipherInfo
-						}
+						{ $SecureStatus = "Not Secure" }
+						$SecureStatusDetail = $cipherInfo
 					}
 				}
 			}
@@ -3760,7 +3753,7 @@ PROCESS
 
 		if($logCutoffExceeded -gt 0)
 		{
-			$msg = "The message log cutoff date {0} is later than some connect times. {1} connections will be skipped." -f $MessageLog_CutoffDate, $logCutoffExceeded
+			$msg = "The message log cutoff date {0} is later than some connect times. {1} connections were be skipped." -f $MessageLog_CutoffDate, $logCutoffExceeded
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 		}
 		
