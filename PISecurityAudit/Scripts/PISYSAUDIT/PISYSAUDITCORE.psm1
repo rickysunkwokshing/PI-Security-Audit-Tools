@@ -3718,7 +3718,7 @@ PROCESS
 			{
 				$connectedTime = $(Get-Date $PIConnection.ConnectedTime)
 				# Message ID 7082 corresponds to a successful connection with Windows
-				$connectionMessages = Get-PIMessage -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
+				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
 				foreach($message in $connectionMessages)
 				{
 					# Extract the connection ID
