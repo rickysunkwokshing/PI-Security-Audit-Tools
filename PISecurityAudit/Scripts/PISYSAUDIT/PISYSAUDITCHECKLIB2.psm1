@@ -74,6 +74,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 # AU20012
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -1167,6 +1168,133 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckTransportSecurity
+{
+<#  
+.SYNOPSIS
+AU20012 - Transport Security Used
+.DESCRIPTION
+VALIDATION: All connections are using transport security.
+COMPLIANCE: All connections should have transport security enabled. To
+	accomplish this, the application must connect with WIS, the PI Data 
+	Archive must be at PI Data Archive 2015 or later and the client 
+	application must be of a supported version:
+	+ PI API 2016 for Windows Integrated Security
+	+ PI SDK 1.3.6 or higher
+	+ PI AF SDK (all versions)
+	For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = "Unknown"
+	try
+	{		
+		# Check if the PI Data Archive version supports transport security before pulling connection stats.
+		$version = $global:PIDataArchiveConnection.ServerVersion
+		if($version.Major -ge 3 -and $version.Minor -ge 4 -and $version.Build -ge 395)
+		{
+			$rawPIConnectionStats = Get-PIConnectionStatistics -Connection $global:PIDataArchiveConnection
+			$processedPIConnectionStats = Get-PISysAudit_ProcessedPIConnectionStatistics -PIDataArchiveConnection $global:PIDataArchiveConnection `
+																					-PIConnectionStats $rawPIConnectionStats -ProtocolFilter Any `
+																					-RemoteOnly $true -SuccessOnly $true -CheckTransportSecurity $true `
+																					-DBGLevel $DBGLevel
+			if($null -ne $processedPIConnectionStats)
+			{
+				$countSecured = $processedPIConnectionStats.SecureStatus | Where-Object { $_ -eq 'Secure' } | Measure-Object | Select-object -ExpandProperty count	
+				if($countSecured -eq $processedPIConnectionStats.Count)	
+				{
+					$result = $true
+					$msg = "All remote connections to the PI Data Archive leverage transport security."
+				}
+				else # Not all connections are using transport security, assess scope.
+				{
+					$result = $false
+					$countWindows=0; $countTrust=0; $countExlplicitLogin=0
+
+					$processedPIConnectionStats.AuthenticationProtocol | Foreach-Object {
+																							switch($_)
+																							{
+																								'Windows' {$countWindows++;break}
+																								'Trust' {$countTrust++;break}
+																								'ExplicitLogin' {$countExlplicitLogin++;break}
+																							} 
+																						} 
+					[float]$percentSecured = 100*($countSecured/$processedPIConnectionStats.Count)
+					if($countWindows -eq $processedPIConnectionStats.Count)
+					{
+						$Severity = 'Moderate'
+						$msg = "Not all remote connections leveraging transport security {0:N1}.  All remote connections leveraging Windows authentication." -f $percentSecured
+					}
+					else
+					{
+						[float]$percentWindows = 100*($countWindows/$processedPIConnectionStats.Count)
+						[float]$percentTrust = 100*($countTrust/$processedPIConnectionStats.Count)
+						[float]$percentExplicitLogin = 100*($countExplicitLogin/$processedPIConnectionStats.Count)
+						$Severity = 'Severe'
+						$msg = "Legacy protocols in use.  Authentication protocol distribution: Windows ({0:N1} %), Trust ({1:N1} %), ExplicitLogin ({2:N1} %)" -f $percentWindows, $percentTrust, $percentExplicitLogin
+					}
+				}
+			}
+			else
+			{
+				$msg = "No remote connections were found."					
+				Write-PISysAudit_LogMessage $msg "Warning" $fn								
+				$result = "N/A"
+			}
+		}
+		else
+		{
+			$result = $false
+			$msg = 'PI Data Archive version does not support transport security.'
+			$Severity = 'Severe'
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20012" `
+										-ain "Transport Security Used" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity $Severity								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1248,6 +1376,7 @@ Export-ModuleMember Get-PISysAudit_CheckPISPN
 Export-ModuleMember Get-PISysAudit_CheckPICollective
 Export-ModuleMember Get-PISysAudit_CheckInstalledClientSoftware
 Export-ModuleMember Get-PISysAudit_CheckPIFirewall
+Export-ModuleMember Get-PISysAudit_CheckTransportSecurity
 # </Do not remove>
 
 # ........................................................................
