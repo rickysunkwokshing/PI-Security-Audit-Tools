@@ -1305,7 +1305,8 @@ AU20013 - PI Backup Configured
 VALIDATION: Ensures that PI Backups are configured and current. <br/>
 COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration
 	and data daily. It is best practice to back up to a local disk on the 
-	PI Data Archive machine, then copy the backup to an off-machine location. <br/>
+	PI Data Archive machine, then copy the backup to an off-machine location. 
+	For more information, see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
