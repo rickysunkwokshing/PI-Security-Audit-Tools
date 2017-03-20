@@ -75,6 +75,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 # AU20012
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 # AU20013
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -1295,6 +1296,142 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPIBackup
+{
+<#  
+.SYNOPSIS
+AU20013 - PI Backup Configured
+.DESCRIPTION
+VALIDATION: Ensures that PI Backups are configured and current. <br/>
+COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration
+	and data daily. It is best practice to back up to a local disk on the 
+	PI Data Archive machine, then copy the backup to an off-machine location. 
+	For more information, see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$severity = 'N/A'
+	try
+	{		
+		$con = $global:PIDataArchiveConnection
+		$now = Get-Date
+		$lastBackup = Get-PIBackupReport -Connection $con -LastReport -ErrorAction SilentlyContinue
+		$archiveList = Get-PIArchiveFileInfo -Connection $con -ErrorAction SilentlyContinue
+
+		# Check how recent the latest backup is
+		if($null -ne $lastBackup)
+		{
+			$backupSummary = $lastBackup.Summary
+			if($backupSummary.StatusMessage -eq '[0] Success')
+			{
+				if($backupSummary.BackupStart -gt $now.AddDays(-1))
+				{
+					# Good recent backup found, check file coverage
+					if($null -ne $archiveList)
+					{
+						$arcsNotBackedUp = $archiveList | Where-Object { $null -eq $_.LastBackupTime }
+						if($arcsNotBackedUp.Count -eq 0)
+						{
+							$result = $true
+							$msg = "Good backup found, all archives backed up."
+						}
+						else
+						{
+							# Not all archives backed up, Moderate warning
+							$result = $false
+							$msg = "Good backup found, but $($arcsNotBackedUp.Count) archive(s) not backed up."
+							$severity = 'Moderate'
+						}
+					}
+					else
+					{
+						# Unable to get archive list, cannot fully assess severity. Default to Moderate
+						$result = $false
+						$msg = "Good backup found, but could not confirm backup coverage of archive files."
+						$severity = 'Moderate'
+					}
+				}
+				elseif($backupSummary.BackupStart -gt $now.AddDays(-7))
+				{
+					# Last backup older than a day but less than a week, Moderate warning
+					$result = $false
+					$lastBackupTime = $backupSummary.BackupStart.ToString("dd-MMM-yyyy HH:mm:ss")
+					$msg = "Last backup is more than a day ago, at $lastBackupTime"
+					$severity = 'Moderate'
+				}
+				else
+				{
+					# Last backup older than a week, Severe warning
+					$result = $false
+					$lastBackupTime = $backupSummary.BackupStart.ToString("dd-MMM-yyyy HH:mm:ss")
+					$msg = "Last backup performed more than a week ago, at $lastBackupTime"
+					$severity = 'Severe'
+				}
+			}
+			else
+			{
+				# Last backup returned an error, Severe warning
+				$result = $false
+				$msg = "Last PI Backup returned error $($backupSummary.StatusMessage)"
+				$severity = 'Severe'
+			}
+
+		}
+		else
+		{
+			# No backup found, Severe warning
+			$result = $false
+			$msg = "No PI Backup configuration found."
+			$severity = 'Severe'
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20013" `
+										-ain "PI Backup Configured" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity $severity
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1377,6 +1514,7 @@ Export-ModuleMember Get-PISysAudit_CheckPICollective
 Export-ModuleMember Get-PISysAudit_CheckInstalledClientSoftware
 Export-ModuleMember Get-PISysAudit_CheckPIFirewall
 Export-ModuleMember Get-PISysAudit_CheckTransportSecurity
+Export-ModuleMember Get-PISysAudit_CheckPIBackup
 # </Do not remove>
 
 # ........................................................................
