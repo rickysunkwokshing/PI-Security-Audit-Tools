@@ -761,7 +761,7 @@ PROCESS
 		{
 			if($null -eq $lastPatch) { return $false }
 			else
-			{ return $lastPatch.ToFileTimeUtc() -gt $cutoffDate }
+			{ return ([datetime]$lastPatch).ToFileTimeUtc() -gt $cutoffDate }
 		}
 		
 		$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
