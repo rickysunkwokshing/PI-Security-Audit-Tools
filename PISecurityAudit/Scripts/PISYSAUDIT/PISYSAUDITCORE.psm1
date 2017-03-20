@@ -1350,6 +1350,7 @@ param(
 				
 		# Prepare data required for multiple compliance checks
 
+		Write-Progress -Activity $activityMsg1 -Status "Gathering PI AF Server Configuration"
 		$global:AFDiagOutput = Invoke-PISysAudit_AFDiagCommand -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
 										
 		# Proceed with all the compliance checks.
@@ -1599,8 +1600,18 @@ param(
 			return
 		}
 
+		# Set message templates.
+		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
+		$statusMsgCompleted = "Completed"
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
+												+ " Audit Table = {1}, Server Name = {2}," `
+												+ " Debug Level = {3}"
+
 		try
 		{
+			Write-Progress -Activity $activityMsg1 -Status "Gathering Coresight Configuration" -ParentId 1
 			Get-PISysAudit_GlobalPICoresightConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
 		}
 		catch
@@ -1623,16 +1634,7 @@ param(
 			$msg = "No PI Coresight checks have been found."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			return
-		}			
-		
-		# Set message templates.
-		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
-		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
-												+ " Audit Table = {1}, Server Name = {2}," `
-												+ " Debug Level = {3}"									
+		}							
 				
 		# Proceed with all the compliance checks.
 		$i = 0
