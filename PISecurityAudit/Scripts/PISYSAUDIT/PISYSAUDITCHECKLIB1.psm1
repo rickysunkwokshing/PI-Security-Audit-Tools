@@ -71,6 +71,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1    # AU10006
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1    # AU10007
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdates"    1    # AU10008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInternetAccess"     1    # AU10009
 
 			
 	# Return all items at or below the specified AuditLevelInt
@@ -805,6 +806,93 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckInternetAccess
+{
+<#  
+.SYNOPSIS
+AU10009 - No Internet Access
+.DESCRIPTION
+VERIFICATION: Checks that this server is not able to access the internet. <br/>
+COMPLIANCE: Implement firewall restrictions to prevent access to the internet 
+	from the server. 
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{
+		# Test ping response from Google's DNS server	
+		$testAddress = '8.8.8.8'
+		$scriptBlock = {
+				param([string]$Address)
+				Test-Connection -ComputerName $Address -Count 4 -Quiet # Quiet simply returns true or false
+		}
+
+		if($LocalComputer)
+		{
+			$canConnect = & $scriptBlock -Address $testAddress
+		}
+		else
+		{
+			$canConnect = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $testAddress
+		}
+
+		if($canConnect -eq $true)
+		{
+			$result = $false
+			$msg = "Server has internet access."
+		}
+		else
+		{
+			$result = $true
+			$msg = "Server does not appear to have internet access."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10009" `
+									-ain "No Internet Access" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Moderate"																																																
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -884,6 +972,7 @@ Export-ModuleMember Get-PISysAudit_CheckUACEnabled
 Export-ModuleMember Get-PISysAudit_CheckManagedPI
 Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
 Export-ModuleMember Get-PISysAudit_CheckSoftwareUpdates
+Export-ModuleMember Get-PISysAudit_CheckInternetAccess
 # </Do not remove>
 
 # ........................................................................
