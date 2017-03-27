@@ -149,7 +149,7 @@ PROCESS
 										-ain "Domain Membership Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Domain" `
-										-Severity "Severe"																				 
+										-Severity "High"																				 
 }
 
 END {}
@@ -223,7 +223,7 @@ PROCESS
 										-ain "Operating System Installation Type" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Operating System" `
-										-Severity "Severe"													
+										-Severity "Critical"													
 }
 
 END {}
@@ -316,7 +316,7 @@ PROCESS
 										-ain "Firewall Enabled" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
-										-Severity "Moderate"																				 
+										-Severity "Medium"																				 
 }
 
 END {}
@@ -406,7 +406,7 @@ PROCESS
 										-ain "AppLocker Enabled" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
-										-Severity "Moderate"																				 
+										-Severity "Medium"																				 
 }
 
 END {}
@@ -469,7 +469,7 @@ PROCESS
 			if ($(Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -RegKeyPath $uacKeyPath -Attribute $uacFeature) -eq 0)
 			{
 				$result = $false
-				$severity = "Moderate"
+				$severity = "Medium"
 				$tmpmsg += $uacFeature + "; "
 			}
 		}
@@ -612,7 +612,7 @@ PROCESS
 										-ain "OSIsoft NOC Monitoring" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Montitoring"`
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -699,7 +699,7 @@ PROCESS
 									-ain "IE Enhanced Security" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
-									-Severity "Moderate"
+									-Severity "Medium"
 }
 
 END {}
@@ -796,7 +796,7 @@ PROCESS
 									-ain "Software Updates" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
-									-Severity "Severe"
+									-Severity "High"
 }
 
 END {}
@@ -883,7 +883,7 @@ PROCESS
 									-ain "No Internet Access" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
-									-Severity "Moderate"																																																
+									-Severity "Medium"																																																
 }
 
 END {}

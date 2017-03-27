@@ -220,7 +220,7 @@ PROCESS
 										-ain "PI Data Archive Table Security" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "DB Security" `
-										-Severity "Moderate"																		
+										-Severity "Medium"																		
 }
 
 END {}
@@ -293,14 +293,14 @@ PROCESS
 			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
 			$result = $false	
 			$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
-			$Severity = "Severe"
+			$Severity = "High"
 		}
 
 		if($noncompliantMappings){
 			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
 			$result = $false	
 			$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
-			$Severity = "Severe"
+			$Severity = "High"
 		}
 
 		if($result -eq $true){
@@ -318,7 +318,7 @@ PROCESS
 			{
 					$result = $false 
 					$msg += "However, the piadmin user can still be assigned to a trust."
-					$Severity = "Moderate"
+					$Severity = "Medium"
 			}
 		}		
 	}
@@ -398,13 +398,13 @@ PROCESS
 		if($versionInt -lt $latestInt)
 		{
 			$result = $false
-			$Severity = 'Severe'
+			$Severity = 'High'
 			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
 		}
 		else
 		{
 			$result = $true
-			$Severity = 'Severe'
+			$Severity = 'High'
 			$msg = "PI Data Archive version is compliant."
 		}
 	}
@@ -509,7 +509,7 @@ PROCESS
 										-ain "Edit Days" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Severe"												
+										-Severity "High"												
 }
 
 END {}
@@ -620,7 +620,7 @@ PROCESS
 										-ain "Auto Trust Configuration" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "Authentication" `
-										-Severity "Severe"	
+										-Severity "High"	
 										
 }
 
@@ -731,7 +731,7 @@ PROCESS
 										-ain "Expensive Query Protection" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "PI Archive Subsystem" `
-										-Severity "Severe"																		
+										-Severity "High"																		
 }
 
 END {}
@@ -801,19 +801,19 @@ PROCESS
 		{
 			$result = $false
 			$msgPolicy = "Using non-compliant policy:"
-			$Severity = "severe"
+			$Severity = "High"
 			
 			$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowExplicitLogin)
 			
 			if($piadminExplicitLoginDisabled)
 			{
 				$description += "Explicit login disabled for piadmin."
-				$Severity = "severe"
+				$Severity = "High"
 			}
 			else
 			{
 				$description += "Explicit login allowed for piadmin."
-				$Severity = "severe"
+				$Severity = "High"
 			}
 		}
 		else
@@ -914,7 +914,7 @@ PROCESS
 										-ain "PI Data Archive SPN Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -987,7 +987,7 @@ PROCESS
 										-ain "PI Collective" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -1072,7 +1072,7 @@ PROCESS
 										-ain "Client Software" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Moderate"
+										-Severity "Medium"
 }
 
 END {}
@@ -1159,7 +1159,7 @@ PROCESS
 										-ain "PI Firewall Used" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -1245,7 +1245,7 @@ PROCESS
 					[float]$percentSecured = 100*($countSecured/$processedPIConnectionStats.Count)
 					if($countWindows -eq $processedPIConnectionStats.Count)
 					{
-						$Severity = 'Moderate'
+						$Severity = 'Medium'
 						$msg = "Not all remote connections leveraging transport security {0:N1}.  All remote connections leveraging Windows authentication." -f $percentSecured
 					}
 					else
@@ -1253,7 +1253,7 @@ PROCESS
 						[float]$percentWindows = 100*($countWindows/$processedPIConnectionStats.Count)
 						[float]$percentTrust = 100*($countTrust/$processedPIConnectionStats.Count)
 						[float]$percentExplicitLogin = 100*($countExplicitLogin/$processedPIConnectionStats.Count)
-						$Severity = 'Severe'
+						$Severity = 'High'
 						$msg = "Legacy protocols in use.  Authentication protocol distribution: Windows ({0:N1} %), Trust ({1:N1} %), ExplicitLogin ({2:N1} %)" -f $percentWindows, $percentTrust, $percentExplicitLogin
 					}
 				}
@@ -1269,7 +1269,7 @@ PROCESS
 		{
 			$result = $false
 			$msg = 'PI Data Archive version does not support transport security.'
-			$Severity = 'Severe'
+			$Severity = 'High'
 		}
 	}
 	catch
@@ -1359,52 +1359,52 @@ PROCESS
 						}
 						else
 						{
-							# Not all archives backed up, Moderate warning
+							# Not all archives backed up, Medium warning
 							$result = $false
 							$msg = "Good backup found, but $($arcsNotBackedUp.Count) archive(s) not backed up."
-							$severity = 'Moderate'
+							$severity = 'Medium'
 						}
 					}
 					else
 					{
-						# Unable to get archive list, cannot fully assess severity. Default to Moderate
+						# Unable to get archive list, cannot fully assess severity. Default to Medium
 						$result = $false
 						$msg = "Good backup found, but could not confirm backup coverage of archive files."
-						$severity = 'Moderate'
+						$severity = 'Medium'
 					}
 				}
 				elseif($backupSummary.BackupStart -gt $now.AddDays(-7))
 				{
-					# Last backup older than a day but less than a week, Moderate warning
+					# Last backup older than a day but less than a week, Medium warning
 					$result = $false
 					$lastBackupTime = $backupSummary.BackupStart.ToString("dd-MMM-yyyy HH:mm:ss")
 					$msg = "Last backup is more than a day ago, at $lastBackupTime"
-					$severity = 'Moderate'
+					$severity = 'Medium'
 				}
 				else
 				{
-					# Last backup older than a week, Severe warning
+					# Last backup older than a week, High warning
 					$result = $false
 					$lastBackupTime = $backupSummary.BackupStart.ToString("dd-MMM-yyyy HH:mm:ss")
 					$msg = "Last backup performed more than a week ago, at $lastBackupTime"
-					$severity = 'Severe'
+					$severity = 'High'
 				}
 			}
 			else
 			{
-				# Last backup returned an error, Severe warning
+				# Last backup returned an error, High warning
 				$result = $false
 				$msg = "Last PI Backup returned error $($backupSummary.StatusMessage)"
-				$severity = 'Severe'
+				$severity = 'High'
 			}
 
 		}
 		else
 		{
-			# No backup found, Severe warning
+			# No backup found, High warning
 			$result = $false
 			$msg = "No PI Backup configuration found."
-			$severity = 'Severe'
+			$severity = 'High'
 		}
 	}
 	catch
