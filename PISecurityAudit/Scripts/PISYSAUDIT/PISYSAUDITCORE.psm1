@@ -1053,7 +1053,10 @@ param(
 		}			
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
 	}
 	catch
 	{
@@ -1211,7 +1214,10 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1381,7 +1387,10 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1527,7 +1536,10 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1661,7 +1673,10 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
 	}
 	catch
 	{
@@ -5189,6 +5204,7 @@ PROCESS
 			$currCheck += $item.Value.Count
 		}
 	}
+	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100 
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
 
 	# Pad console ouput with one line
@@ -5200,7 +5216,11 @@ PROCESS
 	$ActivityMsg = "Generate report"
 	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status "in progress..." -Id 1 }
 	$reportName = Write-PISysAuditReport $auditHashTable -obf $ObfuscateSensitiveData -dtl $DetailReport -dbgl $DBGLevel
-	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -completed }
+	if($ShowUI) 
+	{ 
+		Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100
+		Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed 
+	}
 	
 	# ............................................................................................................
 	# Display that the analysis is completed and where the report can be found.
