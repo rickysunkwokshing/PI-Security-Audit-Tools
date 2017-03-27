@@ -2652,7 +2652,7 @@ PROCESS
 	
 	try
 	{
-		if($PSVersionTable.PSVersion.Major -ge 4)
+		if(Get-Command Resolve-DnsName -ErrorAction SilentlyContinue)
 		{
 			$record = Resolve-DnsName -Name $LookupName 
 			$recordObjectType = $record.GetType().Name
@@ -3029,7 +3029,7 @@ PROCESS
 	{									
 		if($LocalComputer)
 		{			                    			
-			$firewallState = Get-NetFirewallProfile 
+			$firewallState = Get-NetFirewallProfile
 		}
 		else
 		{                            				
