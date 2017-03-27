@@ -3026,14 +3026,35 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{									
+	{
+		$scriptBlock = {
+			if(Get-Command Get-NetFirewallProfile -ErrorAction SilentlyContinue)
+			{
+				Get-NetFirewallProfile
+			}
+			else
+			{
+				# These keys return 0 if disabled, 1 if enabled
+				$domain  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile | Select-Object -ExpandProperty EnableFirewall
+				$private = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile | Select-Object -ExpandProperty EnableFirewall
+				$public  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\PublicProfile | Select-Object -ExpandProperty EnableFirewall
+
+				# Assemble and return a list of objects that will mimic the profile objects returned by Get-NetFirewallProfile
+				$firewallState = @()
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Domain'; 'Enabled'=$domain}
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Private';'Enabled'=$private}
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Public'; 'Enabled'=$public}
+				$firewallState
+			}
+		}
+
 		if($LocalComputer)
 		{			                    			
-			$firewallState = Get-NetFirewallProfile
+			$firewallState = & $scriptBlock
 		}
 		else
 		{                            				
-			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock { Get-NetFirewallProfile } 
+			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
 		}
 		# Return the content.
 		return $firewallState
