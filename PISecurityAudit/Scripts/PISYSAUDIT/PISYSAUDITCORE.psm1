@@ -1053,7 +1053,10 @@ param(
 		}			
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
 	}
 	catch
 	{
@@ -1211,7 +1214,10 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1382,7 +1388,10 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1528,7 +1537,10 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1663,7 +1675,10 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
 	}
 	catch
 	{
@@ -2654,7 +2669,7 @@ PROCESS
 	
 	try
 	{
-		if($PSVersionTable.PSVersion.Major -ge 4)
+		if(Get-Command Resolve-DnsName -ErrorAction SilentlyContinue)
 		{
 			$record = Resolve-DnsName -Name $LookupName 
 			$recordObjectType = $record.GetType().Name
@@ -3028,14 +3043,35 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{									
+	{
+		$scriptBlock = {
+			if(Get-Command Get-NetFirewallProfile -ErrorAction SilentlyContinue)
+			{
+				Get-NetFirewallProfile
+			}
+			else
+			{
+				# These keys return 0 if disabled, 1 if enabled
+				$domain  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile | Select-Object -ExpandProperty EnableFirewall
+				$private = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile | Select-Object -ExpandProperty EnableFirewall
+				$public  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\PublicProfile | Select-Object -ExpandProperty EnableFirewall
+
+				# Assemble and return a list of objects that will mimic the profile objects returned by Get-NetFirewallProfile
+				$firewallState = @()
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Domain'; 'Enabled'=$domain}
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Private';'Enabled'=$private}
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Public'; 'Enabled'=$public}
+				$firewallState
+			}
+		}
+
 		if($LocalComputer)
 		{			                    			
-			$firewallState = Get-NetFirewallProfile 
+			$firewallState = & $scriptBlock
 		}
 		else
 		{                            				
-			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock { Get-NetFirewallProfile } 
+			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
 		}
 		# Return the content.
 		return $firewallState
@@ -5170,6 +5206,7 @@ PROCESS
 			$currCheck += $item.Value.Count
 		}
 	}
+	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100 
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
 
 	# Pad console ouput with one line
@@ -5181,7 +5218,11 @@ PROCESS
 	$ActivityMsg = "Generate report"
 	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status "in progress..." -Id 1 }
 	$reportName = Write-PISysAuditReport $auditHashTable -obf $ObfuscateSensitiveData -dtl $DetailReport -dbgl $DBGLevel
-	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -completed }
+	if($ShowUI) 
+	{ 
+		Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100
+		Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed 
+	}
 	
 	# ............................................................................................................
 	# Display that the analysis is completed and where the report can be found.
