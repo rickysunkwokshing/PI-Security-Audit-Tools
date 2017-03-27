@@ -172,7 +172,7 @@ PROCESS
 										-aif $fn -msg $msg `
 										-ain "SQL Server xp_CmdShell Check" -aiv $result `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -279,7 +279,7 @@ PROCESS
 										-aif $fn -msg $msg `
 										-ain "SQL Server Adhoc Queries Check" -aiv $result `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -387,7 +387,7 @@ PROCESS
 										-aif $fn -msg $msg `
 										-ain "SQL Server DB Mail XPs Check" -aiv $result `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -494,7 +494,7 @@ PROCESS
 										-ain "SQL Server OLE Automation Procedures Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -601,7 +601,7 @@ PROCESS
 										-ain "SQL Server CLR Enabled Configuration Option Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -709,7 +709,7 @@ PROCESS
 										-ain "SQL Server Cross DB Ownership Chaining Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -817,7 +817,7 @@ PROCESS
 										-ain "SQL Server Remote Access Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "SQL Server" `
-										-Severity "Severe"
+										-Severity "High"
 										
 }
 
@@ -910,7 +910,7 @@ PROCESS
 		{ 
 			$result = $false
 			$msg = "Login sa enabled."
-			$Severity = "Severe"
+			$Severity = "High"
 
 			# Build and execute the query.
 			$sarenamed = 0
@@ -930,7 +930,7 @@ PROCESS
 			else
 			{
 				$msg += "  Login name changed from the default."
-				$Severity = "Moderate"
+				$Severity = "Medium"
 			}
 		}	
 	}

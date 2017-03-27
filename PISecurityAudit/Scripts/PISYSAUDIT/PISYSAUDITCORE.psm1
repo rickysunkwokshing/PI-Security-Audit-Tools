@@ -4274,7 +4274,7 @@ param(
 		$Group4 = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("s")]
-		[ValidateSet("Unknown", "N/A", "Low", "Moderate", "Severe")]
+		[ValidateSet("Unknown", "N/A", "Low", "Medium", "High", "Critical")]
 		[String]
 		$Severity = "Low")
 BEGIN {}
@@ -4295,6 +4295,15 @@ PROCESS
 	if($AuditItemValue){$Severity = "N/A"}
 	elseif($AuditItemValue -eq "N/A"){$Severity = "Unknown"}
 
+	switch($Severity)
+	{
+		'Critical' { $SeverityLevel=0; break }
+		'High'     { $SeverityLevel=1; break }
+		'Medium'   { $SeverityLevel=2; break }
+		'Low'      { $SeverityLevel=3; break }
+		default    { $SeverityLevel='N/A'; break }
+	}
+
 	# Set the properties.
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ID" -Value $AuditItemID
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ServerName" -Value $computerName
@@ -4307,6 +4316,7 @@ PROCESS
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group3" -Value $Group3
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group4" -Value $Group4
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Severity" -Value $Severity
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SeverityLevel" -Value $SeverityLevel
 	
 	# Add this custom object to the hash table.
 	$AuditHashTable.Add($myKey, $tempObj)
@@ -4764,7 +4774,7 @@ PROCESS
 		
 		# Export to .csv but sort the results table first to have Failed items on the top sorted by Severity 
 		$results = $results | Sort-Object   @{Expression="AuditItemValue";Descending=$false}, `
-											@{Expression="Severity";Descending=$true}, `
+											@{Expression="SeverityLevel";Descending=$false}, `
 											@{Expression="ServerName";Descending=$false}, `
 											@{Expression="ID";Descending=$false}
 		$results | Export-Csv -Path $fileToExport -Encoding ASCII -NoType
@@ -4820,8 +4830,9 @@ PROCESS
 				$highlight = "`"`""
 				switch ($result.Severity.ToLower())
 				{
-					"severe" {$highlight="`"severe`""; break}
-					"moderate" {$highlight="`"moderate`""; break}
+					"critical" {$highlight="`"critical`""; break}
+					"high" {$highlight="`"high`""; break}
+					"medium" {$highlight="`"medium`""; break}
 					"low" {$highlight="`"low`""; break}
 				}
 				if ($result.AuditItemValue -eq "N/A") {$highlight="`"error`""}
@@ -4924,11 +4935,14 @@ PROCESS
 							background-color: #FFF59D;
 						}
 			
-						.moderate{
+						.medium{
 							background-color: #FFCC80;
 						}
-						.severe{
+						.high{
 							background-color: #FFAB91;
+						}
+						.critical{
+							background-color: #F26B41;
 						}
 						.error{
 							color: #FF0000;

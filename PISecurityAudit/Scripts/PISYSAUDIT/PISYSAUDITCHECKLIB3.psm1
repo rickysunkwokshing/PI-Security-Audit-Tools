@@ -120,7 +120,7 @@ PROCESS
 	try
 	{				
 		# Get the service account.
-		$value = Get-PISysAudit_ServiceProperty -sn 'afservice' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel				
+		$value = Get-PISysAudit_ServiceProperty -sn 'afservice' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 		
 		# Check if the value is <> LocalSystem		
 		if($value.ToLower() -eq "localsystem") 
@@ -148,7 +148,7 @@ PROCESS
 										-aif $fn -msg $msg `
 										-ain "Configured Account" -aiv $result `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Severe"
+										-Severity "High"
 }
 
 END {}
@@ -388,7 +388,7 @@ PROCESS
 										-ain "PI AF Server Service privileges" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Severe"																					
+										-Severity "High"																					
 }
 
 END {}
@@ -476,7 +476,7 @@ PROCESS
 										-ain "PI AF Server Plugin Verify Level" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Moderate"
+										-Severity "Medium"
 										
 }
 
@@ -595,7 +595,7 @@ PROCESS
 										-ain "PI AF Server File Extension Whitelist" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Moderate"
+										-Severity "Medium"
 										
 }
 
@@ -697,7 +697,7 @@ PROCESS
 										-ain "PI AF Server Version" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Moderate"
+										-Severity "Medium"
 										
 }
 
@@ -774,7 +774,7 @@ PROCESS
 										-ain "PI AF Server SPN Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server"`
-										-Severity "Moderate"
+										-Severity "Medium"
 }
 
 END {}
@@ -897,13 +897,13 @@ PROCESS
 					$result = $false
 					if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
 					{
-						$Severity = 'severe'
+						$Severity = 'High'
 						$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
 						$priorityMappings = $endUserMappings
 					}
 					else
 					{
-						$Severity = 'moderate'
+						$Severity = 'Medium'
 						if($osAdminMappings.Count -gt 0)
 						{
 							$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
@@ -1044,7 +1044,7 @@ PROCESS
 										-ain "AF Connection to SQL" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Moderate"
+										-Severity "Medium"
 }
 
 END {}
@@ -1167,7 +1167,7 @@ PROCESS
 										-ain "Restrict AF World" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Moderate"
+										-Severity "Medium"
 }
 
 END {}
@@ -1333,7 +1333,7 @@ PROCESS
 										-ain "Restrict Write Access" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI AF Server" `
-										-Severity "Severe"
+										-Severity "High"
 }
 
 END {}

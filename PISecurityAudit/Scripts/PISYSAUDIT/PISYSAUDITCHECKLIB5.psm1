@@ -248,7 +248,7 @@ PROCESS
 									-aif $fn -msg $msg `
 									-ain "PI Coresight Version" -aiv $result `
 									-Group1 "PI System" -Group2 "PI Coresight" `
-									-Severity "Moderate"																																																
+									-Severity "Medium"																																																
 
 }
 
@@ -365,7 +365,7 @@ PROCESS
 									-aif $fn -msg $msg `
 									-ain "PI Coresight AppPool Check" -aiv $result `
 									-Group1 "PI System" -Group2 "PI Coresight" `
-									-Severity "Moderate"																																																
+									-Severity "Medium"																																																
 }
 
 END {}
@@ -426,12 +426,12 @@ PROCESS
 			# Basic Authentication is disabled.
 			If ($basicAuth.Value -eq $False) 
 			{ 
-				$severity = "Moderate" 
+				$severity = "Medium" 
 				$msg = "HTTPS binding is not enabled."
 			} 
 			Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 			{ 
-				$severity = "Severe"
+				$severity = "High"
 				$msg = "Basic Authentication is enabled, but HTTPS binding is not enabled. User credentials sent over the wire are not encrypted!"
 			}
 		} 
@@ -492,12 +492,12 @@ PROCESS
 				# Basic Authentication is disabled. Not too bad.
 				If ($basicAuth.Value -eq $False) 
 				{ 
-					$severity = "Moderate" 
+					$severity = "Medium" 
 					$msg = "Connections without SSL are allowed."
 				} 
 				Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 				{ 
-					$severity = "Severe" 
+					$severity = "High" 
 					$msg = "Basic Authentication is enabled, but connections without SSL are allowed. User credentials sent over the wire may not be encrypted!"
 				}
 			}
@@ -640,7 +640,7 @@ PROCESS
 									-aif $fn -msg $msg `
 									-ain "PI Coresight SPN Check" -aiv $result `
 									-Group1 "PI System" -Group2 "PI Coresight" `
-									-Severity "Moderate"																																																
+									-Severity "Medium"																																																
 }
 
 END {}
