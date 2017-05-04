@@ -3335,7 +3335,7 @@ protocol and whether the connection is local or remote.
 		[object]
 		$PIConnectionStats,
         [parameter(Mandatory=$false, ParameterSetName = "Default")]
-        [ValidateSet('Windows','Trust','ExplicitLogin','SubSystem','Any')]
+        [ValidateSet('Windows','Trust','ExplicitLogin','Subsystem','Any')]
         [alias("ap")]
         [string]
         $ProtocolFilter="Any",
@@ -3387,11 +3387,11 @@ PROCESS
 					elseif($hasProperty -contains 'User')
 					{ $statAuthProtocol = 'ExplicitLogin' }
 					elseif($Stat.Item('ConnectionType').Value -eq 'Local Connection')
-					{ $statAuthProtocol = 'SubSystem' }
+					{ $statAuthProtocol = 'Subsystem' }
 				}   
 			}
 			elseif($hasProperty -contains 'ServerID') # PINetMgr is a special case
-			{ $statAuthProtocol = 'SubSystem' }
+			{ $statAuthProtocol = 'Subsystem' }
 
 			# Determine whether or not the connection is remote.
 			[boolean]$IsRemote = $false

@@ -157,7 +157,7 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		For more information, see "Security Best Practice" #4 in KB00833: 
 		https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 
 
-		AU20003 - PI Data Archive SubSystem Version Check
+		AU20003 - PI Data Archive Subsystem Version Check
 		VALIDATION: verifies that the PI Data Archive is using the most recent release.   
 		COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
 		2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
