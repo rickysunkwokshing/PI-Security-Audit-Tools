@@ -785,6 +785,10 @@ PROCESS
 		
 		$Server_AuthenticationPolicy = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value
 		
+		# A null Server_AuthenticationPolicy is treated the same as a value of 0.
+		if($null -eq $Server_AuthenticationPolicy)
+		{ $Server_AuthenticationPolicy = 0 }
+
 		switch ($Server_AuthenticationPolicy)
 				{
 					0   { $description = "All authentication options enabled. "; break; }
