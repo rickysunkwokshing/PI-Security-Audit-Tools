@@ -1265,7 +1265,8 @@ PROCESS
 		if($version.Major -ge 3 -and $version.Minor -ge 4 -and $version.Build -ge 395)
 		{
 			$rawPIConnectionStats = Get-PIConnectionStatistics -Connection $global:PIDataArchiveConnection
-			$processedPIConnectionStats = Get-PISysAudit_ProcessedPIConnectionStatistics -PIDataArchiveConnection $global:PIDataArchiveConnection `
+			$processedPIConnectionStats = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $RemoteComputerName `
+																					-PIDataArchiveConnection $global:PIDataArchiveConnection `
 																					-PIConnectionStats $rawPIConnectionStats -ProtocolFilter Any `
 																					-RemoteOnly $true -SuccessOnly $true -CheckTransportSecurity $true `
 																					-DBGLevel $DBGLevel

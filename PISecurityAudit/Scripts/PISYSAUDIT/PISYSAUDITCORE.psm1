@@ -3325,8 +3325,16 @@ Transpose and filter PI Connection Statistics.  Options to filter returned resul
 protocol and whether the connection is local or remote.  
 #>
     [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-    param(							
-        [parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+    param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,
+        [parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("pic")]
 		[object]
 		$PIDataArchiveConnection,
@@ -3362,6 +3370,16 @@ PROCESS
 
 	try
 	{
+		# Get timezone offset between PI Data Archive and here if necessary
+		# This offset can be added to the remote times to get local time
+		$offsetMinutes = 0
+		if(-not $LocalComputer)
+		{
+			$localGmtOffset = ExecuteWMIQuery -lc $true -WMIClassName 'win32_timezone' | Select-Object -ExpandProperty Bias
+			$remoteGmtOffset = ExecuteWMIQuery -lc $false -rcn $RemoteComputerName -WMIClassName 'win32_timezone' | Select-Object -ExpandProperty Bias
+			$offsetMinutes = $localGmtOffset - $remoteGmtOffset
+		}
+
 		$transposedStats = @()
 		Foreach($stat in $PIConnectionStats) 
 		{
@@ -3410,7 +3428,19 @@ PROCESS
 				$transposedStat | Add-Member -MemberType NoteProperty -Name 'AuthenticationProtocol' -Value $statAuthProtocol
 				$transposedStat | Add-Member -MemberType NoteProperty -Name 'Remote' -Value $IsRemote.ToString()
 				# Transpose the object into PSObject with NoteProperties
-				Foreach($property in $stat.StatisticType){ $transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $stat.Item($property).Value }
+				foreach($property in $stat.StatisticType)
+				{
+					# Apply timezone offset to ConnectedTime and LastCallTime properties
+					if($property -eq 'ConnectedTime' -or $property -eq 'LastCallTime')
+					{
+						$adjustedValue = (Get-Date $stat.Item($property).Value).AddMinutes($offsetMinutes)
+						$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $adjustedValue
+					}
+					else
+					{
+						$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $stat.Item($property).Value 
+					}
+				}
 				$transposedStats += $transposedStat 
 			}
 		}
