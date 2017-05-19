@@ -248,10 +248,11 @@ AU20002 - PI Admin Usage Check
 VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.<br/>
 COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
 PI Identity with appropriate privilege for the applications that will use it.  Will also
-check if trusts with piadmin have been disabled globally.  This can be done by checking 
-"User cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To 
-access this menu open use the Identities, Users, & Groups plugin in PI SMT, navigate to 
-the PI User tab, right click the piadmin entry and select Properties in the context menu.  
+check if trusts and mappings to piadmin have been disabled globally.  This can be done by  
+checking "User cannot be used in a Trust" and "User cannot be used in a Mapping" in the 
+Properties menu for the piadmin PI User.  To access this menu open use the Identities, 
+Users, & Groups plugin in PI SMT, navigate to the PI User tab, right click the piadmin 
+entry and select Properties in the context menu.  
 For more information, see "Security Best Practice" #4 in KB00833: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 ">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
 #>
@@ -279,57 +280,96 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$status = ""
+	$policy = "Current policy: "
+	$recommendation = ""
 	$Severity = "Unknown"
 	try
 	{							
 		# Initialize objects.
-		$piadminTrustsDisabled = $false							
+		$piadminTrustsDisabled = $false
+		$piadminMappingsDisabled = $false	
+		$result = $true						
 													
-		# CheckPIAdminUsageInTrusts.dif
+		# Check if piadmin is blocked globally for mappings or trusts
+		$piadminIdentity = $(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin")
+		$piadminTrustsDisabled = -not($piadminIdentity.AllowTrusts)
+		$piadminMappingsDisabled = -not($piadminIdentity.AllowMappings)
+		
+		# Evaluate if authentication policy allows trusts 
+		$trustsGlobalDisabled = $(Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value) -eq 51
+
+		# Get PI Trusts with the piadmin user. 
 		$noncompliantTrusts = Get-PITrust -Connection $global:PIDataArchiveConnection `
 									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
 									| ForEach-Object {$_.Name}
-
-		# CheckPIAdminUsageInMappings.dif
+		# Get PI Mappings with the piadmin user.
 		$noncompliantMappings = Get-PIMapping -Connection $global:PIDataArchiveConnection `
 									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
 									| ForEach-Object {$_.PrincipalName}
-
-		$result = $true
-																	
-		#Iterate through the returned results (is any) and append ; delimiter for the output message. 
+															
+		# Iterate through the returned results (if any) and append ; delimiter for the output message. 
 		if($noncompliantTrusts){
-			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
-			$result = $false	
-			$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
-			$Severity = "High"
-		}
-
-		if($noncompliantMappings){
-			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
-			$result = $false	
-			$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
-			$Severity = "High"
-		}
-
-		if($result -eq $true){
-			$msg = "No Trust(s) or Mapping(s) identified as weaknesses.  "
-			
-			# Check whether using the piadmin user for trusts is blocked globally
-			$piadminTrustsDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowTrusts)
-			
-			if($piadminTrustsDisabled) 
+			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}			
+			if($trustsGlobalDisabled -or $piadminTrustsDisabled)
 			{ 
-				$result = $true 
-				$msg += "The piadmin user cannot be assigned to a trust."
-			} 
-			else 
-			{
-					$result = $false 
-					$msg += "However, the piadmin user can still be assigned to a trust."
-					$Severity = "Medium"
+				$recommendation += "Consider removing or disabling the following trusts which are no longer in effect: " + $noncompliantTrusts	+ ".`n" 
 			}
-		}		
+			else
+			{
+				$result = $false	
+				$status += "Trust(s) in effect using piadmin: " + $noncompliantTrusts	+ ".`n"
+
+				if($noncompliantTrusts.Trim(';') -eq "!Proxy_127!")
+				{ $Severity = "Medium" }
+				else 
+				{ $Severity = "High" }
+			}
+		}
+		if($noncompliantMappings){
+			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}	
+			if($piadminTrustsDisabled)
+			{ $recommendation += "  Consider removing or disabling the following mappings which are no longer used: " + $noncompliantMappings	+ ".`n" }	
+			else
+			{
+				$result = $false	
+				$status += "Mappings(s) in effect using piadmin: " + $noncompliantMappings																												
+				$Severity = "High"
+			}
+		}
+
+		if($result){
+			$status += "No effective Trust(s) or Mapping(s) identified with piadmin.  "
+			
+			# Check if noncompliant objects are still allowed.
+			if(-not($piadminMappingsDisabled))
+			{
+				$result = $false 
+				$Severity = "Low"
+			}
+			if(-not($piadminTrustsDisabled -or $trustsGlobalDisabled))
+			{ 
+				$result = $false
+				$Severity = "Medium"
+			} 
+		}	
+		
+		# Record policy in entry to inform the user.
+		if($trustsGlobalDisabled)
+		{ $policy += " blocks trust authentication;" }
+		else
+		{ $policy += " allows trust authentication;" }
+		
+		if($piadminTrustsDisabled)
+		{ $policy += " blocks trusts to piadmin;" }
+		else 
+		{ $policy += " allows trusts to piadmin;" }
+		if($piadminMappingsDisabled)
+		{ $policy += " blocks mappings to piadmin;" }
+		else
+		{ $policy += " allows mappings to piadmin;" }	
+
+		$msg += $status + " " + $policy.Trim(';') + ". " + $recommendation
 	}
 	catch
 	{
