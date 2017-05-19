@@ -567,53 +567,48 @@ PROCESS
 	$AutoTrustConfig = $null
 	try
 	{
-		# Validate rules	
-	
-		# Example of output.
-		# if the file is empty, it means it is configure to default value of 1
-		# otherwise the file would contain Autotrustconfig,<value>
- 
 		$AutoTrustConfig = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "AutoTrustConfig" | Select-Object -ExpandProperty Value				
-																		
-		# 0 - Do not automatically create any PI Trust entries.
-		# 0x01 - Create the trust entry for the loopback IP address 127.0.0.1
-		# 0x02 - Create the trust entry for the "localhost" hostname
-		# 0x04 - Create the trust entry for the IP address
-		# 0x08 - Create the trust entry for the short hostname
-		# 0x10 - Create the trust entry for the FQDN hostname
-		# 0x1F - Create the old (pre 3.4.370.x) trust entries
-
-		switch ($AutoTrustConfig)
-		{
-			0   { $description = "Does not automatically create any PI Trust entries."; break; }
-			1   { $description = "Creates the trust entry for the loopback IP address 127.0.0.1"; break; }
-			2   { $description = "Creates the trust entry for the `"localhost`" hostname"; break; }
-			4   { $description = "Creates the trust entry for the IP address"; break; }
-			8   { $description = "Creates the trust entry for the short hostname"; break; }
-			16   { $description = "Creates the trust entry for the FQDN hostname"; break; }
-			32   { $description = "Creates the old (pre 3.4.370.x) trust entries"; break; }
-			
-			default {$description = "Unknown configuration" }
-		}
-
+				
+		# Defaults to 1 if not specified.
 		if($null -eq $AutoTrustConfig)
-		{
-			# The default value is set to 1 which is compliant.
-			$result = $true 
-			$msg = "Tuning parameter compliant: Create the trust entry for the loopback IP address 127.0.0.1"
+		{ $AutoTrustConfig = 1 }
+		
+		# Values for AutoTrustConfig Tuning Parameter
+		# 0 = NONE, 1 = Loopback, 2 = Localhost, 4 = IPaddr, 8 = Hostname, 16 = Fully Qualified Domain Name (FQDN)
+		# 17 = LoopBack + FQDN
+		# 127 = v3.4.370 Compatible, 255 = All
+
+		if($AutoTrustConfig -eq 0) 
+		{ $description = "Does not automatically create any PI Trust entries." }
+		else
+		{	
+			$description = "Creates trust entries for: "
+			switch ($AutoTrustConfig)
+			{
+				1   { $description += "127.0.0.1"; break; }
+				2   { $description += "localhost"; break; }
+				4   { $description += "IP address"; break; }
+				8   { $description += "hostname"; break; }
+				16  { $description += "FQDN"; break; }
+				17  { $description += "127.0.0.1 and FQDN"; break; }
+				127 { $description += "v3.4.370 Compatibility"; break; }
+				255 { $description += "127.0.0.1, localhost, IP address, host and FQDN (All)"; break; }
+			
+				default {$description += "Unknown configuration" }
+			}
 		}
-		elseif($AutoTrustConfig -le 1) 
+
+		if($AutoTrustConfig -le 1) 
 		{ 
 			$result = $true 
 			$msg = "Tuning parameter compliant: {0}"
-			$msg = [string]::Format($msg, $description)
 		}
 		else 
 		{ 
 			$result = $false
 			$msg = "Tuning parameter not compliant: {0}" 
-			$msg = [string]::Format($msg, $description)
-		}								
+		}		
+		$msg = [string]::Format($msg, $description)									
 	}
 	catch
 	{
