@@ -573,7 +573,7 @@ PROCESS
 		{ $description = "Does not automatically create any PI Trust entries." }
 		else
 		{	
-			$description = "Creates trust entries for:"
+			$description = "Creates trust entries for: "
 			switch ($AutoTrustConfig)
 			{
 				1   { $description += "127.0.0.1"; break; }
