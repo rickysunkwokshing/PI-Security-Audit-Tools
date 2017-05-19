@@ -91,7 +91,8 @@ VALIDATION: examines the database security of the PI Data Archive and flags any
 ACLs that contain access for PIWorld as weak. <br/>
 COMPLIANCE: remove PIWorld access from all database security ACLs.  Note that prior
 removing PIWorld access, you need to evaluate which applications are relying on that 
-access so that you can grant those applications access explicitly. 
+access so that you can grant those applications access explicitly.  This check will
+also pass if PIWorld is disabled globally.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -121,90 +122,98 @@ PROCESS
 	{				
 		# Initialize objects.
 		$securityWeaknessCounter = 0
-		$warningMessage = ""
-		
-		$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConnection `
-										| Sort-Object -Property Tablename `
-										| ForEach-Object {$_.Tablename + "^" + $_.Security} `
-										| ForEach-Object {$_.Replace(")",") |").Trim("|")}
-		
-		# Validate rules	
-	
-		# Example of output.
-		# PIAFLINK^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
-		# PIARCADMIN^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
-		# PIARCDATA^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
-		# ...
 
-		# Read each line to find the one containing the token to replace.		
-		foreach($line in $outputFileContent)
-		{								
-			# Skip line if not containing the delimiter.
-			if($line.Contains("^"))
-			{             		
-                $securityWeakness = $false
-				# Find the delimiter
-				$position = $line.IndexOf("^")			
-				
-				# Specific Database
-				$length  = $position
-				$dbName = $line.SubString(0, $length)
-				
-				# Find the ACL
-				$length  = $line.Length - $position - 1
-				$acl = ($line.SubString($position + 1, $length)).ToLower()
-				
-                $process = $false
-                # Perform the test on specific databases.
-                Switch($dbName.ToLower())
-                {
-                    "pibatch" { $process = $true }
-                    "pibatchlegacy" { $process = $true }
-                    "picampaign" { $process = $true }
-                    "pidbsec" { $process = $true }
-                    "pids" { $process = $true }
-                    "piheadingsets" { $process = $true }
-                    "pimodules" { $process = $true }
-                    "pitransferrecords" { $process = $true }
-                    "piuser" { $process = $true }
-                    default { $process = $false }
-                }
-
-                if($process)
-                {                    
-                    # Remove piadmin: A(r,w) from the ACL
-				    if($acl.Contains("piworld: a(r,w)")) { $securityWeakness = $true }
-                    elseif($acl.Contains("piworld: a(r)")) { $securityWeakness = $true }
-                    elseif($acl.Contains("piworld: a(w)")) { $securityWeakness = $true }
-                }
-                		
-				# Increment the counter if a weakness has been discovered.
-				if($securityWeakness)
-				{
-					$securityWeaknessCounter++
-					if($securityWeaknessCounter -eq 1)
-					{ $warningMessage = $dbName }
-					else
-					{ $warningMessage = $warningMessage + "; " + $dbName }
-				}					
-			}			
-		}	
-	
-		# Check if the counter is 0 = compliant, 1 or more it is not compliant		
-		if($securityWeaknessCounter -gt 0)
+		$IsPIWorldEnabled = $(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name PIWorld | Select-Object -ExpandProperty IsEnabled)
+		
+		if(-not($IsPIWorldEnabled))
 		{
-			$result = $false
-			if($securityWeaknessCounter -eq 1)
-			{ $warningMessage = "The following database presents a weakness: " + $warningMessage + "." }
-			else
-			{ $warningMessage = "The following databases present weaknesses: " + $warningMessage + "." }
-		}
-		else 
-		{ 
 			$result = $true 
-			$warningMessage = "No databases identified that present a weakness."
-		}	
-		$msg = $warningMessage
+			$msg = "PIWorld is disabled globally."
+		}
+		else
+		{
+			$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConnection `
+											| Sort-Object -Property Tablename `
+											| ForEach-Object {$_.Tablename + "^" + $_.Security} `
+											| ForEach-Object {$_.Replace(")",") |").Trim("|")}
+		
+			# Validate rules	
+	
+			# Example of output.
+			# PIAFLINK^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
+			# PIARCADMIN^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
+			# PIARCDATA^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
+			# ...
+
+			# Read each line to find the one containing the token to replace.		
+			foreach($line in $outputFileContent)
+			{								
+				# Skip line if not containing the delimiter.
+				if($line.Contains("^"))
+				{             		
+					$securityWeakness = $false
+					# Find the delimiter
+					$position = $line.IndexOf("^")			
+				
+					# Specific Database
+					$length  = $position
+					$dbName = $line.SubString(0, $length)
+				
+					# Find the ACL
+					$length  = $line.Length - $position - 1
+					$acl = ($line.SubString($position + 1, $length)).ToLower()
+				
+					$process = $false
+					# Perform the test on specific databases.
+					Switch($dbName.ToLower())
+					{
+						"pibatch" { $process = $true }
+						"pibatchlegacy" { $process = $true }
+						"picampaign" { $process = $true }
+						"pidbsec" { $process = $true }
+						"pids" { $process = $true }
+						"piheadingsets" { $process = $true }
+						"pimodules" { $process = $true }
+						"pitransferrecords" { $process = $true }
+						"piuser" { $process = $true }
+						default { $process = $false }
+					}
+
+					if($process)
+					{                    
+						# Remove piadmin: A(r,w) from the ACL
+						if($acl.Contains("piworld: a(r,w)")) { $securityWeakness = $true }
+						elseif($acl.Contains("piworld: a(r)")) { $securityWeakness = $true }
+						elseif($acl.Contains("piworld: a(w)")) { $securityWeakness = $true }
+					}
+                		
+					# Increment the counter if a weakness has been discovered.
+					if($securityWeakness)
+					{
+						$securityWeaknessCounter++
+						if($securityWeaknessCounter -eq 1)
+						{ $msg = $dbName }
+						else
+						{ $msg = $msg + "; " + $dbName }
+					}					
+				}			
+			}	
+	
+			# Check if the counter is 0 = compliant, 1 or more it is not compliant		
+			if($securityWeaknessCounter -gt 0)
+			{
+				$result = $false
+				if($securityWeaknessCounter -eq 1)
+				{ $msg = "The following database presents a weakness: " + $msg + "." }
+				else
+				{ $msg = "The following databases present weaknesses: " + $msg + "." }
+			}
+			else 
+			{ 
+				$result = $true 
+				$msg = "No databases identified that present a weakness."
+			}	
+		}
 	}
 	catch
 	{
