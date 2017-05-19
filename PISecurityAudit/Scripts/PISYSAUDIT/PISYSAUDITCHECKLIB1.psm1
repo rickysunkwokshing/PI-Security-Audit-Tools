@@ -658,31 +658,42 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{		
-		$adminKeyPath = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"	
-		$userKeyPath  = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
-		# Attribute is 0 or 1 for enabled/disabled
-		$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
-		$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
-		if($adminIsEnabled -and $userIsEnabled)
-		{
+	{				
+		
+		$installTypeKeyPath = "HKLM:\Software\Microsoft\Windows NT\CurrentVersion"
+		$installType = Get-PISysAudit_RegistryKeyValue $installTypeKeyPath "InstallationType" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		if($installType -eq "Server Core") 
+		{ 
 			$result = $true
-			$msg = "IE Enhanced Security is enabled for Users and Admins."
-		}
-		elseif($adminIsEnabled)
-		{
-			$result = $false
-			$msg = "IE Enhanced Security is disabled for Users."
-		}
-		elseif($userIsEnabled)
-		{
-			$result = $false
-			$msg = "IE Enhanced Security is disabled for Admins."
-		}
+			$msg = "Server Core detected.  Core installation does not include IE."
+		} 
 		else
-		{
-			$result = $false
-			$msg = "IE Enhanced Security is disabled for Users and Admins."
+		{ 
+			$adminKeyPath = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"	
+			$userKeyPath  = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+			# Attribute is 0 or 1 for enabled/disabled
+			$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+			$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+			if($adminIsEnabled -and $userIsEnabled)
+			{
+				$result = $true
+				$msg = "IE Enhanced Security is enabled for Users and Admins."
+			}
+			elseif($adminIsEnabled)
+			{
+				$result = $false
+				$msg = "IE Enhanced Security is disabled for Users."
+			}
+			elseif($userIsEnabled)
+			{
+				$result = $false
+				$msg = "IE Enhanced Security is disabled for Admins."
+			}
+			else
+			{
+				$result = $false
+				$msg = "IE Enhanced Security is disabled for Users and Admins."
+			}
 		}
 	}
 	catch
