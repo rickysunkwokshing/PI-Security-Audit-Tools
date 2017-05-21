@@ -960,7 +960,7 @@ END {}
 function Test-PowerShellToolsForPISystemAvailable
 {
     # Check for availability of PowerShell Tools for the PI System
-    if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
+    if(-not(Test-Path variable:global:ArePowerShellToolsAvailable))
 	{
 		if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
 		{
@@ -1002,6 +1002,20 @@ param(
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 		
+		try
+		{
+			Get-PISysAudit_GlobalMachineConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+		}
+		catch
+		{
+			$msgTemplate = "An error occurred while accessing the global configuration of {0}"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "Machine Audit" -fn $fn -msg $msg
+			return
+		}
+
 		# Get the list of functions to execute.
 		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary1 -lvl $AuditLevelInt
 		# There is nothing to execute.
@@ -3120,7 +3134,17 @@ PROCESS
 	
 	try
 	{									
-		$scriptBlock = { if($PSVersionTable.PSVersion.Major -ge 3) { Get-AppLockerPolicy -Effective -XML } else { $null } }
+		$scriptBlock = { 
+			
+			[xml]$Policy = Get-AppLockerPolicy -Effective -XML 
+			$ServiceEnabled = $(Get-Service -Name AppIDSvc | Select-Object -ExpandProperty StartType | Out-String).ToLower() -ne "disabled"
+
+			$AppLockerConfiguration = New-Object PSCustomObject
+			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name Policy -Value $Policy
+			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name ServiceEnabled -Value $ServiceEnabled
+			return $AppLockerConfiguration
+		}
+
 		if($LocalComputer)
 		{			                    			
 			$appLockerPolicy = & $scriptBlock
