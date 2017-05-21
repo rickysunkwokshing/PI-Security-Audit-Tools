@@ -19,12 +19,7 @@
 # ************************************************************************
 
 # Reload the module to make sure you are using the latest
-if($PSVersionTable.PSVersion.Major -eq 2){$PSVersion2 = $true}
-else{$PSVersion2 = $false}
-
-if($PSVersion2){$UpdateScriptRoot = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition}
-else {$UpdateScriptRoot = $PSScriptRoot}
-$rootModuleDir = Split-Path $UpdateScriptRoot
+$rootModuleDir = Split-Path $PSScriptRoot
 
 if(Get-Module pisysaudit){remove-module pisysaudit}
 $modulepath = $rootModuleDir + '\PISYSAUDIT.psd1'
@@ -60,7 +55,7 @@ foreach ($line in $helpFile)
             foreach ($lib in $libs)
             {
 				$fnsSorted = @()
-                foreach($fn in $lib.Keys){ $fnsSorted += Get-Help $fn }
+                foreach($fn in $lib.Name){ $fnsSorted += Get-Help $fn }
                 # Keys get out of order so we need to sort them by ID (Synopsis is of form <ID> - <Name>)
 				$fnsSorted = $fnsSorted | Select-Object * | Sort-Object Synopsis
 				# now we can record each validation.
