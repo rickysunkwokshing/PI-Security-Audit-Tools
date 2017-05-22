@@ -118,6 +118,7 @@ PROCESS
 			
 			$PSVersion = $PSVersionTable.PSVersion.Major
 			$InstallationType = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "InstallationType" | Select-Object -ExpandProperty "InstallationType" | Out-String
+			$InstallationType = $InstallationType.Trim() # Remove any leading or trailing white space
 			# Construct a custom object to store the config information
 			$Configuration = New-Object PSCustomObject
 			$Configuration | Add-Member -MemberType NoteProperty -Name PSVersion -Value $PSVersion
@@ -467,10 +468,12 @@ PROCESS
 			}
 			else
 			{
-				$msg = "The server: {0} has PowerShell {1}, so the AppLocker configuration could not be retrieved." -f $ComputerParams.ComputerName, $global:MachineConfiguration.PSVersion
+				$result = "N/A"
+				$msg = "The server: {0} has PowerShell {1}, so the AppLocker configuration could not be retrieved" -f $RemoteComputerName, $global:MachineConfiguration.PSVersion
 				Write-PISysAudit_LogMessage $msg "Error" $fn
-				New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+				$AuditTable = New-PISysAuditError -lc $LocalComputer -rcn $RemoteComputerName `
 										-at $AuditTable -an 'Computer' -fn $fn -msg $msg
+				return
 			}
 		}
 	}
@@ -836,17 +839,21 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{		
+	{
+		$isServerCore = $global:MachineConfiguration.InstallationType -eq "Server Core"
 		$cutoff = 60
 		$cutoffDate = (Get-Date).AddDays(-1*$cutoff).ToFileTimeUtc()
 		# Get most recent OS patch
 		$lastInstalledHotFix = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type HotFix `
 																| sort-object InstalledOn -Descending `
-																| select-object -ExpandProperty InstalledOn -First 1 
-		# Get most recent application patch
-		$lastInstalledReliability = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type Reliability `
-																| sort-object InstalledOn -Descending `
-																| select-object -ExpandProperty InstalledOn -First 1 
+																| select-object -ExpandProperty InstalledOn -First 1
+		if(!$isServerCore)
+		{
+			# win32_reliabilityRecords not included on Server Core
+			$lastInstalledReliability = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type Reliability `
+																	| sort-object InstalledOn -Descending `
+																	| select-object -ExpandProperty InstalledOn -First 1
+		}
 		
 		function IsPatchLevelCurrent ($lastPatch, $cutoffDate)
 		{
@@ -855,21 +862,50 @@ PROCESS
 			{ return ([datetime]$lastPatch).ToFileTimeUtc() -gt $cutoffDate }
 		}
 		
-		$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
-		$AreAppsPatched = IsPatchLevelCurrent $lastInstalledReliability $cutoffDate
-		
-		if($IsOSPatched -and $AreAppsPatched)
+		if($isServerCore)
 		{
-			$result = $true
-			$msg = "Operating system and application updates have been applied to the server within the past $cutoff days."
+			# On Server Core, only check OS Patches
+			$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
+			if($IsOSPatched)
+			{
+				$result = $true
+				$msg = "Server Core operating system updates have been applied within the past $cutoff days."
+			}
+			else
+			{
+				$result = $false
+				$msg = "Server Core operating system updates have NOT been applied within the past $cutoff days."
+			}
+			if($lastInstalledHotFix) {$msg += " Last update: $($lastInstalledHotFix.ToShortDateString())."}
+			else {$msg += " No updates found."}
 		}
 		else
 		{
-			$result = $false
-			if(!$IsOSPatched)
-			{$msg += "Operating system updates have NOT been applied in the last $cutoff days."}
-			if(!$AreAppsPatched)
-			{$msg += "Application updates have NOT been applied in the last $cutoff days."}
+			# On Server Standard, check OS and App Patches
+			$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
+			$AreAppsPatched = IsPatchLevelCurrent $lastInstalledReliability $cutoffDate
+
+			if($IsOSPatched -and $AreAppsPatched)
+			{
+				$result = $true
+				$msg = "Operating system and application updates have been applied to the server within the past $cutoff days."
+			}
+			else
+			{
+				$result = $false
+				if(!$IsOSPatched)
+				{$msg += "Operating system updates have NOT been applied in the last $cutoff days."}
+				if(!$AreAppsPatched)
+				{$msg += "Application updates have NOT been applied in the last $cutoff days."}
+			}
+			if($lastInstalledHotFix) 
+			{$msg += " Last OS update: $($lastInstalledHotFix.ToShortDateString())."}
+			else
+			{$msg += " No OS updates found."}
+			if($lastInstalledReliability) 
+			{$msg += " Last App update: $($lastInstalledReliability.ToShortDateString())."}
+			else
+			{$msg += " No App updates found."}
 		}
 	}
 	catch

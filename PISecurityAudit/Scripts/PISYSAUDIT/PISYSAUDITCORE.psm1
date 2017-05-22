@@ -738,9 +738,9 @@ param(
 		$scriptBlock = {
 				param([string]$Namespace, [string]$WMIClassName, [parameter(Mandatory=$false)][string]$FilterExpression="") 
 				if($FilterExpression -eq "")
-				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName }
+				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -ErrorAction SilentlyContinue }
 				else 
-				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -Filter $FilterExpression }
+				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -Filter $FilterExpression -ErrorAction SilentlyContinue }
 		}	
 
 		# Verbose only if Debug Level is 2+
@@ -2951,14 +2951,17 @@ PROCESS
 			$className = "Win32_quickfixengineering"
 			$filterExpression = ""
 			$WMIObject += ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel `
-											| Select-Object @{LABEL = "Name";EXPRESSION={$_.HotFixID}}, InstalledOn
+											| Select-Object @{LABEL = "Name";EXPRESSION={$_.HotFixID}}, @{LABEL = "InstalledOn";EXPRESSION={Get-Date $_.InstalledOn}}
 		}
 		if($Type -eq 'Reliability' -or $Type -eq 'All')
 		{
 			$className = 'win32_reliabilityRecords'
 			$filterExpression = "sourcename='Microsoft-Windows-WindowsUpdateClient'"
-			$WMIObject += ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel `
-											| Select-Object @{LABEL = "Name";EXPRESSION={$_.ProductName}}, @{LABEL="InstalledOn";EXPRESSION={$_.ConvertToDateTime($_.TimeGenerated)}}
+			$reliabilityRecords = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel 
+			# Custom Select-Object expression required to convert date string of format yyyyMMddHHmmss.fff000-000
+			# e.g. 20170522150218.793000-000  -->  5/22/2017 3:02:18 PM
+			$WMIObject += $reliabilityRecords | Select-Object @{LABEL = "Name";EXPRESSION={$_.ProductName}}, @{LABEL="InstalledOn";EXPRESSION={ 
+													[datetime]::ParseExact($_.TimeGenerated.Substring(0,14), 'yyyyMMddHHmmss', $null) }}
 		}
 			
 		return $WMIObject | Sort-Object Name					
