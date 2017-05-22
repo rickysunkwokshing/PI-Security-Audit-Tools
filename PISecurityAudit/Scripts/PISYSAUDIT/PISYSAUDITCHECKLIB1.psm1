@@ -78,6 +78,72 @@ param(
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
+function Get-PISysAudit_GlobalMachineConfiguration
+{
+<#  
+.SYNOPSIS
+Gathers global data that can be used by all machine checks.
+.DESCRIPTION
+Some checks reuse information.  This command puts the configuration information
+in a global object to reduce the number of remote calls, improving performance and 
+simplifying validation logic.
+
+Information included in global configuration:
+	PSVersion          - PowerShell version
+	InstallationType   - Edition of Windows installed
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{
+	$fn = GetFunctionName
+
+	# Reset global config object.
+	$global:MachineConfiguration = $null
+	
+	$scriptBlock = {
+			
+			$PSVersion = $PSVersionTable.PSVersion.Major
+			$InstallationType = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "InstallationType" | Select-Object -ExpandProperty "InstallationType" | Out-String
+			# Construct a custom object to store the config information
+			$Configuration = New-Object PSCustomObject
+			$Configuration | Add-Member -MemberType NoteProperty -Name PSVersion -Value $PSVersion
+			$Configuration | Add-Member -MemberType NoteProperty -Name InstallationType -Value $InstallationType
+
+			return $Configuration
+		}
+	try
+	{
+		if($LocalComputer)
+		{ $global:MachineConfiguration = & $scriptBlock }
+		else
+		{ $global:MachineConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the retrieval of the global machine configuration."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+}
+END {}	
+
+}
+
 function Get-PISysAudit_CheckDomainMemberShip
 {
 <#  
@@ -199,9 +265,7 @@ PROCESS
 	$msg = ""
 	try
 	{				
-		$InstallationType = Get-PISysAudit_RegistryKeyValue "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" "InstallationType" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-
-		# Check if the value is from one in the list			
+		$InstallationType = $global:MachineConfiguration.InstallationType
 		if($InstallationType -eq "Server Core") { $result =  $true } else { $result = $false }
 
 		# Set a message to return with the audit object.
@@ -364,32 +428,50 @@ PROCESS
 	try
 	{				
 		$result = $false
-		# Read the AppLocker policy.
-		[xml] $appLockerPolicy = Get-PISysAudit_AppLockerState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		if($null -ne $appLockerPolicy)
-		{
-			if($(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
-				$(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")
-			{
-				$svcStartupMode = Get-PISysAudit_ServiceProperty -sn 'AppIDSvc' -sp StartupType -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-				if($svcStartupMode -ne 'Disabled')
+
+		# Check first to see if Server Core is used.			
+		if($global:MachineConfiguration.InstallationType -eq "Server Core")
+		{ 
+			$result =  $true 
+			$msg = "Windows Server Core detected.  Core edition does not support AppLocker.  Passing check due to reduced attack surface of Server Core"
+		} 
+		else 
+		{ 
+			if($global:MachineConfiguration.PSVersion -ge 3){
+				# Read the AppLocker policy.
+				$appLockerConfiguration = Get-PISysAudit_AppLockerState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				if($null -ne $appLockerConfiguration.Policy)
 				{
-					$result = $true
-					$msg = "AppLocker is configured to enforce."
+					if($(Select-Xml -xml $appLockerConfiguration.Policy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
+						$(Select-Xml -xml $appLockerConfiguration.Policy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")
+					{
+						if($appLockerConfiguration.ServiceEnabled)
+						{
+							$result = $true
+							$msg = "AppLocker is configured to enforce."
+						}
+						else
+						{
+							$msg = "AppLocker is configured to enforce but the Application Identity Service is disabled."
+						}
+					}
+					else
+					{
+						$msg = "AppLocker is not configured to enforce."
+					}
 				}
 				else
 				{
-					$msg = "AppLocker is configured to enforce but the Application Identity Service is disabled."
+					$msg = "No AppLocker policy returned."
 				}
 			}
 			else
 			{
-				$msg = "AppLocker is not configured to enforce."
+				$msg = "The server: {0} has PowerShell {1}, so the AppLocker configuration could not be retrieved." -f $ComputerParams.ComputerName, $global:MachineConfiguration.PSVersion
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+										-at $AuditTable -an 'Computer' -fn $fn -msg $msg
 			}
-		}
-		else
-		{
-			$msg = "No AppLocker policy returned."
 		}
 	}
 	catch
@@ -659,10 +741,7 @@ PROCESS
 	$msg = ""
 	try
 	{				
-		
-		$installTypeKeyPath = "HKLM:\Software\Microsoft\Windows NT\CurrentVersion"
-		$installType = Get-PISysAudit_RegistryKeyValue $installTypeKeyPath "InstallationType" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		if($installType -eq "Server Core") 
+		if($global:MachineConfiguration.InstallationType -eq "Server Core") 
 		{ 
 			$result = $true
 			$msg = "Server Core detected.  Core installation does not include IE."
@@ -974,6 +1053,7 @@ END {}
 # Export Module Member
 # ........................................................................
 # <Do not remove>
+Export-ModuleMember Get-PISysAudit_GlobalMachineConfiguration
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary1
 Export-ModuleMember Get-PISysAudit_CheckDomainMemberShip
 Export-ModuleMember Get-PISysAudit_CheckOSInstallationType
