@@ -542,39 +542,48 @@ PROCESS
 	$severity = "Unknown"
 
 	try
-	{				
-		$result = $true
-		$uacKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\system"
-		$defaultEnabledUACFeatures = "EnableLUA", "ConsentPromptBehaviorAdmin", "EnableInstallerDetection", "PromptOnSecureDesktop", "EnableSecureUIAPaths"
-		
-		# Loop through key default enabled UAC features
-		$tmpmsg = "Some default UAC features are disabled: "
-		foreach ($uacFeature in $defaultEnabledUACFeatures) 
+	{
+		if($global:MachineConfiguration.InstallationType -ne "Server Core")
 		{
-			if ($(Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -RegKeyPath $uacKeyPath -Attribute $uacFeature) -eq 0)
+			$result = $true
+			$uacKeyPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\system"
+			$defaultEnabledUACFeatures = "EnableLUA", "ConsentPromptBehaviorAdmin", "EnableInstallerDetection", "PromptOnSecureDesktop", "EnableSecureUIAPaths"
+		
+			# Loop through key default enabled UAC features
+			$tmpmsg = "Some default UAC features are disabled: "
+			foreach ($uacFeature in $defaultEnabledUACFeatures) 
 			{
-				$result = $false
-				$severity = "Medium"
-				$tmpmsg += $uacFeature + "; "
+				if ($(Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -RegKeyPath $uacKeyPath -Attribute $uacFeature) -eq 0)
+				{
+					$result = $false
+					$severity = "Medium"
+					$tmpmsg += $uacFeature + "; "
+				}
 			}
-		}
 		
-		# If the default features are enabled, check for additional feature for added security.
-		if($result) 
-		{
-			# Assigning lower severity since the default features are in place.
-			$severity = "Low"
-			$additionalUACFeature = "ValidateAdminCodeSignatures"
-			if ($(Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -RegKeyPath $uacKeyPath -Attribute $additionalUACFeature) -eq 0)
+			# If the default features are enabled, check for additional feature for added security.
+			if($result) 
 			{
-				$result = $false
-				$msg = "Recommended UAC feature {0} disabled."
-				$msg = [string]::Format($msg, $additionalUACFeature)
-			}	
-			else {$msg = "UAC features enabled."}
+				# Assigning lower severity since the default features are in place.
+				$severity = "Low"
+				$additionalUACFeature = "ValidateAdminCodeSignatures"
+				if ($(Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -RegKeyPath $uacKeyPath -Attribute $additionalUACFeature) -eq 0)
+				{
+					$result = $false
+					$msg = "Recommended UAC feature {0} disabled."
+					$msg = [string]::Format($msg, $additionalUACFeature)
+				}	
+				else {$msg = "UAC features enabled."}
+			}
+			else
+			{$msg = $tmpmsg}
 		}
 		else
-		{$msg = $tmpmsg}	
+		{
+			# Server Core does not require UAC, pass this check
+			$result = $true
+			$msg = "UAC is not required on Server Core."
+		}
 	}
 	catch
 	{
