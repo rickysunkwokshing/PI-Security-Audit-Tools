@@ -3494,7 +3494,7 @@ PROCESS
 	try
 	{
 		# Get the AF Server installation path to locate the service executable and afdiag.
-		$PIHome_AF_path = Get-PISysAudit_RegistryKeyValue "HKLM:\SOFTWARE\PISystem\AF Server" "CurrentInstallationPath" -lc $LocalComputer -rc $RemoteComputerName -DBGLevel $DBGLevel
+		$PIHome_AF_path = Get-PISysAudit_RegistryKeyValue "HKLM:\SOFTWARE\PISystem\AF Server" "CurrentInstallationPath" -lc $LocalComputer -rcn $RemoteComputerName -DBGLevel $DBGLevel
 		# Set the path to reach out the afdiag.exe CLU.
 		$AFDiagExec = PathConcat -ParentPath $PIHome_AF_path -ChildPath "afdiag.exe"
 		# Set the path to reach out the AFService executable.
