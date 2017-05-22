@@ -666,7 +666,7 @@ param(
 	{ return $false }
 }
 
-function ValidateIfHasPICoresightRole
+function ValidateIfHasPIVisionRole
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(		
@@ -688,8 +688,14 @@ param(
 	try
 	{
 		$result = $false
-		$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
-		$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel						
+		$RegKeyPath = "HKLM:\Software\PISystem\PIVision"
+		$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel	
+		# If PI Vision is not present, check for previous name. 
+		if($result -eq $false)
+		{
+			$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
+			$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel
+		}					
 		return $result
 	}
 	catch
@@ -1551,7 +1557,7 @@ param(
 	}		
 }
 
-function StartPICoresightServerAudit
+function StartPIVisionServerAudit
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(										
@@ -1581,14 +1587,14 @@ param(
 		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value	
 			
 		# Validate the presence of IIS
-		if((ValidateIfHasPICoresightRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
+		if((ValidateIfHasPIVisionRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
 		{
 			# Return the error message.
-			$msgTemplate = "The computer {0} does not have the PI Coresight role or the validation failed"
+			$msgTemplate = "The computer {0} does not have the PI Vision role or the validation failed"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1597,7 +1603,7 @@ param(
 			$msg = "Elevation required to run Audit checks using IIS Cmdlet.  Run PowerShell as Administrator to complete these checks."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1608,12 +1614,12 @@ param(
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
 		# Set message templates.
-		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
+		$activityMsgTemplate1 = "Check PI Vision component on '{0}' computer"
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
 		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
@@ -1623,17 +1629,17 @@ param(
 
 		try
 		{
-			Write-Progress -Activity $activityMsg1 -Status "Gathering Coresight Configuration" -ParentId 1
-			Get-PISysAudit_GlobalPICoresightConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+			Write-Progress -Activity $activityMsg1 -Status "Gathering PI Vision Configuration" -ParentId 1
+			Get-PISysAudit_GlobalPIVisionConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
 		}
 		catch
 		{
 			# Return the error message.
-			$msgTemplate = "An error occurred while accessing the global configuration of PI Coresight on {0}"
+			$msgTemplate = "An error occurred while accessing the global configuration of PI Vision on {0}"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1643,7 +1649,7 @@ param(
 		if($listOfFunctions.Count -eq 0)		
 		{
 			# Return the error message.
-			$msg = "No PI Coresight checks have been found."
+			$msg = "No PI Vision checks have been found."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			return
 		}							
@@ -1683,7 +1689,7 @@ param(
 	catch
 	{
 		# Return the error message.
-		$msg = "A problem occurred during the processing of PI Coresight checks"					
+		$msg = "A problem occurred during the processing of PI Vision checks"					
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return
 	}		
@@ -3584,13 +3590,11 @@ param(
 		[string]
 		$ServiceType,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("appPool")]
 		[string]
-		$csappPool,
+		$AppPool,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("CustomHeader")]
 		[string]
-		$CoresightHeader,
+		$CustomHeader,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -3611,28 +3615,28 @@ PROCESS
 		# Build FQDN using hostname and domain strings.
 		$fqdn = $hostname + "." + $MachineDomain
 
-		# SPN check is done for PI Coresight using a custom host header.
-		If ( $ServiceName -eq "coresight_custom" ) 
+		# SPN check is done for PI Vision using a custom host header.
+		If ( $ServiceName -eq "pivision_custom" ) 
 		{ 
-			# Pass the Coresight AppPool identity as the service account.
-			$svcacc = $csappPool
+			# Pass the AppPool identity as the service account.
+			$svcacc = $AppPool
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
 				
 			# Take Custom header information and create its short and long version.
-			If ($CoresightHeader -match "\.") 
+			If ($CustomHeader -match "\.") 
 			{
-				$csCustomHeaderLong = $CoresightHeader
-				$pos = $CoresightHeader.IndexOf(".")
-				$csCustomHeaderShort = $CoresightHeader.Substring(0, $pos)
+				$CustomHeaderLong = $CustomHeader
+				$pos = $CustomHeader.IndexOf(".")
+				$CustomHeaderShort = $CustomHeader.Substring(0, $pos)
 			} 
 			Else 
 			{ 
-				$csCustomHeaderShort = $CoresightHeader
-				$csCustomHeaderLong = $CoresightHeader + "." + $MachineDomain
+				$CustomHeaderShort = $CustomHeader
+				$CustomHeaderLong = $CustomHeader + "." + $MachineDomain
 			}
 
 			# Deal with the custom header - run nslookup and capture the result.
-			$AliasTypeCheck = Get-PISysAudit_ResolveDnsName -LookupName $CoresightHeader -Attribute Type -DBGLevel $DBGLevel
+			$AliasTypeCheck = Get-PISysAudit_ResolveDnsName -LookupName $CustomHeader -Attribute Type -DBGLevel $DBGLevel
 
 			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
 			If ($AliasTypeCheck -eq 'CNAME') 
@@ -3646,23 +3650,23 @@ PROCESS
 			
 				$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 				$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
-				$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
-				$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
+				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
 			
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
 																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
-																-SPNShortAlias $csCustomHeaderSPN -SPNLongAlias $csCustomHeaderLongSPN `
+																-SPNShortAlias $CustomHeaderSPN -SPNLongAlias $CustomHeaderLongSPN `
 																-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 						
 				return $result			
 			} 			
 			ElseIf($AliasTypeCheck -eq 'A')
 			{ 
-				$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
-				$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
+				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
 
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-																-SPNShort $csCustomHeaderSPN -SPNLong $csCustomHeaderLongSPN `
+																-SPNShort $CustomHeaderSPN -SPNLong $CustomHeaderLongSPN `
 																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 
 				return $result
@@ -3675,16 +3679,16 @@ PROCESS
 				return $null
 			}
 		}	
-		# SPN Check is done for PI Coresight or other service
+		# SPN Check is done for PI Vision or other service
 		Else
 		{
-			# SPN check is done for PI Coresight without custom headers.
-			If ( $ServiceName -eq "coresight" )
+			# SPN check is done for PI Vision without custom headers.
+			If ( $ServiceName -eq "pivision" )
 			{
-				# In case of PI Coresight, the AppPool account is used in the SPN check.
-				$svcacc = $csappPool
+				# AppPool account is used in the SPN check.
+				$svcacc = $AppPool
 			}
-			# SPN check is not done for PI Coresight.
+			# SPN check is not done for PI Vision.
 			Else
 			{
 				# Get the Service account
@@ -3692,7 +3696,7 @@ PROCESS
 			}
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
 
-			# Proceed with checking SPN for Coresight or non-IIS app (PI/AF).
+			# Proceed with checking SPN for PI Vision or non-IIS app (PI/AF).
 			# Distinguish between Domain/Virtual account and Machine Accounts.
 			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
@@ -4509,7 +4513,8 @@ param(
 					"PIAFServer", "AFServer", "PIAF", "AF",
 					"SQLServer", "SQL", "PICoresightServer", 
 					"CoresightServer", "PICoresight", 
-					"Coresight", "PICS", "CS")]
+					"Coresight", "PICS", "CS", "PIVision",
+					"PIVisionServer","Vision","VisionServer","PV")]
 		[alias("type")]
 		[string]		
 		$PISystemComponentType,
@@ -4676,13 +4681,19 @@ PROCESS
 		($PISystemComponentType.ToLower() -eq "coresightserver") -or `
 		($PISystemComponentType.ToLower() -eq "coresight") -or `
 		($PISystemComponentType.ToLower() -eq "cs") -or `
-		($PISystemComponentType.ToLower() -eq "pics"))
+		($PISystemComponentType.ToLower() -eq "pics") -or `
+		($PISystemComponentType.ToLower() -eq "pivision") -or `
+		($PISystemComponentType.ToLower() -eq "visionserver") -or `
+		($PISystemComponentType.ToLower() -eq "vision") -or `
+		($PISystemComponentType.ToLower() -eq "pivisionserver") -or `
+		($PISystemComponentType.ToLower() -eq "pv")
+	)
 	{
 		# Set the properties.
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PICoresightServer'
-		$AuditRoleType = "PICoresightServer"
+		# Use normalized type description as 'PIVisionServer'
+		$AuditRoleType = "PIVisionServer"
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
 		# Nullify all of the MS SQL specific values
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
@@ -5238,8 +5249,8 @@ PROCESS
 				{ StartPIAFServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
 				elseif($role.AuditRoleType -eq "SQLServer")
 				{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-				elseif($role.AuditRoleType -eq "PICoresightServer")
-				{ StartPICoresightServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
+				elseif($role.AuditRoleType -eq "PIVisionServer")
+				{ StartPIVisionServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
 
 				$currCheck++
 			}
