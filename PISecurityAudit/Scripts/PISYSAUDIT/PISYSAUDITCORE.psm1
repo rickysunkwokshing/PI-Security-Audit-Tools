@@ -3771,7 +3771,12 @@ PROCESS
 		{
 			$SecureStatus = "Unknown"
 			$SecureStatusDetail = "Connection not found."
-			if($PIConnection.AuthenticationProtocol -ne 'Windows') # Only Windows Connections can use transport security
+			if($PIConnection.AuthenticationProtocol -eq 'Subsystem')
+			{
+				$SecureStatus = "Secure" 
+				$SecureStatusDetail = "Subsystem"
+			}
+			elseif($PIConnection.AuthenticationProtocol -ne 'Windows') # Only Windows Connections can use transport security
 			{ 
 				$SecureStatus = "Not Secure"
 				$SecureStatusDetail = "Insecure protocol ({0})" -f $PIConnection.AuthenticationProtocol
