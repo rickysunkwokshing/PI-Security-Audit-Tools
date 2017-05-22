@@ -101,18 +101,14 @@ param(
 			"PIMessages" { $outputFileContent = Get-PIMessage -Connection $PIDataArchiveConnection -Starttime $(Get-Date).AddMonths(-1) -Endtime $(Get-Date) -SeverityType Warning -Count $MaxResults | Select-Object * | ConvertSelectionToPSObject; break }
 			"PINetManagerStats" {
 				$outputFileContentRaw = Get-PIConnectionStatistics -Connection $PIDataArchiveConnection
-				# Note: ConvertSelectionToPSObject is not used for NetManStats because attributes are dictionary entries and it is simpler to convert them directly to NoteProperties
-				# while transposing to work with native export to CSV
-				$outputFileContent = @()
-				foreach ($row in $outputFileContentRaw)
-				{
-					$entry = New-Object PSObject 
-					for ($index=0; $index -lt $row.Count; $index++)
-					{
-						$entry | Add-Member -MemberType NoteProperty -Name $row.Name[$index] -Value $row.Value[$index]
-					}
-					$outputFileContent += $entry
-				}
+				# Note: ConvertSelectionToPSObject is not used for NetManStats because additional processing is necessary.
+				# Is this local?
+				$LocalComputer = $(Get-Content env:COMPUTERNAME).ToLower() -eq $($PIDataArchiveConnection.Address.DnsSafeHost.ToLower().Split('.')[0])
+				$outputFileContent = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $PIDataArchiveConnection.Address.DnsSafeHost `
+																					-PIDataArchiveConnection $PIDataArchiveConnection `
+																					-PIConnectionStats $outputFileContentRaw -ProtocolFilter Any `
+																					-RemoteOnly $false -SuccessOnly $true -CheckTransportSecurity $true `
+																					-DBGLevel $DBGLevel
 				break
 			}
 			"PITrusts" { $outputFileContent = Get-PITrust -Connection $PIDataArchiveConnection | Select-Object Name, Identity, Domain, OSUser, ApplicationName, NetworkHost, IPAddress, NetMask, IsEnabled | ConvertSelectionToPSObject; break }
@@ -157,6 +153,13 @@ The syntax is...
 Export-PISecConfig [[-PIDataArchiveComputerName | -pida] <string>]
 .PARAMETER pida
 The PI Data Archive to dump the security configuration from.
+.PARAMETER MaxResults
+Limit the number of PI messages returned.  Defaults to 1000.
+.PARAMETER DataItem
+Select a specific configuration to export rather than all.  Options 
+are 'PIDatabaseSecurity','PIFirewall','PIUsers','PIGroups','PIIdentities',
+'PIMappings','PITrusts','PINetManagerStats','PIMessages' or 'All'.  Default
+value is 'All'
 .EXAMPLE
 Export-PISecConfig -PIDataArchiveComputerName PIDataArchive01
 .LINK
@@ -168,23 +171,41 @@ param(
 		[alias("pida")]
 		[string] $PIDataArchiveComputerName,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[ValidateSet('PIDatabaseSecurity','PIFirewall','PIUsers','PIGroups','PIIdentities','PIMappings','PITrusts','PINetManagerStats','PIMessages','All')]
+		[string] $DataItem = 'All',
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[int] $MaxResults = 1000
 	)	
-
+		
+		# Initialization and prerequisites
+		Initialize-PISysAudit
 		Test-PowerShellToolsForPISystemAvailable
 		if(!$global:ArePowerShellToolsAvailable)
 		{ 
 			Write-Output "PowerShell Tools for the PI System are required for export functionality. Exiting..." 
 			break
 		}
+
 		# Connect to PI Data Archive
 		$PIDataArchiveConnection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchiveComputerName
+		if($null -eq $PIDataArchiveConnection.Connected)
+		{
+			Write-Warning "Could not connect to $PIDataArchiveComputerName"
+			break
+		}
+		
 		# Set export folder
 		$exportFolderPathRoot = SetRootExportFolder
 		$exportFolderPath = PathConcat -ParentPath $exportFolderPathRoot -ChildPath $PIDataArchiveComputerName
 		if (!(Test-Path $exportFolderPath)){ New-Item $exportFolderPath -type directory }
 		
-		$listOfDataItems = @('PIDatabaseSecurity','PIFirewall','PIUsers','PIGroups','PIIdentities','PIMappings','PITrusts','PINetManagerStats','PIMessages')
+		# Set data item(s) to export
+		if($DataItem -eq 'All')
+		{ $listOfDataItems = @('PIDatabaseSecurity','PIFirewall','PIUsers','PIGroups','PIIdentities','PIMappings','PITrusts','PINetManagerStats','PIMessages') }
+		else
+		{ $listOfDataItems = @($DataItem) }
+
+		# Loop through requested data items and export them to a CSV file
 		foreach($dataItem in $listOfDataItems)
 		{
 			$PISecConfigDataItem = $null
