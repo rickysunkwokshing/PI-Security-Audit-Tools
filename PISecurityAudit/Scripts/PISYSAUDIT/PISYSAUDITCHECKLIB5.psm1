@@ -3,7 +3,7 @@
 # ***********************************************************************
 # * Modulename:   PISYSAUDIT
 # * Filename:     PISYSAUDITCHECKLIB5.psm1
-# * Description:  Validation rules for PI Coresight.
+# * Description:  Validation rules for PI Vision.
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,7 +50,7 @@ function Get-PISysAudit_FunctionsFromLibrary5
 {
 <#  
 .SYNOPSIS
-Get functions from Coresight library at or below the specified level.
+Get functions from PI Vision library at or below the specified level.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(
@@ -62,20 +62,20 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckCoresightVersion"  1 # AU50001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckCoresightAppPools" 1 # AU50002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CoresightSSLcheck"      1 # AU50003
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CoresightSPNcheck"      1 # AU50004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionVersion"  1 # AU50001
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionAppPools" 1 # AU50002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSSL"      1 # AU50003
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSPN"      1 # AU50004
 	
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
-function Get-PISysAudit_GlobalPICoresightConfiguration
+function Get-PISysAudit_GlobalPIVisionConfiguration
 {
 <#  
 .SYNOPSIS
-Gathers global data for all Coresight checks.
+Gathers global data for all PI Vision checks.
 .DESCRIPTION
 Several checks reuse information.  This command puts the configuration information
 in a global object to reduce the number of remote calls, improving performance and 
@@ -117,24 +117,31 @@ PROCESS
 	$fn = GetFunctionName
 
 	# Reset global config object.
-	$global:CoresightConfiguration = $null
+	$global:PIVisionConfiguration = $null
 	
 	$scriptBlock = {
-			$ProductName = 'Coresight'
 			Import-Module WebAdministration
 			
+			$pisystemKey = "HKLM:\Software\PISystem\"
+			if(Test-Path -Path $($pisystemKey + "PIVision"))
+			{ $ProductName = 'PIVision' }
+			elseif(Test-Path -Path $($pisystemKey + "Coresight"))
+			{ $ProductName = 'Coresight' }
+			else
+			{ Write-PISysAudit_LogMessage "Product registry key not found." "Error" $fn }
+
 			# Registry keys
-			$Version = Get-ItemProperty -Path "HKLM:\Software\PISystem\Coresight" -Name "CurrentVersion" | Select-Object -ExpandProperty "CurrentVersion"
+			$Version = Get-ItemProperty -Path $($pisystemKey + $ProductName) -Name "CurrentVersion" | Select-Object -ExpandProperty "CurrentVersion"
 			$MachineDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
 			$Hostname = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
-			$Site = Get-ItemProperty -Path $("HKLM:\Software\PISystem\" + $ProductName) -Name "WebSite" | Select-Object -ExpandProperty "WebSite"
+			$Site = Get-ItemProperty -Path $($pisystemKey + $ProductName) -Name "WebSite" | Select-Object -ExpandProperty "WebSite"
 			
 			# IIS Configuration
 			$Bindings = Get-WebBinding -Name $Site
 			$UsingHTTPS = $Bindings.protocol -contains "https"
 			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
-			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/Coresight') -Filter system.webServer/security/access -Name "sslFlags"
-			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site + '/Coresight') | select-object Value	
+			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/' + $ProductName) -Filter system.webServer/security/access -Name "sslFlags"
+			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site.ToString() + '/' + $ProductName) | select-object Value	
 			
 			# App Pool Info 
 			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.identitytype
@@ -144,6 +151,7 @@ PROCESS
 			
 			# Construct a custom object to store the config information
 			$Configuration = New-Object PSCustomObject
+			$Configuration | Add-Member -MemberType NoteProperty -Name ProductName -Value $ProductName
 			$Configuration | Add-Member -MemberType NoteProperty -Name Version -Value $Version
 			$Configuration | Add-Member -MemberType NoteProperty -Name Hostname -Value $Hostname
 			$Configuration | Add-Member -MemberType NoteProperty -Name MachineDomain -Value $MachineDomain
@@ -163,14 +171,14 @@ PROCESS
 	try
 	{
 		if($LocalComputer)
-		{ $global:CoresightConfiguration = & $scriptBlock }
+		{ $global:PIVisionConfiguration = & $scriptBlock }
 		else
-		{ $global:CoresightConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+		{ $global:PIVisionConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
 	}
 	catch
 	{
 		# Return the error message.
-		$msg = "A problem occurred during the retrieval of the Global Coresight configuration."					
+		$msg = "A problem occurred during the retrieval of the Global PI Vision configuration."					
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
 		$result = "N/A"
 	}
@@ -179,14 +187,14 @@ END {}
 
 }
 
-function Get-PISysAudit_CheckCoresightVersion
+function Get-PISysAudit_CheckPIVisionVersion
 {
 <#  
 .SYNOPSIS
-AU50001 - Check for latest version of Coresight
+AU50001 - Check for latest version of PI Vision
 .DESCRIPTION
-VALIDATION: verifies PI Coresight version.<br/>
-COMPLIANCE: upgrade to the latest version of PI Coresight.  For more information, 
+VALIDATION: verifies PI Vision version.<br/>
+COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
 see "Upgrade a PI Coresight installation" in the PI Live Library.<br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a>
 #>
@@ -217,7 +225,7 @@ PROCESS
 	
 	try
 	{		
-		$installVersion = $global:CoresightConfiguration.Version	
+		$installVersion = $global:PIVisionConfiguration.Version	
 		
 		$installVersionTokens = $installVersion.Split(".")
 		# Form an integer value with all the version tokens.
@@ -246,9 +254,9 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU50001" `
 									-aif $fn -msg $msg `
-									-ain "PI Coresight Version" -aiv $result `
-									-Group1 "PI System" -Group2 "PI Coresight" `
-									-Severity "Moderate"																																																
+									-ain "PI Vision Version" -aiv $result `
+									-Group1 "PI System" -Group2 "PI Vision" `
+									-Severity "Medium"																																																
 
 }
 
@@ -259,13 +267,13 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CheckCoresightAppPools
+function Get-PISysAudit_CheckPIVisionAppPools
 {
 <#  
 .SYNOPSIS
-AU50002 - Check Coresight AppPools identity
+AU50002 - Check PI Vision AppPools identity
 .DESCRIPTION
-VALIDATION: checks PI Coresight AppPool identity.<br/>
+VALIDATION: checks PI Vision AppPool identity.<br/>
 COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not ideal. 
 For more information, see "Create a service account for PI Coresight" in the PI Live Library. <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
@@ -296,12 +304,12 @@ PROCESS
 	
 	try
 	{	
-		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType   # Service AppPool Identity Type
-		$AdminAppPoolType = $global:CoresightConfiguration.AdminAppPoolType       # Admin AppPool Identity Type 
-		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser   # Service AppPool User
-		$AdminAppPoolUser = $global:CoresightConfiguration.AdminAppPoolUser       # Admin AppPool User
+		$ServiceAppPoolType = $global:PIVisionConfiguration.ServiceAppPoolType   # Service AppPool Identity Type
+		$AdminAppPoolType = $global:PIVisionConfiguration.AdminAppPoolType       # Admin AppPool Identity Type 
+		$ServiceAppPoolUser = $global:PIVisionConfiguration.ServiceAppPoolUser   # Service AppPool User
+		$AdminAppPoolUser = $global:PIVisionConfiguration.AdminAppPoolUser       # Admin AppPool User
 		
-		# Both Coresight AppPools must run under the same identity.
+		# Both AppPools must run under the same identity.
 		If ( $ServiceAppPoolType -eq $AdminAppPoolType -and $ServiceAppPoolUser -eq $AdminAppPoolUser ) 
 		{ 
 			# If a custom account is used, we need to distinguish between a local and domain account.
@@ -311,11 +319,11 @@ PROCESS
 				If ($ServiceAppPoolUser -contains ".\" ) 
 				{ 
 					$result = $false
-					$msg =  "Local User is running Coresight AppPools. Please use a custom domain account."
+					$msg =  "Local User is running PI Vision AppPools. Please use a custom domain account."
 				}
 				Else # At this point, it's either a domain account or local account using "HOSTNAME\user" format. 
 				{
-					$hostname = $global:CoresightConfiguration.Hostname # Web Server Hostname
+					$hostname = $global:PIVisionConfiguration.Hostname # Web Server Hostname
 					# Extract the domain part from the AppPool identity string.
 					$ServiceAppPoolUserDomain = $ServiceAppPoolUser.Split("\")[0]
 
@@ -323,32 +331,32 @@ PROCESS
 					If ($hostname -eq $ServiceAppPoolUserDomain)
 					{
 						$result = $false
-						$msg =  "Local User is running Coresight AppPools. Please use a custom domain account."
+						$msg =  "Local User is running PI Vision AppPools. Please use a custom domain account."
 					}
 					Else # A custom domain account is used. 
 					{
 						$result = $true
-						$msg =  "A custom domain account is running both Coresight AppPools"
+						$msg =  "A custom domain account is running both PI Vision AppPools"
 					}
 				}
 
 			}
-			ElseIf ($ServiceAppPoolType -eq "LocalSystem" ) # LocalSystem is running the Coresight AppPools. That's a bad idea.
+			ElseIf ($ServiceAppPoolType -eq "LocalSystem" ) # LocalSystem is running the AppPools. That's a bad idea.
 			{ 
 				$result = $false
-				$msg =  "Local System is running both Coresight AppPools. Use a custom domain account instead."
+				$msg =  "Local System is running both PI Vision AppPools. Use a custom domain account instead."
 			}
 			Else # The only other options are: LocalService, NetworkService and AppPoolIdentity.  Pass and recommend domain account.
 			{
 				$result = $true
-				$msg =  $ServiceAppPoolType + " is running the Coresight AppPools. Use a custom domain account instead."
+				$msg =  $ServiceAppPoolType + " is running the PI Vision AppPools. Use a custom domain account instead."
 
 			}
 		}
-		Else # For technical reasons, both Coresight AppPools must run under the same identity.
+		Else # For technical reasons, both AppPools must run under the same identity.
 		{
 			$result = $false
-			$msg = "Both Coresight AppPools must run under the same identity."
+			$msg = "Both PI Vision AppPools must run under the same identity."
 		}
 	}
 	catch
@@ -363,9 +371,9 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU50002" `
 									-aif $fn -msg $msg `
-									-ain "PI Coresight AppPool Check" -aiv $result `
-									-Group1 "PI System" -Group2 "PI Coresight" `
-									-Severity "Moderate"																																																
+									-ain "PI Vision AppPool Check" -aiv $result `
+									-Group1 "PI System" -Group2 "PI Vision" `
+									-Severity "Medium"																																																
 }
 
 END {}
@@ -375,13 +383,13 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CoresightSSLcheck
+function Get-PISysAudit_CheckPIVisionSSL
 {
 <#  
 .SYNOPSIS
-AU50003 - Coresight SSL check
+AU50003 - PI Vision SSL check
 .DESCRIPTION
-VALIDATION: Checks whether SSL is enabled and enforced on the Coresight Web Site.<br/>
+VALIDATION: Checks whether SSL is enabled and enforced on the PI Vision Web Site.<br/>
 COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
 For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library. <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
@@ -412,9 +420,9 @@ PROCESS
 	$severity = "Unknown"
 	try
 	{	
-		$CSwebSite = $global:CoresightConfiguration.WebSite # Web Site name
-		$WebBindings = $global:CoresightConfiguration.Bindings # Web Site bindings
-		$httpsBindingConfigured = $global:CoresightConfiguration.UsingHTTPS # Check if HTTPS binding is enabled.
+		$CSwebSite = $global:PIVisionConfiguration.WebSite # Web Site name
+		$WebBindings = $global:PIVisionConfiguration.Bindings # Web Site bindings
+		$httpsBindingConfigured = $global:PIVisionConfiguration.UsingHTTPS # Check if HTTPS binding is enabled.
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
 		If ($httpsBindingConfigured = $false) 
@@ -422,42 +430,42 @@ PROCESS
 			# Test fails, but how epic is the fail?
 			$result = $false
 
-			$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled # Check if Basic Authentication is enabled.
+			$basicAuth = $global:PIVisionConfiguration.BasicAuthEnabled # Check if Basic Authentication is enabled.
 			# Basic Authentication is disabled.
 			If ($basicAuth.Value -eq $False) 
 			{ 
-				$severity = "Moderate" 
+				$severity = "Medium" 
 				$msg = "HTTPS binding is not enabled."
 			} 
 			Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 			{ 
-				$severity = "Severe"
+				$severity = "High"
 				$msg = "Basic Authentication is enabled, but HTTPS binding is not enabled. User credentials sent over the wire are not encrypted!"
 			}
 		} 
 		Else # HTTPS binding is enabled.
 		{ 
-			$SSLCheck_WebSite = $global:CoresightConfiguration.sslFlagsSite # SSL setting at Web Site level
-			$SSLCheck_WebApp = $global:CoresightConfiguration.sslFlagsApp # SSL setting at Web App level
+			$SSLCheck_WebSite = $global:PIVisionConfiguration.sslFlagsSite # SSL setting at Web Site level
+			$SSLCheck_WebApp = $global:PIVisionConfiguration.sslFlagsApp # SSL setting at Web App level
 
 			# If either the Web Site OR Web App allows only connections with SSL, it's OK.
 			If ($SSLCheck_WebSite.ToString() -eq "Ssl" -or $SSLCheck_WebApp.ToString() -eq "Ssl") 
 			{ 
 				# SSL is correctly configured. Let's check whether the SSL certificate is issued by a CA.
-				$MachineDomain = $global:CoresightConfiguration.MachineDomain # Web Server Machine Domain
-				$hostname = $global:CoresightConfiguration.Hostname # Web Server Hostname.
+				$MachineDomain = $global:PIVisionConfiguration.MachineDomain # Web Server Machine Domain
+				$hostname = $global:PIVisionConfiguration.Hostname # Web Server Hostname.
 
 				# Build FQDN using hostname and domain strings.
 				$fqdn = $hostname + "." + $machineDomain
 
-				# Get the issuer of the SSL certificate used on the Coresight Web Site.
+				# Get the issuer of the SSL certificate used on the Web Site.
 				$matches = [regex]::Matches($WebBindings, 'https \*:([0-9]+):') 
 				
 				# Go through all bindings.
 				foreach ($match in $matches) {
 
 					$port = $($match.Groups[1].Captures[0].Value)
-					# Find SSL certificate for each binding of the PI Coresight Web Site.
+					# Find SSL certificate for each binding of the Web Site.
 					$portCert = Get-PISysAudit_BoundCertificate -lc $LocalComputer -rcn $RemoteComputerName -Port $port -DBGLevel $DBGLevel
 					
 					# Get the Thumbprint from all SSL certificates that have been found.
@@ -488,16 +496,16 @@ PROCESS
 				# Test fails, but how epic is the fail?
 				$result = $false
 				
-				$basicAuth = $global:CoresightConfiguration.BasicAuthEnabled # Check if Basic Authentication is enabled.
+				$basicAuth = $global:PIVisionConfiguration.BasicAuthEnabled # Check if Basic Authentication is enabled.
 				# Basic Authentication is disabled. Not too bad.
 				If ($basicAuth.Value -eq $False) 
 				{ 
-					$severity = "Moderate" 
+					$severity = "Medium" 
 					$msg = "Connections without SSL are allowed."
 				} 
 				Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 				{ 
-					$severity = "Severe" 
+					$severity = "High" 
 					$msg = "Basic Authentication is enabled, but connections without SSL are allowed. User credentials sent over the wire may not be encrypted!"
 				}
 			}
@@ -515,8 +523,8 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU50003" `
 									-aif $fn -msg $msg `
-									-ain "PI Coresight SSL Check" -aiv $result `
-									-Group1 "PI System" -Group2 "PI Coresight" `
+									-ain "PI Vision SSL Check" -aiv $result `
+									-Group1 "PI System" -Group2 "PI Vision" `
 									-Severity $severity																																															
 }
 
@@ -527,14 +535,14 @@ END {}
 #***************************
 }
 
-function Get-PISysAudit_CoresightSPNcheck
+function Get-PISysAudit_CheckPIVisionSPN
 {
 <#  
 .SYNOPSIS
-AU50004 - Coresight SPN check
+AU50004 - PI Vision SPN check
 .DESCRIPTION
-VALIDATION: Checks PI Coresight SPN assignment. <br/>
-COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the Coresight AppPool account. This makes Kerberos Authentication possible.
+VALIDATION: Checks PI Vision SPN assignment. <br/>
+COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool account. This makes Kerberos Authentication possible.
 For more information, see the PI Live Library link below. <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
 #>
@@ -564,17 +572,16 @@ PROCESS
 	
 	try
 	{		
-		$ServiceAppPoolType = $global:CoresightConfiguration.ServiceAppPoolType  # Service AppPool Identity Type 
-		$ServiceAppPoolUser = $global:CoresightConfiguration.ServiceAppPoolUser  # Service AppPool User
-		$CSwebSite = $global:CoresightConfiguration.WebSite  # Web Site Name
-		$WebBindings = $global:CoresightConfiguration.Bindings # Web Site bindings.
+		$ServiceAppPoolType = $global:PIVisionConfiguration.ServiceAppPoolType  # Service AppPool Identity Type 
+		$ServiceAppPoolUser = $global:PIVisionConfiguration.ServiceAppPoolUser  # Service AppPool User
+		$WebBindings = $global:PIVisionConfiguration.Bindings # Web Site bindings.
 
-		# Coresight is using the http service class.
+		# Using the http service class.
 		$serviceType = "http"
 
-		# Special 'service name' for Coresight.
-		# This is needed to distinguish between SPN check for IIS Apps such as Coresight, and Windows Services such as PI or AF.
-		$serviceName = "coresight"
+		# Special 'service name' for PI Vision.
+		# This is needed to distinguish between SPN check for IIS Apps such as PI Vision, and Windows Services such as PI or AF.
+		$serviceName = "pivision"
 
 		# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
 		$BindingsToString = $($WebBindings) | Out-String
@@ -585,29 +592,29 @@ PROCESS
 		# Go through all bindings.
 		foreach ($match in $matches) 
 		{
-			$CSheader = $match.Groups[1].Captures[0].Value 				
-			If ($CSheader) # A custom host header is used!
+			$CustomHeader = $match.Groups[1].Captures[0].Value 				
+			If ($CustomHeader) # A custom host header is used!
 			{ 
-				$serviceName = "coresight_custom"
+				$serviceName = "pivision_custom"
 				break 
 			}
 		}
 
-		# Coresight is running under a custom domain account.
+		# AppPool is running under a custom domain account.
 		If ( $ServiceAppPoolType -eq "SpecificUser") 
 		{ 
-			$csappPool = $ServiceAppPoolUser 
+			$AppPool = $ServiceAppPoolUser 
 		} 
-		# Coresight is running under a machine account.
+		# AppPool is running under a machine account.
 		Else 
 		{ 
-			$csappPool = $ServiceAppPoolType
+			$AppPool = $ServiceAppPoolType
 
 			# Machine accounts don't need HTTP service class - it's already included in the HOST service class.
 			$serviceType = "host"
 		}
 		
-		$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $LocalComputer -rcn $RemoteComputerName -appPool $csappPool -CustomHeader $CSheader -dbgl $DBGLevel
+		$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $LocalComputer -rcn $RemoteComputerName -AppPool $AppPool -CustomHeader $CustomHeader -dbgl $DBGLevel
 
 		if($null -eq $result)
 		{
@@ -638,9 +645,9 @@ PROCESS
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU50004" `
 									-aif $fn -msg $msg `
-									-ain "PI Coresight SPN Check" -aiv $result `
-									-Group1 "PI System" -Group2 "PI Coresight" `
-									-Severity "Moderate"																																																
+									-ain "PI Vision SPN Check" -aiv $result `
+									-Group1 "PI System" -Group2 "PI Vision" `
+									-Severity "Medium"																																																
 }
 
 END {}
@@ -691,7 +698,7 @@ PROCESS
 	try
 	{		
 		# Enter routine.
-		# Use information from $global:CoresightConfiguration whenever possible to 
+		# Use information from $global:PIVisionConfiguration whenever possible to 
 		# focus on validation simplify logic. 		
 	}
 	catch
@@ -723,12 +730,12 @@ END {}
 # Export Module Member
 # ........................................................................
 # <Do not remove>
-Export-ModuleMember Get-PISysAudit_GlobalPICoresightConfiguration
+Export-ModuleMember Get-PISysAudit_GlobalPIVisionConfiguration
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary5
-Export-ModuleMember Get-PISysAudit_CheckCoresightVersion
-Export-ModuleMember Get-PISysAudit_CheckCoresightAppPools
-Export-ModuleMember Get-PISysAudit_CoresightSSLcheck
-Export-ModuleMember Get-PISysAudit_CoresightSPNcheck
+Export-ModuleMember Get-PISysAudit_CheckPIVisionVersion
+Export-ModuleMember Get-PISysAudit_CheckPIVisionAppPools
+Export-ModuleMember Get-PISysAudit_CheckPIVisionSSL
+Export-ModuleMember Get-PISysAudit_CheckPIVisionSPN
 # </Do not remove>
 
 # ........................................................................

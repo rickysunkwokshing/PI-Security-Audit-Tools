@@ -71,10 +71,77 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1    # AU10006
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1    # AU10007
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdates"    1    # AU10008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInternetAccess"     1    # AU10009
 
 			
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
+}
+
+function Get-PISysAudit_GlobalMachineConfiguration
+{
+<#  
+.SYNOPSIS
+Gathers global data that can be used by all machine checks.
+.DESCRIPTION
+Some checks reuse information.  This command puts the configuration information
+in a global object to reduce the number of remote calls, improving performance and 
+simplifying validation logic.
+
+Information included in global configuration:
+	PSVersion          - PowerShell version
+	InstallationType   - Edition of Windows installed
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{
+	$fn = GetFunctionName
+
+	# Reset global config object.
+	$global:MachineConfiguration = $null
+	
+	$scriptBlock = {
+			
+			$PSVersion = $PSVersionTable.PSVersion.Major
+			$InstallationType = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "InstallationType" | Select-Object -ExpandProperty "InstallationType" | Out-String
+			# Construct a custom object to store the config information
+			$Configuration = New-Object PSCustomObject
+			$Configuration | Add-Member -MemberType NoteProperty -Name PSVersion -Value $PSVersion
+			$Configuration | Add-Member -MemberType NoteProperty -Name InstallationType -Value $InstallationType
+
+			return $Configuration
+		}
+	try
+	{
+		if($LocalComputer)
+		{ $global:MachineConfiguration = & $scriptBlock }
+		else
+		{ $global:MachineConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the retrieval of the global machine configuration."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+}
+END {}	
+
 }
 
 function Get-PISysAudit_CheckDomainMemberShip
@@ -148,7 +215,7 @@ PROCESS
 										-ain "Domain Membership Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Domain" `
-										-Severity "Severe"																				 
+										-Severity "High"																				 
 }
 
 END {}
@@ -198,9 +265,7 @@ PROCESS
 	$msg = ""
 	try
 	{				
-		$InstallationType = Get-PISysAudit_RegistryKeyValue "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" "InstallationType" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-
-		# Check if the value is from one in the list			
+		$InstallationType = $global:MachineConfiguration.InstallationType
 		if($InstallationType -eq "Server Core") { $result =  $true } else { $result = $false }
 
 		# Set a message to return with the audit object.
@@ -222,7 +287,7 @@ PROCESS
 										-ain "Operating System Installation Type" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Operating System" `
-										-Severity "Severe"													
+										-Severity "Critical"													
 }
 
 END {}
@@ -315,7 +380,7 @@ PROCESS
 										-ain "Firewall Enabled" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
-										-Severity "Moderate"																				 
+										-Severity "Medium"																				 
 }
 
 END {}
@@ -363,32 +428,50 @@ PROCESS
 	try
 	{				
 		$result = $false
-		# Read the AppLocker policy.
-		[xml] $appLockerPolicy = Get-PISysAudit_AppLockerState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		if($null -ne $appLockerPolicy)
-		{
-			if($(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
-				$(Select-Xml -xml $appLockerPolicy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")
-			{
-				$svcStartupMode = Get-PISysAudit_ServiceProperty -sn 'AppIDSvc' -sp StartupType -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-				if($svcStartupMode -ne 'Disabled')
+
+		# Check first to see if Server Core is used.			
+		if($global:MachineConfiguration.InstallationType -eq "Server Core")
+		{ 
+			$result =  $true 
+			$msg = "Windows Server Core detected.  Core edition does not support AppLocker.  Passing check due to reduced attack surface of Server Core"
+		} 
+		else 
+		{ 
+			if($global:MachineConfiguration.PSVersion -ge 3){
+				# Read the AppLocker policy.
+				$appLockerConfiguration = Get-PISysAudit_AppLockerState -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+				if($null -ne $appLockerConfiguration.Policy)
 				{
-					$result = $true
-					$msg = "AppLocker is configured to enforce."
+					if($(Select-Xml -xml $appLockerConfiguration.Policy -XPath "//RuleCollection[@Type='Exe']").Node.EnforcementMode -eq "Enabled" -and `
+						$(Select-Xml -xml $appLockerConfiguration.Policy -XPath "//RuleCollection[@Type='Msi']").Node.EnforcementMode -eq "Enabled")
+					{
+						if($appLockerConfiguration.ServiceEnabled)
+						{
+							$result = $true
+							$msg = "AppLocker is configured to enforce."
+						}
+						else
+						{
+							$msg = "AppLocker is configured to enforce but the Application Identity Service is disabled."
+						}
+					}
+					else
+					{
+						$msg = "AppLocker is not configured to enforce."
+					}
 				}
 				else
 				{
-					$msg = "AppLocker is configured to enforce but the Application Identity Service is disabled."
+					$msg = "No AppLocker policy returned."
 				}
 			}
 			else
 			{
-				$msg = "AppLocker is not configured to enforce."
+				$msg = "The server: {0} has PowerShell {1}, so the AppLocker configuration could not be retrieved." -f $ComputerParams.ComputerName, $global:MachineConfiguration.PSVersion
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+										-at $AuditTable -an 'Computer' -fn $fn -msg $msg
 			}
-		}
-		else
-		{
-			$msg = "No AppLocker policy returned."
 		}
 	}
 	catch
@@ -405,7 +488,7 @@ PROCESS
 										-ain "AppLocker Enabled" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Policy" `
-										-Severity "Moderate"																				 
+										-Severity "Medium"																				 
 }
 
 END {}
@@ -468,7 +551,7 @@ PROCESS
 			if ($(Get-PISysAudit_RegistryKeyValue -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel -RegKeyPath $uacKeyPath -Attribute $uacFeature) -eq 0)
 			{
 				$result = $false
-				$severity = "Moderate"
+				$severity = "Medium"
 				$tmpmsg += $uacFeature + "; "
 			}
 		}
@@ -611,7 +694,7 @@ PROCESS
 										-ain "OSIsoft NOC Monitoring" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "Machine" -Group2 "Montitoring"`
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -657,31 +740,39 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{		
-		$adminKeyPath = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"	
-		$userKeyPath  = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
-		# Attribute is 0 or 1 for enabled/disabled
-		$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
-		$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
-		if($adminIsEnabled -and $userIsEnabled)
-		{
+	{				
+		if($global:MachineConfiguration.InstallationType -eq "Server Core") 
+		{ 
 			$result = $true
-			$msg = "IE Enhanced Security is enabled for Users and Admins."
-		}
-		elseif($adminIsEnabled)
-		{
-			$result = $false
-			$msg = "IE Enhanced Security is disabled for Users."
-		}
-		elseif($userIsEnabled)
-		{
-			$result = $false
-			$msg = "IE Enhanced Security is disabled for Admins."
-		}
+			$msg = "Server Core detected.  Core installation does not include IE."
+		} 
 		else
-		{
-			$result = $false
-			$msg = "IE Enhanced Security is disabled for Users and Admins."
+		{ 
+			$adminKeyPath = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"	
+			$userKeyPath  = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+			# Attribute is 0 or 1 for enabled/disabled
+			$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+			$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
+			if($adminIsEnabled -and $userIsEnabled)
+			{
+				$result = $true
+				$msg = "IE Enhanced Security is enabled for Users and Admins."
+			}
+			elseif($adminIsEnabled)
+			{
+				$result = $false
+				$msg = "IE Enhanced Security is disabled for Users."
+			}
+			elseif($userIsEnabled)
+			{
+				$result = $false
+				$msg = "IE Enhanced Security is disabled for Admins."
+			}
+			else
+			{
+				$result = $false
+				$msg = "IE Enhanced Security is disabled for Users and Admins."
+			}
 		}
 	}
 	catch
@@ -698,7 +789,7 @@ PROCESS
 									-ain "IE Enhanced Security" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
-									-Severity "Moderate"
+									-Severity "Medium"
 }
 
 END {}
@@ -761,7 +852,7 @@ PROCESS
 		{
 			if($null -eq $lastPatch) { return $false }
 			else
-			{ return $lastPatch.ToFileTimeUtc() -gt $cutoffDate }
+			{ return ([datetime]$lastPatch).ToFileTimeUtc() -gt $cutoffDate }
 		}
 		
 		$IsOSPatched = IsPatchLevelCurrent $lastInstalledHotFix $cutoffDate
@@ -795,7 +886,94 @@ PROCESS
 									-ain "Software Updates" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
-									-Severity "Severe"
+									-Severity "High"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckInternetAccess
+{
+<#  
+.SYNOPSIS
+AU10009 - No Internet Access
+.DESCRIPTION
+VERIFICATION: Checks that this server is not able to access the internet. <br/>
+COMPLIANCE: Implement firewall restrictions to prevent access to the internet 
+	from the server. 
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{
+		# Test ping response from Google's DNS server	
+		$testAddress = '8.8.8.8'
+		$scriptBlock = {
+				param([string]$Address)
+				Test-Connection -ComputerName $Address -Count 4 -Quiet # Quiet simply returns true or false
+		}
+
+		if($LocalComputer)
+		{
+			$canConnect = & $scriptBlock -Address $testAddress
+		}
+		else
+		{
+			$canConnect = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $testAddress
+		}
+
+		if($canConnect -eq $true)
+		{
+			$result = $false
+			$msg = "Server has internet access."
+		}
+		else
+		{
+			$result = $true
+			$msg = "Server does not appear to have internet access."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10009" `
+									-ain "No Internet Access" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Medium"																																																
 }
 
 END {}
@@ -875,6 +1053,7 @@ END {}
 # Export Module Member
 # ........................................................................
 # <Do not remove>
+Export-ModuleMember Get-PISysAudit_GlobalMachineConfiguration
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary1
 Export-ModuleMember Get-PISysAudit_CheckDomainMemberShip
 Export-ModuleMember Get-PISysAudit_CheckOSInstallationType
@@ -884,6 +1063,7 @@ Export-ModuleMember Get-PISysAudit_CheckUACEnabled
 Export-ModuleMember Get-PISysAudit_CheckManagedPI
 Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
 Export-ModuleMember Get-PISysAudit_CheckSoftwareUpdates
+Export-ModuleMember Get-PISysAudit_CheckInternetAccess
 # </Do not remove>
 
 # ........................................................................

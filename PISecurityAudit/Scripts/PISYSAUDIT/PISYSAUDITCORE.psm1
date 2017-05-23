@@ -666,7 +666,7 @@ param(
 	{ return $false }
 }
 
-function ValidateIfHasPICoresightRole
+function ValidateIfHasPIVisionRole
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(		
@@ -688,8 +688,14 @@ param(
 	try
 	{
 		$result = $false
-		$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
-		$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel						
+		$RegKeyPath = "HKLM:\Software\PISystem\PIVision"
+		$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel	
+		# If PI Vision is not present, check for previous name. 
+		if($result -eq $false)
+		{
+			$RegKeyPath = "HKLM:\Software\PISystem\Coresight"
+			$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel
+		}					
 		return $result
 	}
 	catch
@@ -771,9 +777,12 @@ function ValidateWSMan
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(	
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("vlc")]
+		[alias("cp")]		
+		$ComputerParams,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("at")]
 		[System.Collections.HashTable]
-		$ValidatedListOfComputers,
+		$AuditTable,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -782,48 +791,41 @@ param(
 	$fn = GetFunctionName
 	
 	try
-	{								
-		$problemCounter = 0
-		
-		# Process with the unique list.
-		foreach($item in $ValidatedListOfComputers.GetEnumerator())
-		{
-			# Get the current parameter
-			# Read the object within the System.Collections.DictionaryEntry
-			$computerParams = $item.Value | Where-Object AuditRoleType -EQ "Computer"
+	{
+		# Only need the 'Computer' role
+		$ComputerParams = $ComputerParams.Value | Where-Object AuditRoleType -EQ "Computer"
 			
-			# Test non-local computer to validate if WSMan is working.
-			if($computerParams.IsLocal)
-			{							
-				$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
-				$msg = [string]::Format($msgTemplate, $computerParams.ComputerName)
-				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
+		# Test non-local computer to validate if WSMan is working.
+		if($ComputerParams.IsLocal)
+		{
+			$result = $true
+			$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
+		}
+		else
+		{								
+			$result = Test-WSMan -authentication default -ComputerName $ComputerParams.ComputerName -ErrorAction SilentlyContinue
+			if($null -eq $result)
+			{
+				$msgTemplate = "The server: {0} has a problem with WinRM communication"
+				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+									-at $AuditTable -an 'Computer' -fn $fn -msg $msg
 			}
-			else
-			{								
-				$result = $null
-				$result = Test-WSMan -authentication default -ComputerName $computerParams.ComputerName
-				if($null -eq $result)
-				{
-					$problemCounter++
-					$msgTemplate = "The server: {0} has a problem with WinRM communication"
-					$msg = [string]::Format($msgTemplate, $computerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Error" $fn
-				}					
-			}
-		}						
+		}
 		
-		# At least a problem was found.
-		if($problemCounter -gt 0) { return $false }
-		
-		# Validation is a success.
-		return $true
+		if($result) { return $true }
+		else { return $false }
 	}
 	catch
 	{
 		# Return the error message.
 		$msg = "A problem has occurred during the validation with WSMan"						
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an 'Computer' -fn $fn -msg $msg
 		# Validation has failed.
 		return $false
 	}	
@@ -964,7 +966,7 @@ END {}
 function Test-PowerShellToolsForPISystemAvailable
 {
     # Check for availability of PowerShell Tools for the PI System
-    if( -not(Test-Path variable:global:ArePowerShellToolsAvailable) -and $PSVersionTable.PSVersion.Major -ge 3)
+    if(-not(Test-Path variable:global:ArePowerShellToolsAvailable))
 	{
 		if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
 		{
@@ -1006,6 +1008,20 @@ param(
 		# Read from the global constant bag.
 		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 		
+		try
+		{
+			Get-PISysAudit_GlobalMachineConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+		}
+		catch
+		{
+			$msgTemplate = "An error occurred while accessing the global configuration of {0}"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "Machine Audit" -fn $fn -msg $msg
+			return
+		}
+
 		# Get the list of functions to execute.
 		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary1 -lvl $AuditLevelInt
 		# There is nothing to execute.
@@ -1057,7 +1073,10 @@ param(
 		}			
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
 	}
 	catch
 	{
@@ -1215,7 +1234,10 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1354,6 +1376,7 @@ param(
 				
 		# Prepare data required for multiple compliance checks
 
+		Write-Progress -Activity $activityMsg1 -Status "Gathering PI AF Server Configuration"
 		$global:AFDiagOutput = Invoke-PISysAudit_AFDiagCommand -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
 										
 		# Proceed with all the compliance checks.
@@ -1385,7 +1408,10 @@ param(
 
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1531,7 +1557,10 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed
+		}
 	}
 	catch
 	{
@@ -1542,7 +1571,7 @@ param(
 	}		
 }
 
-function StartPICoresightServerAudit
+function StartPIVisionServerAudit
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(										
@@ -1572,14 +1601,14 @@ param(
 		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value	
 			
 		# Validate the presence of IIS
-		if((ValidateIfHasPICoresightRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
+		if((ValidateIfHasPIVisionRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
 		{
 			# Return the error message.
-			$msgTemplate = "The computer {0} does not have the PI Coresight role or the validation failed"
+			$msgTemplate = "The computer {0} does not have the PI Vision role or the validation failed"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1588,7 +1617,7 @@ param(
 			$msg = "Elevation required to run Audit checks using IIS Cmdlet.  Run PowerShell as Administrator to complete these checks."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1599,22 +1628,32 @@ param(
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
+		# Set message templates.
+		$activityMsgTemplate1 = "Check PI Vision component on '{0}' computer"
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
+		$statusMsgCompleted = "Completed"
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
+												+ " Audit Table = {1}, Server Name = {2}," `
+												+ " Debug Level = {3}"
+
 		try
 		{
-			Get-PISysAudit_GlobalPICoresightConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+			Write-Progress -Activity $activityMsg1 -Status "Gathering PI Vision Configuration" -ParentId 1
+			Get-PISysAudit_GlobalPIVisionConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
 		}
 		catch
 		{
 			# Return the error message.
-			$msgTemplate = "An error occurred while accessing the global configuration of PI Coresight on {0}"
+			$msgTemplate = "An error occurred while accessing the global configuration of PI Vision on {0}"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Coresight Server Audit" -fn $fn -msg $msg
+							-at $AuditTable -an "PI Vision Server Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -1624,19 +1663,10 @@ param(
 		if($listOfFunctions.Count -eq 0)		
 		{
 			# Return the error message.
-			$msg = "No PI Coresight checks have been found."
+			$msg = "No PI Vision checks have been found."
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			return
-		}			
-		
-		# Set message templates.
-		$activityMsgTemplate1 = "Check PI Coresight component on '{0}' computer"
-		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
-		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
-												+ " Audit Table = {1}, Server Name = {2}," `
-												+ " Debug Level = {3}"									
+		}							
 				
 		# Proceed with all the compliance checks.
 		$i = 0
@@ -1665,12 +1695,15 @@ param(
 		}
 		# Set the progress.
 		if($ShowUI)
-		{ Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -completed }
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
 	}
 	catch
 	{
 		# Return the error message.
-		$msg = "A problem occurred during the processing of PI Coresight checks"					
+		$msg = "A problem occurred during the processing of PI Vision checks"					
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return
 	}		
@@ -1714,7 +1747,7 @@ PROCESS
 		New-Variable -Name "PISysAuditIsElevated" -Scope "Global" -Visibility "Public" -Value $IsElevated
 
 		# Validate if used with PowerShell version 3.x and more	
-		$majorVersionPS = $Host.Version.Major	
+		$majorVersionPS = $PSVersionTable.PSVersion.Major	
 		if($majorVersionPS -lt 3)
 		{						
 			$msg = "This script won't execute under less than version 3.0 of PowerShell"
@@ -2626,6 +2659,89 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_ResolveDnsName
+{
+<#
+.SYNOPSIS
+(Core functionality) Retrieves attributes of a DNS record 
+.DESCRIPTION
+Wraps nslookup or Resolve-DnsName depending on PS version used.  Currently
+only supports returning the Type of record.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("ln")]
+		[string]
+		$LookupName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("at")]
+		[ValidateSet('Type')]
+		[string]
+		$Attribute='Type',
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS		
+{		
+	$fn = GetFunctionName
+	
+	try
+	{
+		if(Get-Command Resolve-DnsName -ErrorAction SilentlyContinue)
+		{
+			$record = Resolve-DnsName -Name $LookupName 
+			$recordObjectType = $record.GetType().Name
+			if($recordObjectType -eq 'Object[]') # Either CNAME and corresponding A records or collection of A and AAAA records
+			{
+				if($record[0].GetType().Name -eq 'DnsRecord_PTR')
+				{ $type = $record[0].Type }
+				else 
+				{ $type = 'A' } 
+			}
+			elseif($recordObjectType -in @('DnsRecord_A','DnsRecord_AAAA'))
+			{ $type = 'A' }
+			else
+			{ $type = $record.Type }
+		}
+		else
+		{
+			# non-authoritative answer returns an error with nslookup, but not with the more modern Resolve-DnsName
+			# for consistent implementation, sending error output to null for nslookup and noting error if not results
+			# are returned.
+			$record = nslookup $LookupName 2> $null 
+			if($null -eq $record){
+				$msgTemplate = "No results returned by nslookup for {0}"	
+				$msg = [string]::Format($msgTemplate, $LookupName)
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+				return $null
+			}
+			else
+			{
+				if($null -eq $($record -match 'Aliases:')) # A or AAAA
+				{ $type = 'A'	}
+				else # CNAME
+				{ $type = 'CNAME' }
+			}
+		}
+
+		return $type
+	}
+	catch
+	{
+		Write-PISysAudit_LogMessage "Accessing DNS record failed!" "Error" $fn -eo $_
+		return $null
+	}
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Get-PISysAudit_GroupMembers
 {
 <#
@@ -2947,14 +3063,35 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{									
+	{
+		$scriptBlock = {
+			if(Get-Command Get-NetFirewallProfile -ErrorAction SilentlyContinue)
+			{
+				Get-NetFirewallProfile
+			}
+			else
+			{
+				# These keys return 0 if disabled, 1 if enabled
+				$domain  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile | Select-Object -ExpandProperty EnableFirewall
+				$private = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile | Select-Object -ExpandProperty EnableFirewall
+				$public  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\PublicProfile | Select-Object -ExpandProperty EnableFirewall
+
+				# Assemble and return a list of objects that will mimic the profile objects returned by Get-NetFirewallProfile
+				$firewallState = @()
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Domain'; 'Enabled'=$domain}
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Private';'Enabled'=$private}
+				$firewallState += New-Object PSCustomObject -Property @{'Name'='Public'; 'Enabled'=$public}
+				$firewallState
+			}
+		}
+
 		if($LocalComputer)
 		{			                    			
-			$firewallState = Get-NetFirewallProfile 
+			$firewallState = & $scriptBlock
 		}
 		else
 		{                            				
-			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock { Get-NetFirewallProfile } 
+			$firewallState = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock 
 		}
 		# Return the content.
 		return $firewallState
@@ -3003,7 +3140,17 @@ PROCESS
 	
 	try
 	{									
-		$scriptBlock = { if($PSVersionTable.PSVersion.Major -ge 3) { Get-AppLockerPolicy -Effective -XML } else { $null } }
+		$scriptBlock = { 
+			
+			[xml]$Policy = Get-AppLockerPolicy -Effective -XML 
+			$ServiceEnabled = $(Get-Service -Name AppIDSvc | Select-Object -ExpandProperty StartType | Out-String).ToLower() -ne "disabled"
+
+			$AppLockerConfiguration = New-Object PSCustomObject
+			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name Policy -Value $Policy
+			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name ServiceEnabled -Value $ServiceEnabled
+			return $AppLockerConfiguration
+		}
+
 		if($LocalComputer)
 		{			                    			
 			$appLockerPolicy = & $scriptBlock
@@ -3198,6 +3345,155 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_ProcessedPIConnectionStatistics 
+{
+<#
+.SYNOPSIS
+(Core functionality) Transpose and filter PI Connection Statistics.
+.DESCRIPTION
+Transpose and filter PI Connection Statistics.  Options to filter returned results by
+protocol and whether the connection is local or remote.  
+#>
+    [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+    param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName,
+        [parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pic")]
+		[object]
+		$PIDataArchiveConnection,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("pics")]
+		[object]
+		$PIConnectionStats,
+        [parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [ValidateSet('Windows','Trust','ExplicitLogin','Subsystem','Any')]
+        [alias("ap")]
+        [string]
+        $ProtocolFilter="Any",
+        [parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("ro")]
+        [boolean]
+        $RemoteOnly=$false,	
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("so")]
+        [boolean]
+        $SuccessOnly=$true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+        [alias("cts")]
+        [boolean]
+        $CheckTransportSecurity=$false,	
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0) 
+BEGIN {}
+PROCESS 
+{     
+	$fn = GetFunctionName
+
+	try
+	{
+		# Get timezone offset between PI Data Archive and here if necessary
+		# This offset can be added to the remote times to get local time
+		$offsetMinutes = 0
+		if(-not $LocalComputer)
+		{
+			$localGmtOffset = ExecuteWMIQuery -lc $true -WMIClassName 'win32_timezone' | Select-Object -ExpandProperty Bias
+			$remoteGmtOffset = ExecuteWMIQuery -lc $false -rcn $RemoteComputerName -WMIClassName 'win32_timezone' | Select-Object -ExpandProperty Bias
+			$offsetMinutes = $localGmtOffset - $remoteGmtOffset
+		}
+
+		$transposedStats = @()
+		Foreach($stat in $PIConnectionStats) 
+		{
+			# Determine properties included in the connection statistic 
+			$hasProperty = @()
+			foreach($property in $stat.StatisticType)
+			{
+				if($stat.StatisticType -contains $property -and "" -ne $stat.Item($property).Value.ToString())
+				{ $hasProperty += $property }
+			}
+        
+			# Identify the Authentication Protocol
+			$statAuthProtocol = "Unknown"
+			if(($hasProperty -contains 'ConnectionType') -and ($hasProperty -contains 'ConnectionStatus'))
+			{
+				# Only include active connections
+				if($Stat.Item('ConnectionStatus').Value -eq '[0] Success' -or ($SuccessOnly -eq $false))
+				{
+					if($hasProperty -contains 'Trust') 
+					{ $statAuthProtocol = 'Trust' }
+					elseif($hasProperty -contains 'OSUser')
+					{ $statAuthProtocol = 'Windows' }
+					elseif($hasProperty -contains 'User')
+					{ $statAuthProtocol = 'ExplicitLogin' }
+					elseif($Stat.Item('ConnectionType').Value -eq 'Local Connection')
+					{ $statAuthProtocol = 'Subsystem' }
+				}   
+			}
+			elseif($hasProperty -contains 'ServerID') # PINetMgr is a special case
+			{ $statAuthProtocol = 'Subsystem' }
+
+			# Determine whether or not the connection is remote.
+			[boolean]$IsRemote = $false
+			if($hasProperty -contains 'ConnectionType')
+			{
+				if($Stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
+				($Stat.Item('ConnectionType').Value -eq 'PI-API Connection' -and $Stat.Item('PeerAddress').Value -notin ('127.0.0.1','')))
+				{ $IsRemote = $true }
+			}
+        
+			# Apply protocol and RemoteOnly filters if applicable
+			if(($statAuthProtocol -eq $ProtocolFilter -or $ProtocolFilter -eq 'Any') -and ($IsRemote -or $RemoteOnly -eq $false))
+			{ 
+				$transposedStat = New-Object PSObject
+				# Add an authentication protocol attribute for easy filtering
+				$transposedStat | Add-Member -MemberType NoteProperty -Name 'AuthenticationProtocol' -Value $statAuthProtocol
+				$transposedStat | Add-Member -MemberType NoteProperty -Name 'Remote' -Value $IsRemote.ToString()
+				# Transpose the object into PSObject with NoteProperties
+				foreach($property in $stat.StatisticType)
+				{
+					# Apply timezone offset to ConnectedTime and LastCallTime properties
+					if($property -eq 'ConnectedTime' -or $property -eq 'LastCallTime')
+					{
+						$adjustedValue = (Get-Date $stat.Item($property).Value).AddMinutes($offsetMinutes)
+						$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $adjustedValue
+					}
+					else
+					{
+						$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $stat.Item($property).Value 
+					}
+				}
+				$transposedStats += $transposedStat 
+			}
+		}
+
+		if($CheckTransportSecurity)
+		{ $transposedStats = Test-PISysAudit_SecurePIConnections -PIDataArchiveConnection $PIDataArchiveConnection -PIConnections $transposedStats -DBGLevel $DBGLevel }
+
+		return $transposedStats
+	}
+	catch
+	{
+		$msg = "A problem occurred while processing PI Connection Statistics."		
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		return $null
+	}
+}
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 function Invoke-PISysAudit_AFDiagCommand
 {
 <#
@@ -3227,13 +3523,8 @@ PROCESS
 	
 	try
 	{
-		#......................................................................................
-		# Set Paths
-		#......................................................................................
-		# Set the PIPC folder (64 bit).		
-		$PIHome64_path = Get-PISysAudit_EnvVariable "PIHOME64" -lc $LocalComputer -rcn $RemoteComputerName
-		# Set the PIPC\AF folder (64 bit).		
-		$PIHome_AF_path = PathConcat -ParentPath $PIHome64_path -ChildPath "AF"
+		# Get the AF Server installation path to locate the service executable and afdiag.
+		$PIHome_AF_path = Get-PISysAudit_RegistryKeyValue "HKLM:\SOFTWARE\PISystem\AF Server" "CurrentInstallationPath" -lc $LocalComputer -rcn $RemoteComputerName -DBGLevel $DBGLevel
 		# Set the path to reach out the afdiag.exe CLU.
 		$AFDiagExec = PathConcat -ParentPath $PIHome_AF_path -ChildPath "afdiag.exe"
 		# Set the path to reach out the AFService executable.
@@ -3318,13 +3609,11 @@ param(
 		[string]
 		$ServiceType,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("appPool")]
 		[string]
-		$csappPool,
+		$AppPool,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("CustomHeader")]
 		[string]
-		$CoresightHeader,
+		$CustomHeader,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -3345,77 +3634,80 @@ PROCESS
 		# Build FQDN using hostname and domain strings.
 		$fqdn = $hostname + "." + $MachineDomain
 
-		# SPN check is done for PI Coresight using a custom host header.
-		If ( $ServiceName -eq "coresight_custom" ) 
+		# SPN check is done for PI Vision using a custom host header.
+		If ( $ServiceName -eq "pivision_custom" ) 
 		{ 
-			# Pass the Coresight AppPool identity as the service account.
-			$svcacc = $csappPool
+			# Pass the AppPool identity as the service account.
+			$svcacc = $AppPool
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
 				
 			# Take Custom header information and create its short and long version.
-			If ($CoresightHeader -match "\.") 
+			If ($CustomHeader -match "\.") 
 			{
-				$csCustomHeaderLong = $CoresightHeader
-				$pos = $CoresightHeader.IndexOf(".")
-				$csCustomHeaderShort = $CoresightHeader.Substring(0, $pos)
+				$CustomHeaderLong = $CustomHeader
+				$pos = $CustomHeader.IndexOf(".")
+				$CustomHeaderShort = $CustomHeader.Substring(0, $pos)
 			} 
 			Else 
 			{ 
-				$csCustomHeaderShort = $CoresightHeader
-				$csCustomHeaderLong = $CoresightHeader + "." + $MachineDomain
+				$CustomHeaderShort = $CustomHeader
+				$CustomHeaderLong = $CustomHeader + "." + $MachineDomain
 			}
 
 			# Deal with the custom header - run nslookup and capture the result.
-			$AliasTypeCheck = nslookup $CoresightHeader
+			$AliasTypeCheck = Get-PISysAudit_ResolveDnsName -LookupName $CustomHeader -Attribute Type -DBGLevel $DBGLevel
 
 			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
-			If ($AliasTypeCheck -match "Aliases:") 
+			If ($AliasTypeCheck -eq 'CNAME') 
 			{ 
-			# Dealing with Alias (CNAME). 
-
-			# Verify hostnane AND FQDN SPNs are assigned to the service account.
-			#
-			# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
-			# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
-			#
-			# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
+				# Verify hostnane AND FQDN SPNs are assigned to the service account.
+				#
+				# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
+				# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
+				#
+				# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
 			
-			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
-			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
-			$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
-			$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
+				$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
+				$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
+				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
 			
-			$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-															-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
-															-SPNShortAlias $csCustomHeaderSPN -SPNLongAlias $csCustomHeaderLongSPN `
-															-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
+				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
+																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
+																-SPNShortAlias $CustomHeaderSPN -SPNLongAlias $CustomHeaderLongSPN `
+																-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 						
-			return $result			
+				return $result			
 			} 			
-			Else 
+			ElseIf($AliasTypeCheck -eq 'A')
 			{ 
-			# Host (A) 
-			
-			$csCustomHeaderSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderShort.ToLower())
-			$csCustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $csCustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
+				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
 
-			$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-															-SPNShort $csCustomHeaderSPN -SPNLong $csCustomHeaderLongSPN `
-															-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
+				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
+																-SPNShort $CustomHeaderSPN -SPNLong $CustomHeaderLongSPN `
+																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 
-			return $result
+				return $result
+			}
+			Else
+			{
+				$msgTemplate = "Unexpected DNS record type: {0}"	
+				$msg = [string]::Format($msgTemplate, $AliasTypeCheck)
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				return $null
 			}
 		}	
-		# SPN Check is done for PI Coresight or other service
+		# SPN Check is done for PI Vision or other service
 		Else
 		{
-			# SPN check is done for PI Coresight without custom headers.
-			If ( $ServiceName -eq "coresight" )
+			# SPN check is done for PI Vision without custom headers.
+			If ( $ServiceName -eq "pivision" )
 			{
-				# In case of PI Coresight, the AppPool account is used in the SPN check.
-				$svcacc = $csappPool
+				# AppPool account is used in the SPN check.
+				$svcacc = $AppPool
 			}
-			# SPN check is not done for PI Coresight.
+			# SPN check is not done for PI Vision.
 			Else
 			{
 				# Get the Service account
@@ -3423,7 +3715,7 @@ PROCESS
 			}
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
 
-			# Proceed with checking SPN for Coresight or non-IIS app (PI/AF).
+			# Proceed with checking SPN for PI Vision or non-IIS app (PI/AF).
 			# Distinguish between Domain/Virtual account and Machine Accounts.
 			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
 			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
@@ -3445,6 +3737,132 @@ PROCESS
 }
 
 END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Test-PISysAudit_SecurePIConnections
+{
+<#
+.SYNOPSIS
+(Core functionality) Check if connections are protected by transport security
+.DESCRIPTION
+Check if connections are protected by transport security.  Adds SecureStatus and 
+SecureStatusDetail note properties to the connection objects checked
+.PARAMETER PIDataArchiveConnection
+Pass the PI Data Archive connection object for the connections you want to verify.
+.PARAMETER PIConnections
+You can use the output of the command Get-PISysAudit_ProcessedPIConnectionStatistics 
+directly.  Otherwise, requires the connecttime, ID and AuthenticationProtocol for each
+connection.
+#>
+	[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)] 
+    param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("pic")]
+		[object]
+		$PIDataArchiveConnection,
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("con")]
+		[Object[]]
+		$PIConnections,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN{}
+PROCESS
+{
+    $fn = GetFunctionName
+
+	try
+	{
+		$logCutoffExceeded = 0
+		$timeBuffer = 3 # Second buffer checking connection messages
+
+		# Check Message Log Cutoff tuning parameter
+		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $PIDataArchiveConnection -Name 'MessageLog_DayLimit'
+		$Now = Get-Date
+		if($null -eq $messageLog_DayLimitParameter.Value)
+		{ $MessageLog_CutoffDate = $Now.AddDays(-1*$messageLog_DayLimitParameter.Default) }
+		else
+		{ $MessageLog_CutoffDate = $Now.AddDays(-1*$messageLog_DayLimitParameter.Value) }
+		
+		Foreach($PIConnection in $PIConnections)
+		{
+			$SecureStatus = "Unknown"
+			$SecureStatusDetail = "Connection not found."
+			if($PIConnection.AuthenticationProtocol -eq 'Subsystem')
+			{
+				$SecureStatus = "Secure" 
+				$SecureStatusDetail = "Subsystem"
+			}
+			elseif($PIConnection.AuthenticationProtocol -ne 'Windows') # Only Windows Connections can use transport security
+			{ 
+				$SecureStatus = "Not Secure"
+				$SecureStatusDetail = "Insecure protocol ({0})" -f $PIConnection.AuthenticationProtocol
+			} 
+			elseif($MessageLog_CutoffDate -gt $PIConnection.ConnectedTime) # Remove connections too old to exist in the logs
+			{
+				$logCutoffExceeded++
+				$SecureStatus = "Unknown"
+				$SecureStatusDetail = "Connection before log cutoff date."
+			}
+			else # Verify remaining connections with successful connection message
+			{
+				$connectedTime = $(Get-Date $PIConnection.ConnectedTime)
+				# Message ID 7082 corresponds to a successful connection with Windows
+				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
+				foreach($message in $connectionMessages)
+				{
+					# Extract the connection ID
+					$startID = $message.Message.IndexOf('ID:') + 3
+					$endID = $message.Message.IndexOf('. Address:')
+					[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
+					
+					# Check ID against the set of connections
+					if($connectionId -eq $PIConnection.ID)
+					{
+						# Parse the Method attribute out of the message text
+						$startMethod = $message.Message.IndexOf('. Method:') + 9
+						$connectionMethod = $message.Message.Substring($startMethod).Trim()
+						
+						# Parse the cipher info
+						$startCipher = $connectionMethod.IndexOf('(') + 1
+						$endCipher = $connectionMethod.IndexOf(')')
+						$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+						
+						if($connectionMethod -match 'HMAC')
+						{ $SecureStatus = "Secure" }
+						else
+						{ $SecureStatus = "Not Secure" }
+						$SecureStatusDetail = $cipherInfo
+					}
+				}
+			}
+			# Set the Security attributes on the connection
+			Add-Member -InputObject $PIConnection -MemberType NoteProperty -Name SecureStatus -Value $SecureStatus
+			Add-Member -InputObject $PIConnection -MemberType NoteProperty -Name SecureStatusDetail -Value $SecureStatusDetail
+		}
+
+		if($logCutoffExceeded -gt 0)
+		{
+			$msg = "The message log cutoff date {0} is later than some connect times. {1} connections were be skipped." -f $MessageLog_CutoffDate, $logCutoffExceeded
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+		}
+		
+		return $PIConnections
+	}
+	catch
+	{
+		$msg = "A problem occurred while verifying transport security on connections: {0}" -f $_.Exception.Message
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_		
+		return $null
+	}			
+}
+END{}
 
 #***************************
 #End of exported function
@@ -3914,7 +4332,7 @@ param(
 		$Group4 = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("s")]
-		[ValidateSet("Unknown", "N/A", "Low", "Moderate", "Severe")]
+		[ValidateSet("Unknown", "N/A", "Low", "Medium", "High", "Critical")]
 		[String]
 		$Severity = "Low")
 BEGIN {}
@@ -3935,6 +4353,15 @@ PROCESS
 	if($AuditItemValue){$Severity = "N/A"}
 	elseif($AuditItemValue -eq "N/A"){$Severity = "Unknown"}
 
+	switch($Severity)
+	{
+		'Critical' { $SeverityLevel=0; break }
+		'High'     { $SeverityLevel=1; break }
+		'Medium'   { $SeverityLevel=2; break }
+		'Low'      { $SeverityLevel=3; break }
+		default    { $SeverityLevel='N/A'; break }
+	}
+
 	# Set the properties.
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ID" -Value $AuditItemID
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ServerName" -Value $computerName
@@ -3947,6 +4374,7 @@ PROCESS
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group3" -Value $Group3
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Group4" -Value $Group4
 	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Severity" -Value $Severity
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SeverityLevel" -Value $SeverityLevel
 	
 	# Add this custom object to the hash table.
 	$AuditHashTable.Add($myKey, $tempObj)
@@ -4109,7 +4537,8 @@ param(
 					"PIAFServer", "AFServer", "PIAF", "AF",
 					"SQLServer", "SQL", "PICoresightServer", 
 					"CoresightServer", "PICoresight", 
-					"Coresight", "PICS", "CS")]
+					"Coresight", "PICS", "CS", "PIVision",
+					"PIVisionServer","Vision","VisionServer","PV")]
 		[alias("type")]
 		[string]		
 		$PISystemComponentType,
@@ -4276,13 +4705,19 @@ PROCESS
 		($PISystemComponentType.ToLower() -eq "coresightserver") -or `
 		($PISystemComponentType.ToLower() -eq "coresight") -or `
 		($PISystemComponentType.ToLower() -eq "cs") -or `
-		($PISystemComponentType.ToLower() -eq "pics"))
+		($PISystemComponentType.ToLower() -eq "pics") -or `
+		($PISystemComponentType.ToLower() -eq "pivision") -or `
+		($PISystemComponentType.ToLower() -eq "visionserver") -or `
+		($PISystemComponentType.ToLower() -eq "vision") -or `
+		($PISystemComponentType.ToLower() -eq "pivisionserver") -or `
+		($PISystemComponentType.ToLower() -eq "pv")
+	)
 	{
 		# Set the properties.
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PICoresightServer'
-		$AuditRoleType = "PICoresightServer"
+		# Use normalized type description as 'PIVisionServer'
+		$AuditRoleType = "PIVisionServer"
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
 		# Nullify all of the MS SQL specific values
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
@@ -4403,7 +4838,10 @@ PROCESS
 		}
 		
 		# Export to .csv but sort the results table first to have Failed items on the top sorted by Severity 
-		$results = $results | Sort-Object @{Expression="AuditItemValue";Descending=$false},@{Expression="Severity";Descending=$true},@{Expression="ID";Descending=$false}
+		$results = $results | Sort-Object   @{Expression="AuditItemValue";Descending=$false}, `
+											@{Expression="SeverityLevel";Descending=$false}, `
+											@{Expression="ServerName";Descending=$false}, `
+											@{Expression="ID";Descending=$false}
 		$results | Export-Csv -Path $fileToExport -Encoding ASCII -NoType
 	
 		
@@ -4457,8 +4895,9 @@ PROCESS
 				$highlight = "`"`""
 				switch ($result.Severity.ToLower())
 				{
-					"severe" {$highlight="`"severe`""; break}
-					"moderate" {$highlight="`"moderate`""; break}
+					"critical" {$highlight="`"critical`""; break}
+					"high" {$highlight="`"high`""; break}
+					"medium" {$highlight="`"medium`""; break}
 					"low" {$highlight="`"low`""; break}
 				}
 				if ($result.AuditItemValue -eq "N/A") {$highlight="`"error`""}
@@ -4561,11 +5000,14 @@ PROCESS
 							background-color: #FFF59D;
 						}
 			
-						.moderate{
+						.medium{
 							background-color: #FFCC80;
 						}
-						.severe{
+						.high{
 							background-color: #FFAB91;
+						}
+						.critical{
+							background-color: #F26B41;
 						}
 						.error{
 							color: #FF0000;
@@ -4805,40 +5247,45 @@ PROCESS
 	$currCheck = 1
 	$ActivityMsg = "Performing $AuditLevel PI System Security Audit"
 	$statusMsgTemplate = "Checking Role {0}/{1}..."
-	$statusMsgCompleted = "Completed"
-	
-	# ............................................................................................................
-	# Validate that WSMan or WS-Management (WinRM) service is running
-	# ............................................................................................................						
-	if((ValidateWSMan $ComputerParamsTable -dbgl $DBGLevel) -eq $false) { return }		
+	$statusMsgCompleted = "Completed"	
 
 	# ....................................................................................
 	# For each computer, perform checks for all roles
 	# ....................................................................................						
 	foreach($item in $ComputerParamsTable.GetEnumerator())
 	{
-		foreach($role in $item.Value)
+		# Run no checks if WSMan is not available
+		if((ValidateWSMan -cp $item -at $auditHashTable -dbgl $DBGLevel) -EQ $true)
 		{
-			# Write status to progress bar
-			$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
-			$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
-			Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
+			foreach($role in $item.Value)
+			{
+				# Write status to progress bar
+				$statusMsg = [string]::Format($statusMsgTemplate, $currCheck, $totalCheckCount)
+				$pctComplete = ($currCheck - 1) / $totalCheckCount * 100
+				Write-Progress -Activity $ActivityMsg -Status $statusMsg -Id 1 -PercentComplete $pctComplete
 		
-			# Proceed based on component type.
-			if($role.AuditRoleType -eq "Computer")
-			{ StartComputerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-			elseif($role.AuditRoleType -eq "PIDataArchive")
-			{ StartPIDataArchiveAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }		
-			elseif($role.AuditRoleType -eq "PIAFServer")
-			{ StartPIAFServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-			elseif($role.AuditRoleType -eq "SQLServer")
-			{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
-			elseif($role.AuditRoleType -eq "PICoresightServer")
-			{ StartPICoresightServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
+				# Proceed based on component type.
+				if($role.AuditRoleType -eq "Computer")
+				{ StartComputerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "PIDataArchive")
+				{ StartPIDataArchiveAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }		
+				elseif($role.AuditRoleType -eq "PIAFServer")
+				{ StartPIAFServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "SQLServer")
+				{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "PIVisionServer")
+				{ StartPIVisionServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
 
-			$currCheck++
+				$currCheck++
+			}
+		}
+		else
+		{
+			# Skip progress bar ahead for these ckecks since WSman failed
+			$currCheck += $item.Value.Count
 		}
 	}
+	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100 
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
 
 	# Pad console ouput with one line
@@ -4850,7 +5297,11 @@ PROCESS
 	$ActivityMsg = "Generate report"
 	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status "in progress..." -Id 1 }
 	$reportName = Write-PISysAuditReport $auditHashTable -obf $ObfuscateSensitiveData -dtl $DetailReport -dbgl $DBGLevel
-	if($ShowUI) { Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -completed }
+	if($ShowUI) 
+	{ 
+		Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100
+		Write-Progress -activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed 
+	}
 	
 	# ............................................................................................................
 	# Display that the analysis is completed and where the report can be found.
@@ -4941,6 +5392,7 @@ Export-ModuleMember Get-PISysAudit_ServiceProperty
 Export-ModuleMember Get-PISysAudit_AccountProperty
 Export-ModuleMember Get-PISysAudit_CertificateProperty
 Export-ModuleMember Get-PISysAudit_BoundCertificate
+Export-ModuleMember Get-PISysAudit_ResolveDnsName
 Export-ModuleMember Get-PISysAudit_GroupMembers
 Export-ModuleMember Get-PISysAudit_CheckPrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
@@ -4949,6 +5401,8 @@ Export-ModuleMember Get-PISysAudit_InstalledWin32Feature
 Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
+Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
+Export-ModuleMember Test-PISysAudit_SecurePIConnections
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand

@@ -74,6 +74,8 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 # AU20012
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 # AU20013
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -89,7 +91,8 @@ VALIDATION: examines the database security of the PI Data Archive and flags any
 ACLs that contain access for PIWorld as weak. <br/>
 COMPLIANCE: remove PIWorld access from all database security ACLs.  Note that prior
 removing PIWorld access, you need to evaluate which applications are relying on that 
-access so that you can grant those applications access explicitly. 
+access so that you can grant those applications access explicitly.  This check will
+also pass if PIWorld is disabled globally.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -119,90 +122,98 @@ PROCESS
 	{				
 		# Initialize objects.
 		$securityWeaknessCounter = 0
-		$warningMessage = ""
-		
-		$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConnection `
-										| Sort-Object -Property Tablename `
-										| ForEach-Object {$_.Tablename + "^" + $_.Security} `
-										| ForEach-Object {$_.Replace(")",") |").Trim("|")}
-		
-		# Validate rules	
-	
-		# Example of output.
-		# PIAFLINK^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
-		# PIARCADMIN^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
-		# PIARCDATA^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
-		# ...
 
-		# Read each line to find the one containing the token to replace.		
-		foreach($line in $outputFileContent)
-		{								
-			# Skip line if not containing the delimiter.
-			if($line.Contains("^"))
-			{             		
-                $securityWeakness = $false
-				# Find the delimiter
-				$position = $line.IndexOf("^")			
-				
-				# Specific Database
-				$length  = $position
-				$dbName = $line.SubString(0, $length)
-				
-				# Find the ACL
-				$length  = $line.Length - $position - 1
-				$acl = ($line.SubString($position + 1, $length)).ToLower()
-				
-                $process = $false
-                # Perform the test on specific databases.
-                Switch($dbName.ToLower())
-                {
-                    "pibatch" { $process = $true }
-                    "pibatchlegacy" { $process = $true }
-                    "picampaign" { $process = $true }
-                    "pidbsec" { $process = $true }
-                    "pids" { $process = $true }
-                    "piheadingsets" { $process = $true }
-                    "pimodules" { $process = $true }
-                    "pitransferrecords" { $process = $true }
-                    "piuser" { $process = $true }
-                    default { $process = $false }
-                }
-
-                if($process)
-                {                    
-                    # Remove piadmin: A(r,w) from the ACL
-				    if($acl.Contains("piworld: a(r,w)")) { $securityWeakness = $true }
-                    elseif($acl.Contains("piworld: a(r)")) { $securityWeakness = $true }
-                    elseif($acl.Contains("piworld: a(w)")) { $securityWeakness = $true }
-                }
-                		
-				# Increment the counter if a weakness has been discovered.
-				if($securityWeakness)
-				{
-					$securityWeaknessCounter++
-					if($securityWeaknessCounter -eq 1)
-					{ $warningMessage = $dbName }
-					else
-					{ $warningMessage = $warningMessage + "; " + $dbName }
-				}					
-			}			
-		}	
-	
-		# Check if the counter is 0 = compliant, 1 or more it is not compliant		
-		if($securityWeaknessCounter -gt 0)
+		$IsPIWorldEnabled = $(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name PIWorld | Select-Object -ExpandProperty IsEnabled)
+		
+		if(-not($IsPIWorldEnabled))
 		{
-			$result = $false
-			if($securityWeaknessCounter -eq 1)
-			{ $warningMessage = "The following database presents a weakness: " + $warningMessage + "." }
-			else
-			{ $warningMessage = "The following databases present weaknesses: " + $warningMessage + "." }
-		}
-		else 
-		{ 
 			$result = $true 
-			$warningMessage = "No databases identified that present a weakness."
-		}	
-		$msg = $warningMessage
+			$msg = "PIWorld is disabled globally."
+		}
+		else
+		{
+			$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConnection `
+											| Sort-Object -Property Tablename `
+											| ForEach-Object {$_.Tablename + "^" + $_.Security} `
+											| ForEach-Object {$_.Replace(")",") |").Trim("|")}
+		
+			# Validate rules	
+	
+			# Example of output.
+			# PIAFLINK^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
+			# PIARCADMIN^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
+			# PIARCDATA^piadmin: A(r,w) | piadmins: A(r,w) | PIWorld: A()
+			# ...
+
+			# Read each line to find the one containing the token to replace.		
+			foreach($line in $outputFileContent)
+			{								
+				# Skip line if not containing the delimiter.
+				if($line.Contains("^"))
+				{             		
+					$securityWeakness = $false
+					# Find the delimiter
+					$position = $line.IndexOf("^")			
+				
+					# Specific Database
+					$length  = $position
+					$dbName = $line.SubString(0, $length)
+				
+					# Find the ACL
+					$length  = $line.Length - $position - 1
+					$acl = ($line.SubString($position + 1, $length)).ToLower()
+				
+					$process = $false
+					# Perform the test on specific databases.
+					Switch($dbName.ToLower())
+					{
+						"pibatch" { $process = $true }
+						"pibatchlegacy" { $process = $true }
+						"picampaign" { $process = $true }
+						"pidbsec" { $process = $true }
+						"pids" { $process = $true }
+						"piheadingsets" { $process = $true }
+						"pimodules" { $process = $true }
+						"pitransferrecords" { $process = $true }
+						"piuser" { $process = $true }
+						default { $process = $false }
+					}
+
+					if($process)
+					{                    
+						# Remove piadmin: A(r,w) from the ACL
+						if($acl.Contains("piworld: a(r,w)")) { $securityWeakness = $true }
+						elseif($acl.Contains("piworld: a(r)")) { $securityWeakness = $true }
+						elseif($acl.Contains("piworld: a(w)")) { $securityWeakness = $true }
+					}
+                		
+					# Increment the counter if a weakness has been discovered.
+					if($securityWeakness)
+					{
+						$securityWeaknessCounter++
+						if($securityWeaknessCounter -eq 1)
+						{ $msg = $dbName }
+						else
+						{ $msg = $msg + "; " + $dbName }
+					}					
+				}			
+			}	
+	
+			# Check if the counter is 0 = compliant, 1 or more it is not compliant		
+			if($securityWeaknessCounter -gt 0)
+			{
+				$result = $false
+				if($securityWeaknessCounter -eq 1)
+				{ $msg = "The following database presents a weakness: " + $msg + "." }
+				else
+				{ $msg = "The following databases present weaknesses: " + $msg + "." }
+			}
+			else 
+			{ 
+				$result = $true 
+				$msg = "No databases identified that present a weakness."
+			}	
+		}
 	}
 	catch
 	{
@@ -218,7 +229,7 @@ PROCESS
 										-ain "PI Data Archive Table Security" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "DB Security" `
-										-Severity "Moderate"																		
+										-Severity "Medium"																		
 }
 
 END {}
@@ -237,10 +248,11 @@ AU20002 - PI Admin Usage Check
 VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.<br/>
 COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
 PI Identity with appropriate privilege for the applications that will use it.  Will also
-check if trusts with piadmin have been disabled globally.  This can be done by checking 
-"User cannot be used in a Trust" in the Properties menu for the piadmin PI User.  To 
-access this menu open use the Idenitities, Users, & Groups plugin in PI SMT, navigate to 
-the PI User tab, right click the piadmin entry and select Properties in the context menu.  
+check if trusts and mappings to piadmin have been disabled globally.  This can be done by  
+checking "User cannot be used in a Trust" and "User cannot be used in a Mapping" in the 
+Properties menu for the piadmin PI User.  To access this menu open use the Identities, 
+Users, & Groups plugin in PI SMT, navigate to the PI User tab, right click the piadmin 
+entry and select Properties in the context menu.  
 For more information, see "Security Best Practice" #4 in KB00833: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 ">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
 #>
@@ -268,57 +280,96 @@ PROCESS
 	# Get and store the function Name.
 	$fn = GetFunctionName
 	$msg = ""
+	$status = ""
+	$policy = "Current policy: "
+	$recommendation = ""
 	$Severity = "Unknown"
 	try
 	{							
 		# Initialize objects.
-		$piadminTrustsDisabled = $false							
+		$piadminTrustsDisabled = $false
+		$piadminMappingsDisabled = $false	
+		$result = $true						
 													
-		# CheckPIAdminUsageInTrusts.dif
+		# Check if piadmin is blocked globally for mappings or trusts
+		$piadminIdentity = $(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin")
+		$piadminTrustsDisabled = -not($piadminIdentity.AllowTrusts)
+		$piadminMappingsDisabled = -not($piadminIdentity.AllowMappings)
+		
+		# Evaluate if authentication policy allows trusts 
+		$trustsGlobalDisabled = $(Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value) -eq 51
+
+		# Get PI Trusts with the piadmin user. 
 		$noncompliantTrusts = Get-PITrust -Connection $global:PIDataArchiveConnection `
 									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
 									| ForEach-Object {$_.Name}
-
-		# CheckPIAdminUsageInMappings.dif
+		# Get PI Mappings with the piadmin user.
 		$noncompliantMappings = Get-PIMapping -Connection $global:PIDataArchiveConnection `
 									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
 									| ForEach-Object {$_.PrincipalName}
-
-		$result = $true
-																	
-		#Iterate through the returned results (is any) and append ; delimiter for the output message. 
+															
+		# Iterate through the returned results (if any) and append ; delimiter for the output message. 
 		if($noncompliantTrusts){
-			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}		
-			$result = $false	
-			$msg = "Trust(s) that present weaknesses: " + $noncompliantTrusts	+ ".`n"
-			$Severity = "Severe"
-		}
-
-		if($noncompliantMappings){
-			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}		
-			$result = $false	
-			$msg += "Mappings(s) that present weaknesses: " + $noncompliantMappings																												
-			$Severity = "Severe"
-		}
-
-		if($result -eq $true){
-			$msg = "No Trust(s) or Mapping(s) identified as weaknesses.  "
-			
-			# Check whether using the piadmin user for trusts is blocked globally
-			$piadminTrustsDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowTrusts)
-			
-			if($piadminTrustsDisabled) 
+			$noncompliantTrusts = $noncompliantTrusts | ForEach-Object {$_ + ';'}			
+			if($trustsGlobalDisabled -or $piadminTrustsDisabled)
 			{ 
-				$result = $true 
-				$msg += "The piadmin user cannot be assigned to a trust."
-			} 
-			else 
-			{
-					$result = $false 
-					$msg += "However, the piadmin user can still be assigned to a trust."
-					$Severity = "Moderate"
+				$recommendation += "Consider removing or disabling the following trusts which are no longer in effect: " + $noncompliantTrusts	+ ".`n" 
 			}
-		}		
+			else
+			{
+				$result = $false	
+				$status += "Trust(s) in effect using piadmin: " + $noncompliantTrusts	+ ".`n"
+
+				if($noncompliantTrusts.Trim(';') -eq "!Proxy_127!")
+				{ $Severity = "Medium" }
+				else 
+				{ $Severity = "High" }
+			}
+		}
+		if($noncompliantMappings){
+			$noncompliantMappings =	$noncompliantMappings | ForEach-Object {$_ + ';'}	
+			if($piadminTrustsDisabled)
+			{ $recommendation += "  Consider removing or disabling the following mappings which are no longer used: " + $noncompliantMappings	+ ".`n" }	
+			else
+			{
+				$result = $false	
+				$status += "Mappings(s) in effect using piadmin: " + $noncompliantMappings																												
+				$Severity = "High"
+			}
+		}
+
+		if($result){
+			$status += "No effective Trust(s) or Mapping(s) identified with piadmin.  "
+			
+			# Check if noncompliant objects are still allowed.
+			if(-not($piadminMappingsDisabled))
+			{
+				$result = $false 
+				$Severity = "Low"
+			}
+			if(-not($piadminTrustsDisabled -or $trustsGlobalDisabled))
+			{ 
+				$result = $false
+				$Severity = "Medium"
+			} 
+		}	
+		
+		# Record policy in entry to inform the user.
+		if($trustsGlobalDisabled)
+		{ $policy += " blocks trust authentication;" }
+		else
+		{ $policy += " allows trust authentication;" }
+		
+		if($piadminTrustsDisabled)
+		{ $policy += " blocks trusts to piadmin;" }
+		else 
+		{ $policy += " allows trusts to piadmin;" }
+		if($piadminMappingsDisabled)
+		{ $policy += " blocks mappings to piadmin;" }
+		else
+		{ $policy += " allows mappings to piadmin;" }	
+
+		$msg += $status + " " + $policy.Trim(';') + ". " + $recommendation
 	}
 	catch
 	{
@@ -396,13 +447,13 @@ PROCESS
 		if($versionInt -lt $latestInt)
 		{
 			$result = $false
-			$Severity = 'Severe'
+			$Severity = 'High'
 			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
 		}
 		else
 		{
 			$result = $true
-			$Severity = 'Severe'
+			$Severity = 'High'
 			$msg = "PI Data Archive version is compliant."
 		}
 	}
@@ -507,7 +558,7 @@ PROCESS
 										-ain "Edit Days" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Severe"												
+										-Severity "High"												
 }
 
 END {}
@@ -556,53 +607,48 @@ PROCESS
 	$AutoTrustConfig = $null
 	try
 	{
-		# Validate rules	
-	
-		# Example of output.
-		# if the file is empty, it means it is configure to default value of 1
-		# otherwise the file would contain Autotrustconfig,<value>
- 
 		$AutoTrustConfig = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "AutoTrustConfig" | Select-Object -ExpandProperty Value				
-																		
-		# 0 - Do not automatically create any PI Trust entries.
-		# 0x01 - Create the trust entry for the loopback IP address 127.0.0.1
-		# 0x02 - Create the trust entry for the "localhost" hostname
-		# 0x04 - Create the trust entry for the IP address
-		# 0x08 - Create the trust entry for the short hostname
-		# 0x10 - Create the trust entry for the FQDN hostname
-		# 0x1F - Create the old (pre 3.4.370.x) trust entries
-
-		switch ($AutoTrustConfig)
-		{
-			0   { $description = "Does not automatically create any PI Trust entries."; break; }
-			1   { $description = "Creates the trust entry for the loopback IP address 127.0.0.1"; break; }
-			2   { $description = "Creates the trust entry for the `"localhost`" hostname"; break; }
-			4   { $description = "Creates the trust entry for the IP address"; break; }
-			8   { $description = "Creates the trust entry for the short hostname"; break; }
-			16   { $description = "Creates the trust entry for the FQDN hostname"; break; }
-			32   { $description = "Creates the old (pre 3.4.370.x) trust entries"; break; }
-			
-			default {$description = "Unknown configuration" }
-		}
-
+				
+		# Defaults to 1 if not specified.
 		if($null -eq $AutoTrustConfig)
-		{
-			# The default value is set to 1 which is compliant.
-			$result = $true 
-			$msg = "Tuning parameter compliant: Create the trust entry for the loopback IP address 127.0.0.1"
+		{ $AutoTrustConfig = 1 }
+		
+		# Values for AutoTrustConfig Tuning Parameter
+		# 0 = NONE, 1 = Loopback, 2 = Localhost, 4 = IPaddr, 8 = Hostname, 16 = Fully Qualified Domain Name (FQDN)
+		# 17 = LoopBack + FQDN
+		# 127 = v3.4.370 Compatible, 255 = All
+
+		if($AutoTrustConfig -eq 0) 
+		{ $description = "Does not automatically create any PI Trust entries." }
+		else
+		{	
+			$description = "Creates trust entries for: "
+			switch ($AutoTrustConfig)
+			{
+				1   { $description += "127.0.0.1"; break; }
+				2   { $description += "localhost"; break; }
+				4   { $description += "IP address"; break; }
+				8   { $description += "hostname"; break; }
+				16  { $description += "FQDN"; break; }
+				17  { $description += "127.0.0.1 and FQDN"; break; }
+				127 { $description += "v3.4.370 Compatibility"; break; }
+				255 { $description += "127.0.0.1, localhost, IP address, host and FQDN (All)"; break; }
+			
+				default {$description += "Unknown configuration" }
+			}
 		}
-		elseif($AutoTrustConfig -le 1) 
+
+		if($AutoTrustConfig -le 1) 
 		{ 
 			$result = $true 
 			$msg = "Tuning parameter compliant: {0}"
-			$msg = [string]::Format($msg, $description)
 		}
 		else 
 		{ 
 			$result = $false
 			$msg = "Tuning parameter not compliant: {0}" 
-			$msg = [string]::Format($msg, $description)
-		}								
+		}		
+		$msg = [string]::Format($msg, $description)									
 	}
 	catch
 	{
@@ -618,7 +664,7 @@ PROCESS
 										-ain "Auto Trust Configuration" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "Authentication" `
-										-Severity "Severe"	
+										-Severity "High"	
 										
 }
 
@@ -729,7 +775,7 @@ PROCESS
 										-ain "Expensive Query Protection" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" -Group3 "PI Archive Subsystem" `
-										-Severity "Severe"																		
+										-Severity "High"																		
 }
 
 END {}
@@ -783,6 +829,10 @@ PROCESS
 		
 		$Server_AuthenticationPolicy = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value
 		
+		# A null Server_AuthenticationPolicy is treated the same as a value of 0.
+		if($null -eq $Server_AuthenticationPolicy)
+		{ $Server_AuthenticationPolicy = 0 }
+
 		switch ($Server_AuthenticationPolicy)
 				{
 					0   { $description = "All authentication options enabled. "; break; }
@@ -799,19 +849,19 @@ PROCESS
 		{
 			$result = $false
 			$msgPolicy = "Using non-compliant policy:"
-			$Severity = "severe"
+			$Severity = "High"
 			
 			$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowExplicitLogin)
 			
 			if($piadminExplicitLoginDisabled)
 			{
 				$description += "Explicit login disabled for piadmin."
-				$Severity = "severe"
+				$Severity = "High"
 			}
 			else
 			{
 				$description += "Explicit login allowed for piadmin."
-				$Severity = "severe"
+				$Severity = "High"
 			}
 		}
 		else
@@ -912,7 +962,7 @@ PROCESS
 										-ain "PI Data Archive SPN Check" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -985,7 +1035,7 @@ PROCESS
 										-ain "PI Collective" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive"`
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -1070,7 +1120,7 @@ PROCESS
 										-ain "Client Software" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Moderate"
+										-Severity "Medium"
 }
 
 END {}
@@ -1157,7 +1207,7 @@ PROCESS
 										-ain "PI Firewall Used" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Moderate"								
+										-Severity "Medium"								
 }
 
 END {}
@@ -1166,6 +1216,270 @@ END {}
 #End of exported function
 #***************************
 }
+
+function Get-PISysAudit_CheckTransportSecurity
+{
+<#  
+.SYNOPSIS
+AU20012 - Transport Security Used
+.DESCRIPTION
+VALIDATION: All connections are using transport security.
+COMPLIANCE: All connections should have transport security enabled. To
+	accomplish this, the application must connect with WIS, the PI Data 
+	Archive must be at PI Data Archive 2015 or later and the client 
+	application must be of a supported version:
+	+ PI API 2016 for Windows Integrated Security
+	+ PI SDK 1.3.6 or higher
+	+ PI AF SDK (all versions)
+	For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = "Unknown"
+	try
+	{		
+		# Check if the PI Data Archive version supports transport security before pulling connection stats.
+		$version = $global:PIDataArchiveConnection.ServerVersion
+		if($version.Major -ge 3 -and $version.Minor -ge 4 -and $version.Build -ge 395)
+		{
+			$rawPIConnectionStats = Get-PIConnectionStatistics -Connection $global:PIDataArchiveConnection
+			$processedPIConnectionStats = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $RemoteComputerName `
+																					-PIDataArchiveConnection $global:PIDataArchiveConnection `
+																					-PIConnectionStats $rawPIConnectionStats -ProtocolFilter Any `
+																					-RemoteOnly $true -SuccessOnly $true -CheckTransportSecurity $true `
+																					-DBGLevel $DBGLevel
+			if($null -ne $processedPIConnectionStats)
+			{
+				$countSecured = $processedPIConnectionStats.SecureStatus | Where-Object { $_ -eq 'Secure' } | Measure-Object | Select-object -ExpandProperty count	
+				if($countSecured -eq $processedPIConnectionStats.Count)	
+				{
+					$result = $true
+					$msg = "All remote connections to the PI Data Archive leverage transport security."
+				}
+				else # Not all connections are using transport security, assess scope.
+				{
+					$result = $false
+					$countWindows=0; $countTrust=0; $countExlplicitLogin=0
+
+					$processedPIConnectionStats.AuthenticationProtocol | Foreach-Object {
+																							switch($_)
+																							{
+																								'Windows' {$countWindows++;break}
+																								'Trust' {$countTrust++;break}
+																								'ExplicitLogin' {$countExlplicitLogin++;break}
+																							} 
+																						} 
+					[float]$percentSecured = 100*($countSecured/$processedPIConnectionStats.Count)
+					if($countWindows -eq $processedPIConnectionStats.Count)
+					{
+						$Severity = 'Medium'
+						$msg = "Not all remote connections leveraging transport security {0:N1}.  All remote connections leveraging Windows authentication." -f $percentSecured
+					}
+					else
+					{
+						[float]$percentWindows = 100*($countWindows/$processedPIConnectionStats.Count)
+						[float]$percentTrust = 100*($countTrust/$processedPIConnectionStats.Count)
+						[float]$percentExplicitLogin = 100*($countExplicitLogin/$processedPIConnectionStats.Count)
+						$Severity = 'High'
+						$msg = "Legacy protocols in use.  Authentication protocol distribution: Windows ({0:N1} %), Trust ({1:N1} %), ExplicitLogin ({2:N1} %)" -f $percentWindows, $percentTrust, $percentExplicitLogin
+					}
+				}
+			}
+			else
+			{
+				$msg = "No remote connections were found."					
+				Write-PISysAudit_LogMessage $msg "Warning" $fn								
+				$result = "N/A"
+			}
+		}
+		else
+		{
+			$result = $false
+			$msg = 'PI Data Archive version does not support transport security.'
+			$Severity = 'High'
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20012" `
+										-ain "Transport Security Used" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity $Severity								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+function Get-PISysAudit_CheckPIBackup
+{
+<#  
+.SYNOPSIS
+AU20013 - PI Backup Configured
+.DESCRIPTION
+VALIDATION: Ensures that PI Backups are configured and current. <br/>
+COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration
+	and data daily. It is best practice to back up to a local disk on the 
+	PI Data Archive machine, then copy the backup to an off-machine location. 
+	For more information, see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$severity = 'N/A'
+	try
+	{		
+		$con = $global:PIDataArchiveConnection
+		$now = Get-Date
+		$lastBackup = Get-PIBackupReport -Connection $con -LastReport -ErrorAction SilentlyContinue
+		$archiveList = Get-PIArchiveFileInfo -Connection $con -ErrorAction SilentlyContinue
+
+		# Check how recent the latest backup is
+		if($null -ne $lastBackup)
+		{
+			$backupSummary = $lastBackup.Summary
+			if($backupSummary.StatusMessage -eq '[0] Success')
+			{
+				if($backupSummary.BackupStart -gt $now.AddDays(-1))
+				{
+					# Good recent backup found, check file coverage
+					if($null -ne $archiveList)
+					{
+						$arcsNotBackedUp = $archiveList | Where-Object { $null -eq $_.LastBackupTime }
+						if($arcsNotBackedUp.Count -eq 0)
+						{
+							$result = $true
+							$msg = "Good backup found, all archives backed up."
+						}
+						else
+						{
+							# Not all archives backed up, Medium warning
+							$result = $false
+							$msg = "Good backup found, but $($arcsNotBackedUp.Count) archive(s) not backed up."
+							$severity = 'Medium'
+						}
+					}
+					else
+					{
+						# Unable to get archive list, cannot fully assess severity. Default to Medium
+						$result = $false
+						$msg = "Good backup found, but could not confirm backup coverage of archive files."
+						$severity = 'Medium'
+					}
+				}
+				elseif($backupSummary.BackupStart -gt $now.AddDays(-7))
+				{
+					# Last backup older than a day but less than a week, Medium warning
+					$result = $false
+					$lastBackupTime = $backupSummary.BackupStart.ToString("dd-MMM-yyyy HH:mm:ss")
+					$msg = "Last backup is more than a day ago, at $lastBackupTime"
+					$severity = 'Medium'
+				}
+				else
+				{
+					# Last backup older than a week, High warning
+					$result = $false
+					$lastBackupTime = $backupSummary.BackupStart.ToString("dd-MMM-yyyy HH:mm:ss")
+					$msg = "Last backup performed more than a week ago, at $lastBackupTime"
+					$severity = 'High'
+				}
+			}
+			else
+			{
+				# Last backup returned an error, High warning
+				$result = $false
+				$msg = "Last PI Backup returned error $($backupSummary.StatusMessage)"
+				$severity = 'High'
+			}
+
+		}
+		else
+		{
+			# No backup found, High warning
+			$result = $false
+			$msg = "No PI Backup configuration found."
+			$severity = 'High'
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20013" `
+										-ain "PI Backup Configured" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity $severity
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
@@ -1248,6 +1562,8 @@ Export-ModuleMember Get-PISysAudit_CheckPISPN
 Export-ModuleMember Get-PISysAudit_CheckPICollective
 Export-ModuleMember Get-PISysAudit_CheckInstalledClientSoftware
 Export-ModuleMember Get-PISysAudit_CheckPIFirewall
+Export-ModuleMember Get-PISysAudit_CheckTransportSecurity
+Export-ModuleMember Get-PISysAudit_CheckPIBackup
 # </Do not remove>
 
 # ........................................................................
