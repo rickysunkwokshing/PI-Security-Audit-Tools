@@ -328,7 +328,7 @@ PROCESS
 		{
 			$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value
 			# Verify running elevated.
-			if(-not($IsElevated))
+			if($LocalComputer -and (-not $IsElevated))
 			{
 				$msg = "Elevation required to check process privileges.  Run Powershell as Administrator to complete this check"
 				Write-PISysAudit_LogMessage $msg "Warning" $fn
@@ -344,33 +344,42 @@ PROCESS
 				# Get the service account.
 				$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -an $ServiceAccount -dbgl $DBGLevel					
 				
-				# Read each line to find granted privileges.		
-				foreach($line in $listOfPrivileges)
-				{											
-					# Reset.					
-					$privilegeFound = $false			
-					
-					# Skip any line not starting with 'SE'
-					if($line.ToUpper().StartsWith("SE")) 
-					{								
-						# Validate that the tokens contains these privileges.
-						if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
-						if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
-						if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
-						if($privilegeFound){
-							$result = $false
-							$msg = $msg + ", " + $line.ToUpper()
-						}
-					}						
-				}	
-				if($result -eq $false)
+				if($null -ne $listOfPrivileges)
 				{
-					$msg = "The account has the following privileges: " + $msg + "." 
+					# Read each line to find granted privileges.		
+					foreach($line in $listOfPrivileges)
+					{											
+						# Reset.					
+						$privilegeFound = $false			
+					
+						# Skip any line not starting with 'SE'
+						if($line.ToUpper().StartsWith("SE")) 
+						{								
+							# Validate that the tokens contains these privileges.
+							if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
+							if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
+							if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
+							if($privilegeFound){
+								$result = $false
+								$msg = $msg + ", " + $line.ToUpper()
+							}
+						}						
+					}	
+					if($result -eq $false)
+					{
+						$msg = "The account has the following privileges: " + $msg + "." 
+					}
+					else 
+					{ 
+						$msg = "No weaknesses were detected."
+					}
 				}
-				else 
-				{ 
-					$msg = "No weaknesses were detected."
+				else
+				{
+					$result = "N/A"
+					$msg = "Unable to complete AF Server service privilege check."
 				}
+				
 			}
 		}	
 	}
