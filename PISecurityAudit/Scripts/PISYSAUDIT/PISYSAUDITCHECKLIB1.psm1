@@ -936,7 +936,7 @@ PROCESS
 		$testAddress = '8.8.8.8'
 		$scriptBlock = {
 				param([string]$Address)
-				Test-Connection -ComputerName $Address -Count 4 -Quiet # Quiet simply returns true or false
+				Test-Connection -ComputerName $Address -Count 4 -Quiet -ErrorAction SilentlyContinue # Quiet simply returns true or false
 		}
 
 		if($LocalComputer)
