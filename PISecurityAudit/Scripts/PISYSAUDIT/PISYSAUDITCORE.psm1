@@ -3287,7 +3287,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "Could not resolve the SID for $AccountName to evaluate the Privilege."
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			return $null
 		}
 		$scriptBlock = {
@@ -3938,8 +3938,16 @@ PROCESS
 			$accountNane = $strSPNtargetDomain + '\' + $strSPNtargetAccount
 		}
 		
-		# Run setspn
-		$spnCheck = $(setspn -l $accountNane)
+		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
+		$spnCheck = $(setspn -l $accountNane) 2>null 
+
+		# Null if something went wrong
+		if($null -eq $spnCheck)
+		{
+			$msg = "setspn failed to retrieve SPNs for $accountNane"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			return $false
+		}
 		
 		# Loop through SPNs, trimming and ensure all lower for comparison
 		$spnCounter = 0

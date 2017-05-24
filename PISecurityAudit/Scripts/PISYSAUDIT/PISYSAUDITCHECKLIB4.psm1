@@ -144,7 +144,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn								
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -251,7 +251,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn								
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -359,7 +359,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -466,7 +466,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -573,7 +573,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -681,7 +681,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -789,7 +789,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			$result = "N/A"
 		}				
 		elseif($value -eq 0) 
@@ -898,7 +898,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "A problem occurred during the processing of the validation check (logon issue, communication problem, etc.)"					
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			$result = "N/A"
 		}				
 		elseif($value -eq 1) 
