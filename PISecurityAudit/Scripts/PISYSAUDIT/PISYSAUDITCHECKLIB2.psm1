@@ -81,6 +81,103 @@ param(
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
 }
 
+function Get-PISysAudit_GlobalPIDataArchiveConfiguration
+{
+<#  
+.SYNOPSIS
+Gathers global data that can be used by all PI Data Archive checks.
+.DESCRIPTION
+Some checks reuse information.  This command puts the configuration information
+in a global object to reduce the number of remote calls, improving performance and 
+simplifying validation logic.
+
+Information included in global configuration:
+	Connection					- PI Data Archive Connection
+	ConnectionStatistics        - Network manager statistics
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{
+	$fn = GetFunctionName
+
+	# Reset global config object.
+	$global:PIDataArchiveConfiguration = $null
+
+	try
+	{
+		$Connection = Connect-PIDataArchive -PIDataArchiveMachineName $RemoteComputerName
+		if($Connection.Connected){
+			$msg = "Successfully connected to the PI Data Archive {0} with PowerShell." -f $RemoteComputerName
+			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+		}
+		else
+		{
+			$portOpen = $true
+			if($PSVersionTable.PSVersion.Major -ge 4){
+				$portOpen = $(Test-NetConnection -ComputerName $RemoteComputerName -Port 5450 -InformationLevel Quiet -WarningAction SilentlyContinue)
+			}
+			elseif($PSVersionTable.PSVersion.Major -lt 4 -and $ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage')
+			{
+				try
+				{
+					$testPort = new-object net.sockets.tcpclient
+					$testPort.Connect($RemoteComputerName, 5450)
+				}
+				catch 
+				{ 
+					$portOpen = $false 
+				}
+			}
+			if($portOpen -eq $false)
+			{ $msgTemplate = "The PI Data Archive {0} is not accessible over port 5450" }
+			else
+			{ $msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user. Terminating PI Data Archive audit" }
+			$msg = [string]::Format($msgTemplate, $RemoteComputerName)
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			
+			return $false
+		}
+
+		$ConnectionStatisticsRaw = Get-PIConnectionStatistics -Connection $Connection
+		$ConnectionStatistics = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $RemoteComputerName `
+																					-PIDataArchiveConnection $Connection `
+																					-PIConnectionStats $ConnectionStatisticsRaw -ProtocolFilter Any `
+																					-RemoteOnly $true -SuccessOnly $true -CheckTransportSecurity $true `
+																					-DBGLevel $DBGLevel
+		
+		$Configuration = New-Object PSCustomObject
+		$Configuration | Add-Member -MemberType NoteProperty -Name Connection -Value $Connection
+		$Configuration | Add-Member -MemberType NoteProperty -Name ConnectionStatistics -Value $ConnectionStatistics
+		$global:PIDataArchiveConfiguration = $Configuration
+		
+		return $true
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the retrieval of the global PI Data Archive information."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		return $false
+	}
+}
+END {}	
+
+}
+
 function Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 {
 <#  
@@ -123,7 +220,7 @@ PROCESS
 		# Initialize objects.
 		$securityWeaknessCounter = 0
 
-		$IsPIWorldEnabled = $(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name PIWorld | Select-Object -ExpandProperty IsEnabled)
+		$IsPIWorldEnabled = $(Get-PIIdentity -Connection $global:PIDataArchiveConfiguration.Connection -Name PIWorld | Select-Object -ExpandProperty IsEnabled)
 		
 		if(-not($IsPIWorldEnabled))
 		{
@@ -132,7 +229,7 @@ PROCESS
 		}
 		else
 		{
-			$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConnection `
+			$outputFileContent = Get-PIDatabaseSecurity -Connection $global:PIDataArchiveConfiguration.Connection `
 											| Sort-Object -Property Tablename `
 											| ForEach-Object {$_.Tablename + "^" + $_.Security} `
 											| ForEach-Object {$_.Replace(")",") |").Trim("|")}
@@ -292,19 +389,19 @@ PROCESS
 		$result = $true						
 													
 		# Check if piadmin is blocked globally for mappings or trusts
-		$piadminIdentity = $(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin")
+		$piadminIdentity = $(Get-PIIdentity -Connection $global:PIDataArchiveConfiguration.Connection -Name "piadmin")
 		$piadminTrustsDisabled = -not($piadminIdentity.AllowTrusts)
 		$piadminMappingsDisabled = -not($piadminIdentity.AllowMappings)
 		
 		# Evaluate if authentication policy allows trusts 
-		$trustsGlobalDisabled = $(Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value) -eq 51
+		$trustsGlobalDisabled = $(Get-PITuningParameter -Connection $global:PIDataArchiveConfiguration.Connection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value) -eq 51
 
 		# Get PI Trusts with the piadmin user. 
-		$noncompliantTrusts = Get-PITrust -Connection $global:PIDataArchiveConnection `
+		$noncompliantTrusts = Get-PITrust -Connection $global:PIDataArchiveConfiguration.Connection `
 									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
 									| ForEach-Object {$_.Name}
 		# Get PI Mappings with the piadmin user.
-		$noncompliantMappings = Get-PIMapping -Connection $global:PIDataArchiveConnection `
+		$noncompliantMappings = Get-PIMapping -Connection $global:PIDataArchiveConfiguration.Connection `
 									| Where-Object {$_.Identity -EQ 'piadmin' -and $_.IsEnabled} `
 									| ForEach-Object {$_.PrincipalName}
 															
@@ -440,7 +537,7 @@ PROCESS
 		$latestVersion = '3.4.405.1198'
 		$readable = '2016 R2'
 
-		$installationVersion = $global:PIDataArchiveConnection.ServerVersion.ToString()
+		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
 		$versionInt = [int]($installationVersion -replace '\.', '')
 		$latestInt = [int]($latestVersion -replace '\.', '')
 		
@@ -522,7 +619,7 @@ PROCESS
 	try
 	{
 
-		$EditDays = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "EditDays" | Select-Object -ExpandProperty Value
+		$EditDays = Get-PITuningParameter -Connection $global:PIDataArchiveConfiguration.Connection -Name "EditDays" | Select-Object -ExpandProperty Value
 
 		# The default value is set to 0 which is not compliant.
 		if($null -eq $EditDays) 
@@ -607,7 +704,7 @@ PROCESS
 	$AutoTrustConfig = $null
 	try
 	{
-		$AutoTrustConfig = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "AutoTrustConfig" | Select-Object -ExpandProperty Value				
+		$AutoTrustConfig = Get-PITuningParameter -Connection $global:PIDataArchiveConfiguration.Connection -Name "AutoTrustConfig" | Select-Object -ExpandProperty Value				
 				
 		# Defaults to 1 if not specified.
 		if($null -eq $AutoTrustConfig)
@@ -723,9 +820,9 @@ PROCESS
 		# otherwise the file would contain Archive_MaxQueryExecutionSec,<value>
 										
 		# Get installation version
-		$installationVersion = $global:PIDataArchiveConnection.ServerVersion.ToString()
+		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
 		# Get tuning parameter value 
-		$temp = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Archive_MaxQueryExecutionSec" | Select-Object -ExpandProperty Value
+		$temp = Get-PITuningParameter -Connection $global:PIDataArchiveConfiguration.Connection -Name "Archive_MaxQueryExecutionSec" | Select-Object -ExpandProperty Value
 		# Using temp because otherwise null (Default) will be coerced to 0 when int16 conversion is applied.
 		if($null -ne $temp){[int16]$Archive_MaxQueryExecutionSec = $temp}
 		
@@ -827,7 +924,7 @@ PROCESS
 	try
 	{		
 		
-		$Server_AuthenticationPolicy = Get-PITuningParameter -Connection $global:PIDataArchiveConnection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value
+		$Server_AuthenticationPolicy = Get-PITuningParameter -Connection $global:PIDataArchiveConfiguration.Connection -Name "Server_AuthenticationPolicy" | Select-Object -ExpandProperty Value
 		
 		# A null Server_AuthenticationPolicy is treated the same as a value of 0.
 		if($null -eq $Server_AuthenticationPolicy)
@@ -851,7 +948,7 @@ PROCESS
 			$msgPolicy = "Using non-compliant policy:"
 			$Severity = "High"
 			
-			$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConnection -Name "piadmin").AllowExplicitLogin)
+			$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConfiguration.Connection -Name "piadmin").AllowExplicitLogin)
 			
 			if($piadminExplicitLoginDisabled)
 			{
@@ -1008,12 +1105,12 @@ PROCESS
 	$msg = ""
 	try
 	{	
-		$serviceType = $global:PIDataArchiveConnection.Service.Type.ToString()
+		$serviceType = $global:PIDataArchiveConfiguration.Connection.Service.Type.ToString()
 		if ($serviceType.ToLower() -eq 'collective')
 		{
 			$result = $true
 			$msg = "PI Data Archive is a member of PI Collective '{0}'"
-			$msg = [string]::Format($msg, $global:PIDataArchiveConnection.Service.Name)
+			$msg = [string]::Format($msg, $global:PIDataArchiveConfiguration.Connection.Service.Name)
 		}
 		else
 		{
@@ -1168,7 +1265,7 @@ PROCESS
 	$msg = ""
 	try
 	{		
-		$rules = Get-PIFirewall -Connection $global:PIDataArchiveConnection
+		$rules = Get-PIFirewall -Connection $global:PIDataArchiveConfiguration.Connection
 		if($rules)
 		{
 			# Get-PIFirewall returns 'Unknown' if rule does not fit text "Allow" or "Disallow" 
@@ -1261,15 +1358,11 @@ PROCESS
 	try
 	{		
 		# Check if the PI Data Archive version supports transport security before pulling connection stats.
-		$version = $global:PIDataArchiveConnection.ServerVersion
+		$version = $global:PIDataArchiveConfiguration.Connection.ServerVersion
 		if($version.Major -ge 3 -and $version.Minor -ge 4 -and $version.Build -ge 395)
 		{
-			$rawPIConnectionStats = Get-PIConnectionStatistics -Connection $global:PIDataArchiveConnection
-			$processedPIConnectionStats = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $RemoteComputerName `
-																					-PIDataArchiveConnection $global:PIDataArchiveConnection `
-																					-PIConnectionStats $rawPIConnectionStats -ProtocolFilter Any `
-																					-RemoteOnly $true -SuccessOnly $true -CheckTransportSecurity $true `
-																					-DBGLevel $DBGLevel
+			$processedPIConnectionStats = $global:PIDataArchiveConfiguration.ConnectionStatistics
+
 			if($null -ne $processedPIConnectionStats)
 			{
 				$countSecured = $processedPIConnectionStats.SecureStatus | Where-Object { $_ -eq 'Secure' } | Measure-Object | Select-object -ExpandProperty count	
@@ -1384,7 +1477,7 @@ PROCESS
 	$severity = 'N/A'
 	try
 	{		
-		$con = $global:PIDataArchiveConnection
+		$con = $global:PIDataArchiveConfiguration.Connection
 		$now = Get-Date
 		$lastBackup = Get-PIBackupReport -Connection $con -LastReport -ErrorAction SilentlyContinue
 		$archiveList = Get-PIArchiveFileInfo -Connection $con -ErrorAction SilentlyContinue
