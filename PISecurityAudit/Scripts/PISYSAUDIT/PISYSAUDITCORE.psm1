@@ -738,9 +738,9 @@ param(
 		$scriptBlock = {
 				param([string]$Namespace, [string]$WMIClassName, [parameter(Mandatory=$false)][string]$FilterExpression="") 
 				if($FilterExpression -eq "")
-				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName }
+				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -ErrorAction SilentlyContinue }
 				else 
-				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -Filter $FilterExpression }
+				{ Get-WMIObject -Namespace $Namespace -Class $WMIClassName -Filter $FilterExpression -ErrorAction SilentlyContinue }
 		}	
 
 		# Verbose only if Debug Level is 2+
@@ -799,25 +799,15 @@ param(
 		if($ComputerParams.IsLocal)
 		{
 			$result = $true
-			$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
-			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			$msg = "The server: {0} does not need WinRM communication because it will use a local connection" -f $ComputerParams.ComputerName
 			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1					
 		}
 		else
 		{								
 			$result = Test-WSMan -authentication default -ComputerName $ComputerParams.ComputerName -ErrorAction SilentlyContinue
-			if($null -eq $result)
-			{
-				$msgTemplate = "The server: {0} has a problem with WinRM communication"
-				$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-				Write-PISysAudit_LogMessage $msg "Error" $fn
-				New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-									-at $AuditTable -an 'Computer' -fn $fn -msg $msg
-			}
 		}
 		
-		if($result) { return $true }
-		else { return $false }
+		return $result
 	}
 	catch
 	{
@@ -2676,7 +2666,7 @@ param(
 		$LookupName,
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("at")]
-		[ValidateSet('Type')]
+		[ValidateSet('Type', 'HostName', 'FQDN')]
 		[string]
 		$Attribute='Type',
 		[alias("dbgl")]
@@ -2696,14 +2686,24 @@ PROCESS
 			if($recordObjectType -eq 'Object[]') # Either CNAME and corresponding A records or collection of A and AAAA records
 			{
 				if($record[0].GetType().Name -eq 'DnsRecord_PTR')
-				{ $type = $record[0].Type }
+				{ 
+					$type = $record[0].Type 
+					$name = $record[0].NameHost
+				}
 				else 
-				{ $type = 'A' } 
+				{ 
+					$type = 'A'
+					$name = $record[0].Name
+				} 
 			}
-			elseif($recordObjectType -in @('DnsRecord_A','DnsRecord_AAAA'))
-			{ $type = 'A' }
 			else
-			{ $type = $record.Type }
+			{
+				if($recordObjectType -in @('DnsRecord_A','DnsRecord_AAAA'))
+				{ $type = 'A' } 
+				else
+				{ $type = $record.Type }
+				$name = $record.Name
+			}
 		}
 		else
 		{
@@ -2719,14 +2719,33 @@ PROCESS
 			}
 			else
 			{
-				if($null -eq $($record -match 'Aliases:')) # A or AAAA
+				if($null -eq $($record -match 'Aliases:')) # Host entry
 				{ $type = 'A'	}
-				else # CNAME
+				else # Alias
 				{ $type = 'CNAME' }
+				foreach ($line in $record)
+                {
+                    if($line -match 'Name:')
+                    { 
+						$name = $line.ToString().Split(':')[1].Trim() 
+						break
+					}
+                }
 			}
 		}
 
-		return $type
+		switch ($Attribute) {
+			'Type' {$returnvalue = $type}
+			'HostName' {
+							if($name.IndexOf('.') -ne -1)
+							{ $returnvalue = $name.Split('.')[0] }
+							else
+							{ $returnvalue = $name }
+						}
+			'FQDN' {$returnvalue = $name}
+		}
+
+		return $returnvalue
 	}
 	catch
 	{
@@ -2951,14 +2970,17 @@ PROCESS
 			$className = "Win32_quickfixengineering"
 			$filterExpression = ""
 			$WMIObject += ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel `
-											| Select-Object @{LABEL = "Name";EXPRESSION={$_.HotFixID}}, InstalledOn
+											| Select-Object @{LABEL = "Name";EXPRESSION={$_.HotFixID}}, @{LABEL = "InstalledOn";EXPRESSION={Get-Date $_.InstalledOn}}
 		}
 		if($Type -eq 'Reliability' -or $Type -eq 'All')
 		{
 			$className = 'win32_reliabilityRecords'
 			$filterExpression = "sourcename='Microsoft-Windows-WindowsUpdateClient'"
-			$WMIObject += ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel `
-											| Select-Object @{LABEL = "Name";EXPRESSION={$_.ProductName}}, @{LABEL="InstalledOn";EXPRESSION={$_.ConvertToDateTime($_.TimeGenerated)}}
+			$reliabilityRecords = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel 
+			# Custom Select-Object expression required to convert date string of format yyyyMMddHHmmss.fff000-000
+			# e.g. 20170522150218.793000-000  -->  5/22/2017 3:02:18 PM
+			$WMIObject += $reliabilityRecords | Select-Object @{LABEL = "Name";EXPRESSION={$_.ProductName}}, @{LABEL="InstalledOn";EXPRESSION={ 
+													[datetime]::ParseExact($_.TimeGenerated.Substring(0,14), 'yyyyMMddHHmmss', $null) }}
 		}
 			
 		return $WMIObject | Sort-Object Name					
@@ -3284,7 +3306,7 @@ PROCESS
 		{
 			# Return the error message.
 			$msg = "Could not resolve the SID for $AccountName to evaluate the Privilege."
-			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			Write-PISysAudit_LogMessage $msg "Error" $fn
 			return $null
 		}
 		$scriptBlock = {
@@ -3935,8 +3957,16 @@ PROCESS
 			$accountNane = $strSPNtargetDomain + '\' + $strSPNtargetAccount
 		}
 		
-		# Run setspn
-		$spnCheck = $(setspn -l $accountNane)
+		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
+		$spnCheck = $(setspn -l $accountNane) 2>null 
+
+		# Null if something went wrong
+		if($null -eq $spnCheck)
+		{
+			$msg = "setspn failed to retrieve SPNs for $accountNane"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			return $false
+		}
 		
 		# Loop through SPNs, trimming and ensure all lower for comparison
 		$spnCounter = 0
@@ -5255,7 +5285,34 @@ PROCESS
 	foreach($item in $ComputerParamsTable.GetEnumerator())
 	{
 		# Run no checks if WSMan is not available
-		if((ValidateWSMan -cp $item -at $auditHashTable -dbgl $DBGLevel) -EQ $true)
+		$wsManValidated = ValidateWSMan -cp $item -at $auditHashTable -dbgl $DBGLevel
+		
+		# If WSman fails we can check if IsLocal is set properly. 
+		# This check is too expensive to check frivolously, so we only check on failure.
+		if(-not($wsManValidated))
+		{
+			$computerRole = $item.Value[0]
+			$resolvedName = Get-PISysAudit_ResolveDnsName -LookupName $computerRole.ComputerName -Attribute HostName -DBGLevel $DBGLevel
+			$localComputerName = Get-Content Env:\COMPUTERNAME
+			if($resolvedName.ToLower() -eq $localComputerName.ToLower())
+			{ 
+				foreach($role in $item.Value)
+				{ $role.IsLocal = $true } 
+				$wsManValidated = $true
+
+				$msg = "The server: {0} does not need WinRM communication because it will use a local connection (alias used)" -f $role.ComputerName
+				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 1
+			}
+			else
+			{
+				$msg = "The server: {0} has a problem with WinRM communication" -f $computerRole.ComputerName
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+				New-PISysAuditError -lc $computerRole.IsLocal -rcn $computerRole.ComputerName `
+										-at $auditHashTable -an 'Computer' -fn $fn -msg $msg
+			}
+		}
+
+		if($wsManValidated)
 		{
 			foreach($role in $item.Value)
 			{
@@ -5284,6 +5341,7 @@ PROCESS
 			# Skip progress bar ahead for these ckecks since WSman failed
 			$currCheck += $item.Value.Count
 		}
+
 	}
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -PercentComplete 100 
 	Write-Progress -Activity $ActivityMsg -Status $statusMsgCompleted -Id 1 -Completed
