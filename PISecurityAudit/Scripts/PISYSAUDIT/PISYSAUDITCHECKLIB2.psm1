@@ -76,6 +76,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 # AU20012
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 # AU20013
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 # AU20014
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -106,6 +107,10 @@ param(
 		[string]
 		$RemoteComputerName = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)		
@@ -116,6 +121,7 @@ PROCESS
 
 	# Reset global config object.
 	$global:PIDataArchiveConfiguration = $null
+	$Configuration = New-Object PSCustomObject
 
 	try
 	{
@@ -151,17 +157,21 @@ PROCESS
 			
 			return $false
 		}
+		# Add to global information object
+		$Configuration | Add-Member -MemberType NoteProperty -Name Connection -Value $Connection
 
-		$ConnectionStatisticsRaw = Get-PIConnectionStatistics -Connection $Connection
-		$ConnectionStatistics = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $RemoteComputerName `
+		if($AuditLevelInt -gt 1)
+		{
+			$ConnectionStatisticsRaw = Get-PIConnectionStatistics -Connection $Connection
+			$ConnectionStatistics = Get-PISysAudit_ProcessedPIConnectionStatistics -lc $LocalComputer -rcn $RemoteComputerName `
 																					-PIDataArchiveConnection $Connection `
 																					-PIConnectionStats $ConnectionStatisticsRaw -ProtocolFilter Any `
 																					-RemoteOnly $true -SuccessOnly $true -CheckTransportSecurity $true `
 																					-DBGLevel $DBGLevel
+			
+			$Configuration | Add-Member -MemberType NoteProperty -Name ConnectionStatistics -Value $ConnectionStatistics
+		}
 		
-		$Configuration = New-Object PSCustomObject
-		$Configuration | Add-Member -MemberType NoteProperty -Name Connection -Value $Connection
-		$Configuration | Add-Member -MemberType NoteProperty -Name ConnectionStatistics -Value $ConnectionStatistics
 		$global:PIDataArchiveConfiguration = $Configuration
 		
 		return $true
@@ -1573,6 +1583,158 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckInvalidConnections
+{
+<#  
+.SYNOPSIS
+AU20014 - Invalid connections check
+.DESCRIPTION
+VALIDATION: All connections use an existing, enabled identity and protocol.
+COMPLIANCE: 
+	For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = "Unknown"
+	try
+	{		
+		$connectionIssues = @()
+		$connectionStats = $global:PIDataArchiveConfiguration.ConnectionStatistics
+		$trusts = Get-PITrust -Connection $global:PIDataArchiveConfiguration.Connection | Select Name, Identity, IsEnabled
+		$identities = Get-PIIdentity -Connection $global:PIDataArchiveConfiguration.Connection
+		
+		$enabledTrusts = @()
+		$enabledTrusts = $trusts | ? { $_.IsEnabled -eq $true } 
+
+		$disabledTrusts = @()
+		$disabledTrusts = $trusts | ? { $_.IsEnabled -eq $false }
+		
+		$identitiesWithTrusts = $enabledTrusts | Select-Object -ExpandProperty Identity | Select-Object -Unique 
+		$identitiesBannedFromTrusts = @()
+		$identitiesBannedFromTrusts += $identites | ? { ($_.IsEnabled -eq $false) -or `                    # Disabled trusts
+														($_.AllowTrusts -eq $false) -or `                     # Identities disallowed from trusts specifically
+														($identitiesWithTrusts -notcontains $_.Name) }     # Identities that don't have a current mapping 
+
+		$identitiesWithMappings = Get-PIMapping -Connection $global:PIDataArchiveConfiguration.Connection `
+														| Where-Object {$_.IsEnabled} | Select-Object -ExpandProperty Identity | Select-Object -unique
+		# None of these Identities should appear in an active Windows connection
+		$identitiesBannedFromWIS = @()
+		$identitiesBannedFromWIS += $identities | ? {($_.IsEnabled -eq $false) -or `                 # Disabled globally
+													($_.AllowMappings -eq $false -and $_.Name -ne 'PIWorld') -or `              # Disabled for Mappings, specifically
+													($identitiesWithMappings -notcontains $_.Name -and $_.Name -ne 'PIWorld')}  # There are no valid mappings presently
+
+
+		foreach($stat in $connectionStats)
+		{
+			switch ($stat.AuthenticationProtocol)
+			{
+				# Ignoring subsystem connections since they do not use PI Identities
+				'Subsystem' { break }
+				# Ignoring Explicit Login connections since they are an issue regardless of
+				# staleness and flagged by other checks
+				'ExplicitLogin' { break }
+				'Windows' {
+								# Check if any of the identities used are disabled.
+								$connectionIdentities = $stat.User.ToString()
+								# Checking for the pipe because multiple PI Identities may be assigned delimited with pipes.
+								if($connectionIdentities.IndexOf('|') -eq -1){
+									if($identitiesBannedFromWIS.Name -contains $connectionIdentities)
+									{ $connectionIssues += "ID:" + $stat.ID + "; Disallowed Identity:" + $connectionIdentities }
+								}
+								else 
+								{
+									$connectionIdentities = $connectionIdentities.Split('|').Trim()
+									foreach($connectionIdentity in $connectionIdentities)
+									{
+										if($identitiesBannedFromWIS.Name -contains $connectionIdentity)
+										{ $connectionIssues += "ID:" + $stat.ID + "; Disallowed Identity:" + $connectionIdentity }
+									} 
+								}
+								break
+						}
+				'Trust' {
+							# check if trust matches an enabled enabled trust
+							if($enabledTrusts.Name -contains $stat.Trust)
+							{
+								# Secondary check to make sure the identity has not been modified since the connection was established
+								$trustIdentity = $enabledTrusts | ? {$_.Name -eq $stat.Trust} | select -ExpandProperty Identity
+								if($trustIdentity -ne $stat.User)
+								{ $connectionIssues += "ID: {0}; Trust: {1}; Effective Identity: {2}; Configured Identity {3}" -f $stat.ID, $stat.Trust, $stat.User, $trustIdentity }
+								elseif($identitiesBannedFromTrusts.Name -contains $stat.User)
+								{ $connectionIssues += "ID: {0}; Trust: {1}; Effective Identity: {2} (Disallowed)" -f $stat.ID, $stat.Trust, $stat.User }           
+							}
+							else
+							{
+								if($disabledtrusts.Name -contains $stat.Trust)
+								{ $truststate = "Disabled" }
+								else
+								{ $truststate = "Deleted" }
+								$connectionIssues += "ID: {0}; Trust: {1} ({2})" -f $stat.ID, $stat.Trust, $truststate
+							}
+						}
+			}
+			if($connectionIssues.Count -eq 0)
+			{
+				$result = $true
+				$msg = "No invalid or stale connections were detected."
+			}
+			else
+			{
+				$result = $false
+				$Severity = 'Medium'
+				$msg = "Invalid or stale connections detected: "
+				foreach($issue in $connectionIssues)
+				{ $msg += " " + $issue + " |" }
+				$msg = $msg.Trim('|')
+			}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20014" `
+										-ain "Invalid Connection Check" -aiv $result `
+										-aif $fn -msg $msg `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity $Severity								
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
@@ -1644,6 +1806,7 @@ END {}
 # ........................................................................
 # <Do not remove>
 Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary2
+Export-ModuleMember Get-PISysAudit_GlobalPIDataArchiveConfiguration
 Export-ModuleMember Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 Export-ModuleMember Get-PISysAudit_CheckPIAdminUsage
 Export-ModuleMember Get-PISysAudit_CheckPIServerVersion
@@ -1657,6 +1820,7 @@ Export-ModuleMember Get-PISysAudit_CheckInstalledClientSoftware
 Export-ModuleMember Get-PISysAudit_CheckPIFirewall
 Export-ModuleMember Get-PISysAudit_CheckTransportSecurity
 Export-ModuleMember Get-PISysAudit_CheckPIBackup
+Export-ModuleMember Get-PISysAudit_CheckInvalidConnections
 # </Do not remove>
 
 # ........................................................................

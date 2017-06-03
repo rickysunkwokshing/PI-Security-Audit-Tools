@@ -1122,7 +1122,7 @@ param(
 		{
 			try
 			{
-				$success = Get-PISysAudit_GlobalPIDataArchiveConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
+				$success = Get-PISysAudit_GlobalPIDataArchiveConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lvl $AuditLevelInt -dbgl $DBGLevel
 				if(-not($success))
 				{
 					$msg = "Failed to access PI Data Archive information from {0}" -f $ComputerParams.ComputerName
@@ -3427,7 +3427,7 @@ PROCESS
 			if(($hasProperty -contains 'ConnectionType') -and ($hasProperty -contains 'ConnectionStatus'))
 			{
 				# Only include active connections
-				if($Stat.Item('ConnectionStatus').Value -eq '[0] Success' -or ($SuccessOnly -eq $false))
+				if($stat.Item('ConnectionStatus').Value -eq '[0] Success' -or ($SuccessOnly -eq $false))
 				{
 					if($hasProperty -contains 'Trust') 
 					{ $statAuthProtocol = 'Trust' }
@@ -3446,8 +3446,8 @@ PROCESS
 			[boolean]$IsRemote = $false
 			if($hasProperty -contains 'ConnectionType')
 			{
-				if($Stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
-				($Stat.Item('ConnectionType').Value -eq 'PI-API Connection' -and $Stat.Item('PeerAddress').Value -notin ('127.0.0.1','')))
+				if($stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
+				($stat.Item('ConnectionType').Value -eq 'PI-API Connection' -and $stat.Item('PeerAddress').Value -notin ('127.0.0.1','')))
 				{ $IsRemote = $true }
 			}
         
