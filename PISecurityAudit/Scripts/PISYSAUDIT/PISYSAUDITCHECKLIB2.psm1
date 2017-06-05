@@ -1590,8 +1590,16 @@ function Get-PISysAudit_CheckInvalidConnections
 AU20014 - Invalid connections check
 .DESCRIPTION
 VALIDATION: All connections use an existing, enabled identity and protocol.
-COMPLIANCE: 
-	For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+COMPLIANCE: To comply with this check, connections should only be using the
+currently configured identity and mechanism.  A connection can only be in 
+this state if it is long lived and trust or mapping it was using was edited 
+after the connection was established.  When a mapping or trust is changed, 
+the PI Data Archive requires a reconnect in order to update the credentials 
+of a connecting client application. This can lead to unintentional prolonged 
+access or delayed identification of access revocation having a greater impact 
+than expected. Note that access control for identities is effective immediately, 
+for example revoking access to a PI point from a specific identity.
+For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8">https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
