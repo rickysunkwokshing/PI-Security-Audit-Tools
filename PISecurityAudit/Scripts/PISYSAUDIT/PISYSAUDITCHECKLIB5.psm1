@@ -421,7 +421,8 @@ PROCESS
 	try
 	{	
 		$CSwebSite = $global:PIVisionConfiguration.WebSite # Web Site name
-		$WebBindings = $global:PIVisionConfiguration.Bindings # Web Site bindings
+		[Object[]]$WebBindings = @()
+		$WebBindings += $global:PIVisionConfiguration.Bindings # Web Site bindings
 		$httpsBindingConfigured = $global:PIVisionConfiguration.UsingHTTPS # Check if HTTPS binding is enabled.
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
