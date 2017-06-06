@@ -723,8 +723,8 @@ function Get-PISysAudit_CheckAFSPN
 .SYNOPSIS
 AU30007 - Verify AF Server SPN exists
 .DESCRIPTION
-	VALIDATION: Checks PI AF Server SPN assignment.<br/>
-	COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. This makes Kerberos Authentication possible.
+VALIDATION: Checks PI AF Server SPN assignment.<br/>
+COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. This makes Kerberos Authentication possible.
 For more information, see "PI AF and Kerberos authentication" in the PI Live Library. <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D</a>
 #>
@@ -976,8 +976,8 @@ AU30009 - AF Connection to SQL
 .DESCRIPTION
 VERIFICATION: AF Service connects to the SQL Server with Windows authentication. <br/>
 COMPLIANCE: Ensure that the AF Application service connects to the SQL Server with
-	Windows Authentication. Windows Authentication is the preferred method, see:
-	<a href="https://msdn.microsoft.com/en-us/library/ms144284.aspx">https://msdn.microsoft.com/en-us/library/ms144284.aspx</a>
+Windows Authentication. Windows Authentication is the preferred method, see:
+<a href="https://msdn.microsoft.com/en-us/library/ms144284.aspx">https://msdn.microsoft.com/en-us/library/ms144284.aspx</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1071,8 +1071,8 @@ AU30010 - Restrict AF World Identity
 .DESCRIPTION
 VERIFICATION: Ensures that the World Identity has been disabled or restricted <br/>
 COMPLIANCE: For best practice, disable the World Identity on the AF Server. 
-	Alternatively, remove the mapping to the \Everyone group and re-map it to 
-	an appropriate group with only users who need access to PI AF.
+Alternatively, remove the mapping to the \Everyone group and re-map it to 
+an appropriate group with only users who need access to PI AF.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1194,7 +1194,7 @@ AU30011 - Restrict Write Access
 .DESCRIPTION
 VERIFICATION: Write access to objects should be limited to power users. <br/>
 COMPLIANCE: Database level write access should not be granted to any well-known, 
-	end user groups. Similarly, write access to analyses should be limited. <br/>
+end user groups. Similarly, write access to analyses should be limited. <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							

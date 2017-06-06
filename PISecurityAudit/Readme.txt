@@ -7,7 +7,7 @@ If targeting a remote machine with the scripts then PS-Remoting must be enabled 
 	Test-WSMan -authentication default -ComputerName <TargetComputer>
 
 Modules: 
-WebAdministration Module: the IIS Management PowerShell module must be installed on the target web server to read IIS configuration data when performing a PI Coresight role audit.
+WebAdministration Module: the IIS Management PowerShell module must be installed on the target web server to read IIS configuration data when performing a PI Vision role audit.
 OSIsoft.PowerShell: PowerShell Tools for the PI System are required for the PI Data Archive and PI AF Server checks.
 
 Permissions:

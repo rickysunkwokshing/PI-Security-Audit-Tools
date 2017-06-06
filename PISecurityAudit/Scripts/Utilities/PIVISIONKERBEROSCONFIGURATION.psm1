@@ -473,7 +473,7 @@ Function Check-ClassicDelegation
 		    If ($ClassicProtocolTransition -eq $false) {
 		    $global:strClassicDelegation +="<p><bad>Protocol Transition is Disabled - Kerberos Delegation may fail.</bad><br>
 											<details>
-											<summary>PowerShell commands to fix the issue and <a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >documentation</a></summary><br>
+											<summary>PowerShell commands to fix the issue and <a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >documentation</a></summary><br>
 											<code>
 											Set-ADAccountControl -Identity  $ClassicAppPoolPT -TrustedToAuthForDelegation `$true
 											</code>				
@@ -501,7 +501,7 @@ Function Check-ClassicDelegation
 			    Else { 
 				    $global:strSPNs = "<p><bad>Kerberos authentication will fail. Please make sure $CSShortSPN Service Principal Name is assigned to the correct service identity: $global:AppPoolAccountFriendlyName.</bad><br>
 				    <details>
-					<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 `" target=`"_blank`" >Documentation</a> | Command to create the missing SPN:</summary><br>
+					<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 `" target=`"_blank`" >Documentation</a> | Command to create the missing SPN:</summary><br>
                     <code>
 					setspn -s $CSShortSPN $PIVisionUserSvc
 					</code>
@@ -517,7 +517,7 @@ Function Check-ClassicDelegation
 			    Else { 
 				    $global:strSPNs = "<p><bad>Kerberos authentication will fail. Please make sure $CSShortSPN and $CSLongSPN Service Principal Names are assigned to the correct service identity: $global:AppPoolAccountFriendlyName.</bad><br>
 				    <details>
-					<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 `" target=`"_blank`" >Documentation</a> | Commands to create the missing SPNs</summary><br>
+					<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 `" target=`"_blank`" >Documentation</a> | Commands to create the missing SPNs</summary><br>
 					<code>
                     setspn -s $CSShortSPN $PIVisionUserSvc<br>
                     setspn -s $CSLongSPN $PIVisionUserSvc
@@ -540,14 +540,14 @@ Function Check-ClassicDelegation
 	# Delegation is configured within a single Windows Domain.
 	If ($ClassicLongSPNtoDelegateTo -match $WebServerDomain) {
     $DelegationFix ="<p><details><summary>
-	<a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Documentation</a> | PowerShell commands to fix the issue:</summary><br>
+	<a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Documentation</a> | PowerShell commands to fix the issue:</summary><br>
 	<code>$global:ADObjType -Identity $ClassicAppPool -Add @{ `"msDS-AllowedToDelegateTo`" = '$ClassicShortSPNtoDelegateTo' }<br>
     $global:ADObjType -Identity $ClassicAppPool -Add @{ `"msDS-AllowedToDelegateTo`" = '$ClassicLongSPNtoDelegateTo' } </code><br>
     </details></p>"		
 	}
 	# Classic Kebreros Constrained Delegation doesn't work cross-domain. Go for RBKCD.
 	Else {
-	$DelegationFix ="<p><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Configure Resource-Based Constrained Kerberos Delegation.</a></p>"
+	$DelegationFix ="<p><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Configure Resource-Based Constrained Kerberos Delegation.</a></p>"
 	}
 	
 	# Debug option.
@@ -754,7 +754,7 @@ Function Check-ServicePrincipalName
 			Else { 
 				$global:strSPNs = "<p><bad>Kerberos authentication to PI Vision will fail.<br></bad>
 				<details>
-				<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Documentation</a> | Command to create the missing SPN:</summary><br>
+				<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Documentation</a> | Command to create the missing SPN:</summary><br>
 				<code>
                 setspn -s $SPNstring1 $PIVisionUserSvc<br>
                 </code>
@@ -770,7 +770,7 @@ Function Check-ServicePrincipalName
 			Else { 
 				$global:strSPNs = "<p><bad>Kerberos authentication to PI Vision will fail.<br></bad>
 				<details>
-				<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v8/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Documentation</a> | Commands to create the missing SPNs</summary><br>
+				<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46`" target=`"_blank`" >Documentation</a> | Commands to create the missing SPNs</summary><br>
 				<code>
                 setspn -s $SPNstring1 $PIVisionUserSvc<br>
                 setspn -s $SPNstring2 $PIVisionUserSvc<br>
@@ -991,12 +991,12 @@ Function Initialize-KerberosConfigurationTest
 Function Test-KerberosConfiguration {
 <#  
 .SYNOPSIS
-Designed to check PI Vision (PI Coresight) configuration to ensure Kerberos authentication and delegation
+Designed to check PI Vision (formerly PI Coresight) configuration to ensure Kerberos authentication and delegation
 are configured correctly.  
 
 .DESCRIPTION
 Dubbed 'PI Dog' after Kerberos, the three-headed guardian of Hades. This utility is designed to
-examine the configuration of a PI Coresight web application related to Kerberos delegation and 
+examine the configuration of a PI Vision web application related to Kerberos delegation and 
 provide actionable information if any issues or deviation from best practices are detected.
 	
 PI Dog has best support when run locally due to complications with WS-Man, SPN resolution or 
@@ -1010,7 +1010,7 @@ Test-KerberosConfiguration [[-ComputerName | -cn] <string>]
 Import the PISYSAUDIT module to make this function available.
 
 .PARAMETER cn
-The computer hosting the target PI Vision (PI Coresight) web application.
+The computer hosting the target PI Vision (formerly PI Coresight) web application.
 .PARAMETER kc
 The type of kerberos delegation configuration check to perform.  Supported values
 are None, Classic, ResourceBased and Menu (select interactively).
