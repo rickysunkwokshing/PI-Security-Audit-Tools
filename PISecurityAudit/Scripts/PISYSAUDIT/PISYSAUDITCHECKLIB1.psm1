@@ -617,7 +617,7 @@ AU10006 - Monitored by OSIsoft NOC
 .DESCRIPTION
 VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled. <br/>
 COMPLIANCE: Ensure that PI Agent and PI Diagnostics are installed and running
-	on the machine so that the OSIsoft NOC will detect issues. <br/>
+on the machine so that the OSIsoft NOC will detect issues. <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -724,8 +724,8 @@ AU10007 - Internet Explorer Enhanced Security
 .DESCRIPTION
 VERIFICATION: Validates that IE Enhanced Security is enabled <br/>
 COMPLIANCE: Ensure that Internet Explorer Enhanced Security is enabled
-	for both Administrators and Users. More information is available at: 
-	<a href="https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx"> https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx </a> <br/>
+for both Administrators and Users. More information is available at: 
+<a href="https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx"> https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -818,10 +818,10 @@ function Get-PISysAudit_CheckSoftwareUpdates
 AU10008 - Software Updates
 .DESCRIPTION
 VERIFICATION: Validates that the operating system and Microsoft applications 
-	receive updates <br/>
+receive updates <br/>
 COMPLIANCE: Ensure that the operating system and the Microsoft applications
-	have been updated in the last 60 days.
-	<a href="https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date">https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date</a> <br/>
+have been updated in the last 60 days.
+<a href="https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date">https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -949,7 +949,7 @@ AU10009 - No Internet Access
 .DESCRIPTION
 VERIFICATION: Checks that this server is not able to access the internet. <br/>
 COMPLIANCE: Implement firewall restrictions to prevent access to the internet 
-	from the server. 
+from the server. 
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							

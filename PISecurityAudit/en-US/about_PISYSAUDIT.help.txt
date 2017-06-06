@@ -42,7 +42,7 @@ RUNNING THE PI SECURITY AUDIT SCRIPTS
 	$cpt = piauditparams $cpt "myPI" "PIAFServer"
 	$cpt = piauditparams $cpt "myPI" "SQLServer" -InstanceName "myinstance" 
 	# -IntegratedSecurity $false -user "sa" -pf "p1.dat"
-	$cpt = piauditparams $cpt "myPI" "PICoresightServer"
+	$cpt = piauditparams $cpt "myPI" "PIVisionServer"
 	piaudit -cpt $cpt
 
 	# Example 3
@@ -55,7 +55,7 @@ RUNNING THE PI SECURITY AUDIT SCRIPTS
 	$cpt = piauditparams $cpt "myPI" "PIAFServer"
 	$cpt = piauditparams $cpt "myPI" "SQLServer" -InstanceName "myinstance" `
 	-IntegratedSecurity $false -user "sa" -pf "p1.dat"
-	$cpt = piauditparams $cpt "myPI" "PICoresightServer"
+	$cpt = piauditparams $cpt "myPI" "PIVisionServer"
 	piaudit -cpt $cpt
 
 	# Example 4
@@ -65,7 +65,7 @@ RUNNING THE PI SECURITY AUDIT SCRIPTS
 	$cpt = piauditparams $cpt "myPI" "PIAFServer"
 	$cpt = piauditparams $cpt "myPI" "SQLServer" -InstanceName "myinstance" `
 	-IntegratedSecurity $false -user "sa"
-	$cpt = piauditparams $cpt "myPI" "PICoresightServer"
+	$cpt = piauditparams $cpt "myPI" "PIVisionServer"
 	piaudit -cpt $cpt
 
 	# Example 5
@@ -90,7 +90,7 @@ RUNNING THE PI SECURITY AUDIT SCRIPTS
 	ComputerName,PISystemComponentType
 	myPI1,piaf
 	myPI1,pidataarchive
-	myPI2,picoresight
+	myPI2,pivision
 
 VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 	
@@ -142,25 +142,25 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		AU10006 - Monitored by OSIsoft NOC
 		VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled. 
 		COMPLIANCE: Ensure that PI Agent and PI Diagnostics are installed and running
-			on the machine so that the OSIsoft NOC will detect issues. 
+		on the machine so that the OSIsoft NOC will detect issues. 
 
 		AU10007 - Internet Explorer Enhanced Security
 		VERIFICATION: Validates that IE Enhanced Security is enabled 
 		COMPLIANCE: Ensure that Internet Explorer Enhanced Security is enabled
-			for both Administrators and Users. More information is available at: 
-			 https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx  
+		for both Administrators and Users. More information is available at: 
+		 https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx  
 
 		AU10008 - Software Updates
 		VERIFICATION: Validates that the operating system and Microsoft applications 
-			receive updates 
+		receive updates 
 		COMPLIANCE: Ensure that the operating system and the Microsoft applications
-			have been updated in the last 60 days.
-			https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date 
+		have been updated in the last 60 days.
+		https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date 
 
 		AU10009 - No Internet Access
 		VERIFICATION: Checks that this server is not able to access the internet. 
 		COMPLIANCE: Implement firewall restrictions to prevent access to the internet 
-			from the server.
+		from the server.
 
 		AU20001 - PI Data Archive Table Security Check
 		VALIDATION: examines the database security of the PI Data Archive and flags any 
@@ -315,19 +315,19 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		AU30009 - AF Connection to SQL
 		VERIFICATION: AF Service connects to the SQL Server with Windows authentication. 
 		COMPLIANCE: Ensure that the AF Application service connects to the SQL Server with
-			Windows Authentication. Windows Authentication is the preferred method, see:
-			https://msdn.microsoft.com/en-us/library/ms144284.aspx
+		Windows Authentication. Windows Authentication is the preferred method, see:
+		https://msdn.microsoft.com/en-us/library/ms144284.aspx
 
 		AU30010 - Restrict AF World Identity
 		VERIFICATION: Ensures that the World Identity has been disabled or restricted 
 		COMPLIANCE: For best practice, disable the World Identity on the AF Server. 
-			Alternatively, remove the mapping to the \Everyone group and re-map it to 
-			an appropriate group with only users who need access to PI AF.
+		Alternatively, remove the mapping to the \Everyone group and re-map it to 
+		an appropriate group with only users who need access to PI AF.
 
 		AU30011 - Restrict Write Access
 		VERIFICATION: Write access to objects should be limited to power users. 
 		COMPLIANCE: Database level write access should not be granted to any well-known, 
-			end user groups. Similarly, write access to analyses should be limited. 
+		end user groups. Similarly, write access to analyses should be limited. 
 
 		AU40001 - SQL Server xp_CmdShell Check
 		VALIDATION: verifies that SQL Server does not have xp_CmdShell enabled.
@@ -391,26 +391,26 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		AU50001 - Check for latest version of PI Vision
 		VALIDATION: verifies PI Vision version.
 		COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
-		see "Upgrade a PI Coresight installation" in the PI Live Library.
-		https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6
+		see "Upgrade a PI Vision installation" in the PI Live Library.
+		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6
 
 		AU50002 - Check PI Vision AppPools identity
 		VALIDATION: checks PI Vision AppPool identity.
 		COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not ideal. 
-		For more information, see "Create a service account for PI Coresight" in the PI Live Library. 
-		https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-A790D013-BAC8-405B-A017-33E55595B411
+		For more information, see "Create a service account for PI Vision" in the PI Live Library. 
+		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411
 
 		AU50003 - PI Vision SSL check
 		VALIDATION: Checks whether SSL is enabled and enforced on the PI Vision Web Site.
 		COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
 		For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library. 
-		https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
+		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
 
 		AU50004 - PI Vision SPN check
 		VALIDATION: Checks PI Vision SPN assignment. 
 		COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool account. This makes Kerberos Authentication possible.
 		For more information, see the PI Live Library link below. 
-		https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-68329569-D75C-406D-AE2D-9ED512E74D46
+		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46
 
 		//ENDSECTION - VALIDATIONS//
 
@@ -430,6 +430,10 @@ CONTRIBUTE
 	If you encounter a bug, please submit it as an issue on the GitHub repo
 	or fix the bug and submit a pull request!
         https://github.com/osisoft/PI-System-Audit-Tools/issues
+
+
+
+
 
 
 
