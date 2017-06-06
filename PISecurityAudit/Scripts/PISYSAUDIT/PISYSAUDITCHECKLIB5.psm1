@@ -195,8 +195,8 @@ AU50001 - Check for latest version of PI Vision
 .DESCRIPTION
 VALIDATION: verifies PI Vision version.<br/>
 COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
-see "Upgrade a PI Coresight installation" in the PI Live Library.<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a>
+see "Upgrade a PI Vision installation" in the PI Live Library.<br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -275,8 +275,8 @@ AU50002 - Check PI Vision AppPools identity
 .DESCRIPTION
 VALIDATION: checks PI Vision AppPool identity.<br/>
 COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not ideal. 
-For more information, see "Create a service account for PI Coresight" in the PI Live Library. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
+For more information, see "Create a service account for PI Vision" in the PI Live Library. <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -392,7 +392,7 @@ AU50003 - PI Vision SSL check
 VALIDATION: Checks whether SSL is enabled and enforced on the PI Vision Web Site.<br/>
 COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
 For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -421,7 +421,8 @@ PROCESS
 	try
 	{	
 		$CSwebSite = $global:PIVisionConfiguration.WebSite # Web Site name
-		$WebBindings = $global:PIVisionConfiguration.Bindings # Web Site bindings
+		[Object[]]$WebBindings = @()
+		$WebBindings += $global:PIVisionConfiguration.Bindings # Web Site bindings
 		$httpsBindingConfigured = $global:PIVisionConfiguration.UsingHTTPS # Check if HTTPS binding is enabled.
 
 		# HTTPS binding is disabled, so there's no point in checking anything else.
@@ -544,7 +545,7 @@ AU50004 - PI Vision SPN check
 VALIDATION: Checks PI Vision SPN assignment. <br/>
 COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool account. This makes Kerberos Authentication possible.
 For more information, see the PI Live Library link below. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/coresight-v7/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							

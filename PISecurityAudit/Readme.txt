@@ -2,18 +2,18 @@
 # Requirements #
 ################
 
-PowerShell version 3.0 or later is required.
+PowerShell version 3.0 or later is required to run this tool.
 If targeting a remote machine with the scripts then PS-Remoting must be enabled on the target machine.  You can test whether or not PS-Remoting is enabled with the command below, where <TargetComputer> is the machine that the scripts will be run against.  We do not recommend enabling PS-Remoting to run this tool if it is not already enabled.
 	Test-WSMan -authentication default -ComputerName <TargetComputer>
 
 Modules: 
-WebAdministration Module: the IIS Management PowerShell module must be installed on the target web server to read IIS configuration data when performing a PI Coresight role audit.
+WebAdministration Module: the IIS Management PowerShell module must be installed on the target web server to read IIS configuration data when performing a PI Vision role audit.
 OSIsoft.PowerShell: PowerShell Tools for the PI System are required for the PI Data Archive and PI AF Server checks.
 
 Permissions:
 PI Data Archive - Read access to PIDBSEC, PIMAPPING, PITRUST, PIUSER and PITUNING in database security.
 PI AF Server - Process must be run as administrator to access AFDiag locally.
-PI Coresight - Process must be run as administrator to access IIS Configuration data.
+PI Vision - Process must be run as administrator to access IIS Configuration data.
 SQL Server - Login with the public server role.
 
 #############################

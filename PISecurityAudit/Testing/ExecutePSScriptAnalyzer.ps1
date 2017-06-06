@@ -28,6 +28,6 @@ $libraryPath = $PISecAuditRoot + '\Scripts\PISysAudit\'
 InvokePSScriptAnalysis $libraries $libraryPath $excludedRules $PISecAuditRoot
 
 # Scan all utilities
-$utilities = @( 'PISECCONFIGEXPORT', 'CoresightKerberosConfiguration' )
+$utilities = @( 'PISECCONFIGEXPORT', 'PIVISIONKERBEROSCONFIGURATION' )
 $utilityPath = $PISecAuditRoot + '\Scripts\Utilities\'
 InvokePSScriptAnalysis $utilities $utilityPath $excludedRules $PISecAuditRoot
