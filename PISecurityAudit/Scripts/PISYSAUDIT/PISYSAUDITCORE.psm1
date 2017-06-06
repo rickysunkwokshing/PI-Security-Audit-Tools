@@ -1099,7 +1099,6 @@ param(
 					
 	# Get and store the function Name.
 	$fn = GetFunctionName
-	$global:PIDataArchiveConnection = $null
 
 	try
 	{
@@ -1123,34 +1122,12 @@ param(
 		{
 			try
 			{
-				$global:PIDataArchiveConnection = Connect-PIDataArchive -PIDataArchiveMachineName $ComputerParams.ComputerName
-				if($global:PIDataArchiveConnection.Connected){
-					$msgTemplate = "Successfully connected to the PI Data Archive {0} with PowerShell."
-					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-				}
-				else
+				$success = Get-PISysAudit_GlobalPIDataArchiveConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lvl $AuditLevelInt -dbgl $DBGLevel
+				if(-not($success))
 				{
-					$portOpen = $true
-					if($PSVersionTable.PSVersion.Major -ge 4){
-						$portOpen = $(Test-NetConnection -ComputerName $ComputerParams.ComputerName -Port 5450 -InformationLevel Quiet -WarningAction SilentlyContinue)
-					}
-					elseif($PSVersionTable.PSVersion.Major -lt 4 -and $ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage'){
-						try
-						{
-							$testPort = new-object net.sockets.tcpclient
-							$testPort.Connect($ComputerParams.ComputerName, 5450)
-						}
-						catch { $portOpen = $false }
-					}
-					if($portOpen -eq $false)
-					{ $msgTemplate = "The PI Data Archive {0} is not accessible over port 5450" }
-					else
-					{ $msgTemplate = "Unable to access the PI Data Archive {0} with PowerShell.  Check if there is a valid mapping for your user. Terminating PI Data Archive audit" }
-					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Error" $fn
+					$msg = "Failed to access PI Data Archive information from {0}" -f $ComputerParams.ComputerName
 					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "PI Data Archive Audit" -fn $fn -msg $msg
+								-at $AuditTable -an "PI Data Archive Audit" -fn $fn -msg $msg
 					return
 				}
 			}
@@ -1220,7 +1197,9 @@ param(
 		}
 
 		# Disconnect if PowerShell Tools are used.
-		if($global:PIDataArchiveConnection.Connected){$global:PIDataArchiveConnection.Disconnect()}
+		if($global:PIDataArchiveConfiguration.Connection){
+			if($global:PIDataArchiveConfiguration.Connection.Connected){$global:PIDataArchiveConfiguration.Connection.Disconnect()}
+		}
 
 		# Set the progress.
 		if($ShowUI)
@@ -3448,7 +3427,7 @@ PROCESS
 			if(($hasProperty -contains 'ConnectionType') -and ($hasProperty -contains 'ConnectionStatus'))
 			{
 				# Only include active connections
-				if($Stat.Item('ConnectionStatus').Value -eq '[0] Success' -or ($SuccessOnly -eq $false))
+				if($stat.Item('ConnectionStatus').Value -eq '[0] Success' -or ($SuccessOnly -eq $false))
 				{
 					if($hasProperty -contains 'Trust') 
 					{ $statAuthProtocol = 'Trust' }
@@ -3467,8 +3446,8 @@ PROCESS
 			[boolean]$IsRemote = $false
 			if($hasProperty -contains 'ConnectionType')
 			{
-				if($Stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
-				($Stat.Item('ConnectionType').Value -eq 'PI-API Connection' -and $Stat.Item('PeerAddress').Value -notin ('127.0.0.1','')))
+				if($stat.Item('ConnectionType').Value -eq 'Remote resolver' -or `
+				($stat.Item('ConnectionType').Value -eq 'PI-API Connection' -and $stat.Item('PeerAddress').Value -notin ('127.0.0.1','')))
 				{ $IsRemote = $true }
 			}
         
