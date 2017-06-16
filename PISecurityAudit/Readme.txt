@@ -37,6 +37,19 @@ Import the PI System Audit Module by typing the command below.
 To validate that the module has been successfully loaded you can test with the Get-Module cmdlet as shown below.  If successful, you will see the ModuleType, Name and ExportedCommands.  
     Get-Module PISYSAUDIT  
 
+###############################
+# Accessing the built in help #
+###############################
+To read the help documentation on the New-PISystemAuditReport cmdlet, type the following:  
+    Get-Help New-PISystemAuditReport
+
+Similarly, retrieve help for the Kerberos Configuration Utility or the Security Configuration Export Utility
+	Get-Help Test-KerberosConfiguration
+	Get-Help Export-PISecConfig
+
+To view the conceptual help, run the command below:  
+    Get-Help about_PISYSAUDIT
+
 ####################
 # Running the tool #
 ####################
@@ -52,14 +65,26 @@ Finally, when you are done adding components, launch the audit with the piaudit 
 
 Open the generated *.html file from the Export folder in your favorite browser and examine the results.  
 
-###############################
-# Accessing the built in help #
-###############################
-Read the help documentation on the New-PISystemAuditReport cmdlet by typing the following:  
-    Get-Help New-PISystemAuditReport
+#############################
+# Running a batch of audits #
+#############################
 
-To view the conceptual help, run the command below:  
-    Get-Help about_PISYSAUDIT
+A more convenient way to audit several components at once may be to use the computer parameters file 
+option that uses a CSV file with parameters.
+	piaudit -cpf "D:\PathToYourFile\Servers.csv"
+
+Sample contents for CSV file are below.
+NOTE: headings must be included.
+	ComputerName,PISystemComponentType,InstanceName,IntegratedSecurity,SQLServerUserID,PasswordFile
+	mySQL1,sql,sqlexpress,false,myTestUser,
+	myPI1,pidataarchive,,,,
+	myPI1,piaf,,,,
+
+If no SQL Servers are included, the file can be simplified to two columns as shown below
+	ComputerName,PISystemComponentType
+	myPI1,piaf
+	myPI1,pidataarchive
+	myPI2,pivision
 
 #############
 # Resources #

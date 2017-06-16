@@ -96,16 +96,16 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 	
 		//BEGINSECTION - VALIDATIONS// This section is automatically generated.
 
-		AU10001 - Domain Membership Check
-		VALIDATION: verifies that the machine is a member of an Active Directory Domain.  
-		COMPLIANCE: join the machine to an Active Directory Domain.  Use of a domain is 
+		AU10001 - Domain Membership
+		VALIDATION: Verifies that the machine is a member of an Active Directory Domain.  
+		COMPLIANCE: Join the machine to an Active Directory Domain.  Use of a domain is 
 		encouraged as AD provides Kerberos authentication and is our best available technology 
 		for securing a PI System.  Furthermore, the implementation of transport security in the 
 		PI System relies on Windows Integrated Security and AD to automatically enable higher 
 		strength ciphers.
 
 		AU10002 - Operating System Installation Type
-		VALIDATION: verifies that the OS installation type is server core for the 
+		VALIDATION: Verifies that the OS installation type is server core for the 
 		reduced surface area.
 		COMPLIANCE: Installation Type should be Server Core. Different SKUs are
 		available at the link below:
@@ -114,8 +114,8 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx 
 
 		AU10003 - Windows Firewall Enabled
-		VALIDATION: verifies that the Windows host based firewall is enabled. 
-		COMPLIANCE: enable the Windows firewall for Domain, Private and Public Scope.  
+		VALIDATION: Verifies that the Windows host based firewall is enabled. 
+		COMPLIANCE: Enable the Windows firewall for Domain, Private and Public Scope.  
 		A firewall's effectiveness is heavily dependent on the configuration.  
 		For PI specific port requirements, please see: 
 		 https://techsupport.osisoft.com/Troubleshooting/KB/KB01162  
@@ -124,25 +124,30 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		https://technet.microsoft.com/en-us/library/hh831365(v=ws.11).aspx 
 
 		AU10004 - AppLocker Enabled
-		VALIDATION: verifies that AppLocker is enabled.   
-		COMPLIANCE: set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
+		VALIDATION: Verifies that AppLocker is enabled.   
+		COMPLIANCE: Set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
 		primer on running AppLocker on a PI Data Archive, see: 
 		https://techsupport.osisoft.com/Troubleshooting/KB/KB00994
 
 		AU10005 - UAC Enabled
-		VALIDATION: verifies that UAC is enabled.  More precisely, it verifies the 
+		VALIDATION: Verifies that UAC is enabled.  More precisely, it verifies the 
 		following default features: EnableLUA, ConsentPromptBehaviorAdmin, 
 		EnableInstallerDetection, PromptOnSecureDesktop and EnableSecureUIAPaths.
 		Additionally, a check is performed for the feature ValidateAdminCodeSignatures.  
 		Lower severity is assigned if this is the only feature disabled.
-		COMPLIANCE: enable the flagged UAC features through Local Security Policy.  
+		COMPLIANCE: Enable the flagged UAC features through Local Security Policy.  
 		For more information on specific UAC features, see: 
 		https://technet.microsoft.com/en-us/library/dd835564(v=ws.10).aspx 
 
-		AU10006 - Monitored by OSIsoft NOC
-		VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled. 
-		COMPLIANCE: Ensure that PI Agent and PI Diagnostics are installed and running
-		on the machine so that the OSIsoft NOC will detect issues. 
+		AU10006 - Health Monitoring (OSIsoft NOC)
+		VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled, 
+		indicating that the machine is monitored in the OSIsoft NOC. 
+		COMPLIANCE: The goal of this check is to ensure that the PI System component
+		has monitoring for notification and response, of which mPI is one example.  
+		If an equivalent independent solution is in place for monitoring, this check 
+		can be safely ignored.  To ensure compliance with this check PI Agent and PI 
+		Diagnostics need to be installed and running on the machine so that the 
+		OSIsoft NOC will detect issues. 
 
 		AU10007 - Internet Explorer Enhanced Security
 		VERIFICATION: Validates that IE Enhanced Security is enabled 
@@ -154,7 +159,7 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		VERIFICATION: Validates that the operating system and Microsoft applications 
 		receive updates 
 		COMPLIANCE: Ensure that the operating system and the Microsoft applications
-		have been updated in the last 60 days.
+		have been updated in the last 120 days.
 		https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date 
 
 		AU10009 - No Internet Access
@@ -162,17 +167,17 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		COMPLIANCE: Implement firewall restrictions to prevent access to the internet 
 		from the server.
 
-		AU20001 - PI Data Archive Table Security Check
-		VALIDATION: examines the database security of the PI Data Archive and flags any 
+		AU20001 - PI Data Archive Table Security
+		VALIDATION: Examines the database security of the PI Data Archive and flags any 
 		ACLs that contain access for PIWorld as weak. 
-		COMPLIANCE: remove PIWorld access from all database security ACLs.  Note that prior
+		COMPLIANCE: Remove PIWorld access from all database security ACLs.  Note that prior
 		removing PIWorld access, you need to evaluate which applications are relying on that 
 		access so that you can grant those applications access explicitly.  This check will
 		also pass if PIWorld is disabled globally.
 
-		AU20002 - PI Admin Usage Check
-		VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.
-		COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
+		AU20002 - PI Admin Usage
+		VALIDATION: Verifies that the piadmin PI User is not used in mappings or trusts.
+		COMPLIANCE: Replace any trusts or mappings that use piadmin with a mapping or trust to a
 		PI Identity with appropriate privilege for the applications that will use it.  Will also
 		check if trusts and mappings to piadmin have been disabled globally.  This can be done by  
 		checking "User cannot be used in a Trust" and "User cannot be used in a Mapping" in the 
@@ -183,13 +188,13 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 
 
 		AU20003 - PI Data Archive Version
-		VALIDATION: verifies that the PI Data Archive is using the most recent release.   
-		COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
+		VALIDATION: Verifies that the PI Data Archive is using the most recent release.   
+		COMPLIANCE: Upgrade the PI Data Archive to the latest version, PI Data Archive 
 		2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
 		section of the PI Data Archive Installation and Upgrade Guide, Live Library: 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD 
 
-		AU20004 - Check Edit Days
+		AU20004 - Edit Days Specified
 		VALIDATION: verified that the Edit Days tuning parameter is set. 
 		COMPLIANCE: set to a value greater than zero.  EditDays defines the number of past 
 		days where events can be modified in the Snapshot or Archive databases. A zero value means 
@@ -198,28 +203,28 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 
 
 		AU20005 - Auto Trust Configuration
-		VALIDATION: verifies that the autotrustconfig tuning parameter is set to create 
+		VALIDATION: Verifies that the autotrustconfig tuning parameter is set to create 
 		either no trusts or a trust for the loopback automatically (127.0.0.1). 
-		COMPLIANCE: set the autotrustconfig tuning parameter to a value of 0 (do not 
+		COMPLIANCE: Set the autotrustconfig tuning parameter to a value of 0 (do not 
 		automatically create any PI Trust entries) or 1 (create the trust entry for the loopback 
 		IP address 127.0.0.1 only).
 
-		AU20006 - Expensive Query Protection Check
-		VALIDATION: verify that the PI Data Archive has protection against expensive queries. 
-		COMPLIANCE: set the archive_maxqueryexecutionsec tuning parameter to a value between 60 
+		AU20006 - Expensive Query Protection
+		VALIDATION: Verify that the PI Data Archive has protection against expensive queries. 
+		COMPLIANCE: Set the archive_maxqueryexecutionsec tuning parameter to a value between 60 
 		and 300.  For more information on this parameter and other that can protect against expensive 
 		queries, see the knowledgebase article 3224OSI8 
 		https://techsupport.osisoft.com/Troubleshooting/KB/3224OSI8  
 
-		AU20007 - Check if the explicit login is disabled
-		VALIDATION: verifies that explicit login is disabled as an authentication protocol.   
-		COMPLIANCE: set the tuning parameter Server_AuthenticationPolicy to a value greater than 3.  
+		AU20007 - Explicit Login Disabled
+		VALIDATION: Verifies that explicit login is disabled as an authentication protocol.   
+		COMPLIANCE: Set the tuning parameter Server_AuthenticationPolicy to a value greater than 3.  
 		This is equivalent to the third notch, "Disable explicit login", or higher on the Security 
 		Settings plugin in PI SMT.  For more information, see "Security Best Practice #2" and "Security 
 		Best Practice #3" in KB00833. 
 		https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 
 
-		AU20008 - Check PI Server SPN
+		AU20008 - PI Server SPN
 		VALIDATION: Checks PI Data Archive SPN assignment.
 		COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running pinetmgr. 
 		Presently only local system is supported.  Correct SPN assignment makes Kerberos 
@@ -230,84 +235,87 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		AU20009 - PI Collective
 		VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. 
 		COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
-			High Availability. 
+		High Availability which avoids a single point of failure and allows for less disruptive servicing.
 
 		AU20010 - No Client Software
 		VALIDATION: Checks if common client software is installed on the PI Data Archive machine. 
-		COMPLIANCE: Ensure the PI Processbookt and Microsoft Office are not installed
-			on the PI Data Archive machine, as these programs should be used on client
-			machines only. 
+		COMPLIANCE: Local logon access to the PI Data Archive server should be limited to administrators
+		and only performed for maintenance tasks which require local logon.  Client tools should not be 
+		necessary locally, and following the principle of least functionality, should be removed to reduce
+		the available attack surface and required patch maintenance.  As a minimum measure, ensure common
+		client tools such as PI Processbookt and Microsoft Office are not installedon the PI Data Archive 
+		machines only. 
 
 		AU20011 - PI Firewall Used
 		VALIDATION: Checks that PI Firewall is used. 
 		COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should 
-			be removed and replaced with specific IPs or subnets that may 
-			connect to the PI Data Archive. For more information on PI Firewall,
-			see https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB  
+		be removed and replaced with specific IPs or subnets that may 
+		connect to the PI Data Archive. For more information on PI Firewall,
+		see https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB  
 
 		AU20013 - PI Backup Configured
 		VALIDATION: Ensures that PI Backups are configured and current. 
 		COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration
-			and data daily. It is best practice to back up to a local disk on the 
-			PI Data Archive machine, then copy the backup to an off-machine location. 
-			For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61
+		and data daily. It is best practice to back up to a local disk on the 
+		PI Data Archive machine, then copy the backup to an off-machine location. 
+		For more information, see https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61
 
-		AU30001 - PI AF Server Service Account Check
-		VALIDATION: verifies that the AF Server application service is not running as the account 
+		AU30001 - PI AF Server Service Account
+		VALIDATION: Verifies that the AF Server application service is not running as the account 
 		Local System. 
-		COMPLIANCE: run the AF Server Application service as a user other than Local System.  In 
+		COMPLIANCE: Run the AF Server Application service as a user other than Local System.  In 
 		order to change the user that the service is running as, open control panel, go to Programs, 
 		Programs and Features, select the entry for the PI AF Server and click Change.  This will 
 		launch the installer where you will be given the option to change configuration settings, 
 		including the service account.
 
-		AU30002 - Impersonation mode for AF Data Sets Check
-		VALIDATION:  verifies the impersonation mode for external data tables. 
-		COMPLIANCE: set the Configuration Setting ExternalDataTablesAllowNonImpersonatedUsers to 
+		AU30002 - Impersonation mode for AF Data Sets
+		VALIDATION: Verifies the impersonation mode for external data tables. 
+		COMPLIANCE: Set the Configuration Setting ExternalDataTablesAllowNonImpersonatedUsers to 
 		false, thereby requiring impersonation for access to external tables.  This setting can be 
 		changed by running the AFDiag utility with the /ExternalDataTablesAllowNonImpersonatedUsers- 
 		flag.  For more information, see "AFDiag utility parameters" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
 
-		AU30003 - PI AF Server Service Access Check
-		VALIDATION: verifies that the PI AF application server service does not have excessive 
+		AU30003 - PI AF Server Service Access
+		VALIDATION: Verifies that the PI AF application server service does not have excessive 
 		rights. 
-		COMPLIANCE: ensure that the account does not have the following privileges: 
+		COMPLIANCE: Ensure that the account does not have the following privileges: 
 		SeDebugPrivilege, SeTakeOwnershipPrivilege and SeTcbPrivilege.  For information on these 
 		rights and how to set them, see "User Rights" on TechNet: 
 		https://technet.microsoft.com/en-us/library/dd349804(v=ws.10).aspx
 
-		AU30004 - PI AF Server Plugin Verify Level Check
-		VALIDATION: verifies that PI AF requires plugins to be validated. 
-		COMPLIANCE: set the Configuration Setting PlugInVerifyLevel to RequireSigned or 
+		AU30004 - PI AF Server Plugin Verify Level
+		VALIDATION: Verifies that PI AF requires plugins to be validated. 
+		COMPLIANCE: Set the Configuration Setting PlugInVerifyLevel to RequireSigned or 
 		RequireSignedTrustedProvider.  This can be done with AFDiag /PluginVerifyLevel:<Level>.
 		For more information, see "AFDiag utility parameters" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
 
 		AU30005 - PI AF Server File Extension Whitelist
-		VALIDATION: verifies file extension whitelist for PI AF. 
-		COMPLIANCE: set the Configuration Setting FileExtensions to only include the file 
+		VALIDATION: Verifies file extension whitelist for PI AF. 
+		COMPLIANCE: Set the Configuration Setting FileExtensions to only include the file 
 		extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a subset thereof.
 		This can be done with AFDiag /FileExtensions:<ExtensionList>.  For more information, 
 		see "AFDiag utility parameters" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
 
 		AU30006 - PI AF Server Version
-		VALIDATION: verifies PI AF Server version. 
-		COMPLIANCE: upgrade to the latest version of PI AF Server.  For more information, 
+		VALIDATION: Verifies PI AF Server version. 
+		COMPLIANCE: Upgrade to the latest version of PI AF Server.  For more information, 
 		see "PI AF Server upgrades" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 
 
-		AU30007 - Verify AF Server SPN exists
+		AU30007 - AF Server SPN
 		VALIDATION: Checks PI AF Server SPN assignment.
 		COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. This makes Kerberos Authentication possible.
 		For more information, see "PI AF and Kerberos authentication" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D
 
 		AU30008 - PI AF Server Admin Right
-		VALIDATION: verifies PI AF Server Admin right on the server object is not set improperly. 
-		COMPLIANCE: for compliance, there should be a single identity with the Admin right at the server 
-		level.  That identity should have a single custom account or group mapped to it.  Admin rights 
+		VALIDATION: Verifies PI AF Server Admin right on the server object is not set improperly. 
+		COMPLIANCE: Ensure there is a single identity with the Admin right at the server level.
+		That identity should have a single custom account or group mapped to it.  Admin rights 
 		at the server level should not be necessary for ordinary administration tasks.
 		For more information, see "PI AF Access rights" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
@@ -319,94 +327,98 @@ VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 		https://msdn.microsoft.com/en-us/library/ms144284.aspx
 
 		AU30010 - Restrict AF World Identity
-		VERIFICATION: Ensures that the World Identity has been disabled or restricted 
-		COMPLIANCE: For best practice, disable the World Identity on the AF Server. 
+		VERIFICATION: Verifies the World Identity has been disabled or restricted 
+		COMPLIANCE: Ensure that the World Identity is disabled on the AF Server. 
 		Alternatively, remove the mapping to the \Everyone group and re-map it to 
-		an appropriate group with only users who need access to PI AF.
+		an appropriate group with only users who need access to PI AF.  For more 
+		information on default PI AF Identities, see:
+		<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0" >https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0
 
 		AU30011 - Restrict Write Access
 		VERIFICATION: Write access to objects should be limited to power users. 
 		COMPLIANCE: Database level write access should not be granted to any well-known, 
-		end user groups. Similarly, write access to analyses should be limited. 
+		end user groups, such as \Everyone or Domain Users. Similarly, write access to 
+		analyses should be limited. For more information on PI AF access writes, please 
+		see: <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399" >https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
 
 		AU40001 - SQL Server xp_CmdShell Check
-		VALIDATION: verifies that SQL Server does not have xp_CmdShell enabled.
-		COMPLIANCE: disable xp_CmdShell configuration option.  This option can be configured 
+		VALIDATION: Verifies that SQL Server does not have xp_CmdShell enabled.
+		COMPLIANCE: Disable xp_CmdShell configuration option.  This option can be configured 
 		using the Policy-Based Management or the sp_configure stored procedure.  For more 
 		information, see:
 		https://msdn.microsoft.com/en-us/library/ms190693.aspx
 
 		AU40002 - SQL Server Adhoc Queries Check
-		VALIDATION: verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.    
-		COMPLIANCE: disable Ad Hoc Distributed Queries configuration option.  This option can be 
+		VALIDATION: Verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.    
+		COMPLIANCE: Disable Ad Hoc Distributed Queries configuration option.  This option can be 
 		configured using the Policy-Based Management or the sp_configure stored procedure. For more 
 		information, see: 
 		https://msdn.microsoft.com/en-us/library/ms187569.aspx 
 
 		AU40003 - SQL Server DB Mail XPs Check
-		VALIDATION CHECK: verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.</br>
-		FOR COMPLIANCE: disable Database Mail XPs configuration option.  This option can be configured 
+		VALIDATION CHECK: Verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.</br>
+		FOR COMPLIANCE: Disable Database Mail XPs configuration option.  This option can be configured 
 		using the Policy-Based Management or the sp_configure stored procedure. For more information, 
 		see:
 		https://msdn.microsoft.com/en-us/library/ms191189.aspx
 
 		AU40004 - SQL Server OLE Automation Procedures Check
-		VALIDATION: verifies that SQL Server does not have OLE Automation Procedures enabled. 
-		COMPLIANCE: disable the OLE Automation Procedures configuration option.  This option can 
+		VALIDATION: Verifies that SQL Server does not have OLE Automation Procedures enabled. 
+		COMPLIANCE: Disable the OLE Automation Procedures configuration option.  This option can 
 		be configured using the Policy-Based Management or the sp_configure stored procedure. For 
 		more information, see:
 		https://msdn.microsoft.com/en-us/library/ms191188.aspx
 
-		AU40008 - SQL Server sa Login Check
-		VALIDATION: verifies that SQL Server does not have the sa login enabled 
-		enabled. 
-		COMPLIANCE: disable the sa login.  This option can 
-		be configured using the Policy-Based Management or the sp_configure 
-		stored procedure. For more information, see:
-		https://msdn.microsoft.com/en-us/library/ms191188.aspx
-
-		AU40007 - SQL Server Remote Access Option Check
-		VALIDATION: verifies that SQL Server does not have Remote Access 
-		enabled. 
-		COMPLIANCE: disable the Remote Access option.  This option can 
-		be configured using the Policy-Based Management or the sp_configure 
-		stored procedure. For more information, see:
-		https://msdn.microsoft.com/en-us/library/ms191188.aspx
-
-		AU40006 - SQL Server Cross DB Ownership Chaining Option Check
-		VALIDATION: verifies that SQL Server does not have Cross DB Ownership 
-		Chaining enabled. 
-		COMPLIANCE: disable the Cross DB Ownership Chaining option.  This option 
-		can be configured using the Policy-Based Management or the sp_configure 
-		stored procedure. For more information, see:
-		https://msdn.microsoft.com/en-us/library/ms191188.aspx
-
 		AU40005 - SQL Server CLR Configuration Option Check
-		VALIDATION: verifies that SQL Server does not have CLR enabled. 
-		COMPLIANCE: disable the CLR option.  This option can be configured using 
+		VALIDATION: Verifies that SQL Server does not have CLR enabled. 
+		COMPLIANCE: Disable the CLR option.  This option can be configured using 
 		the Policy-Based Management or the sp_configure stored procedure. For 
 		more information, see:
 		https://msdn.microsoft.com/en-us/library/ms191188.aspx
 
-		AU50001 - Check for latest version of PI Vision
+		AU40006 - SQL Server Cross DB Ownership Chaining Option Check
+		VALIDATION: Verifies that SQL Server does not have Cross DB Ownership 
+		Chaining enabled. 
+		COMPLIANCE: Disable the Cross DB Ownership Chaining option.  This option 
+		can be configured using the Policy-Based Management or the sp_configure 
+		stored procedure. For more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
+		AU40007 - SQL Server Remote Access Option Check
+		VALIDATION: Verifies that SQL Server does not have Remote Access 
+		enabled. 
+		COMPLIANCE: Disable the Remote Access option.  This option can 
+		be configured using the Policy-Based Management or the sp_configure 
+		stored procedure. For more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
+		AU40008 - SQL Server sa Login Check
+		VALIDATION: Verifies that SQL Server does not have the sa login enabled 
+		enabled. 
+		COMPLIANCE: Disable the sa login.  This option can 
+		be configured using the Policy-Based Management or the sp_configure 
+		stored procedure. For more information, see:
+		https://msdn.microsoft.com/en-us/library/ms191188.aspx
+
+		AU50001 - PI Vision Version
 		VALIDATION: verifies PI Vision version.
 		COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
 		see "Upgrade a PI Vision installation" in the PI Live Library.
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6
 
-		AU50002 - Check PI Vision AppPools identity
+		AU50002 - PI Vision AppPool Identities
 		VALIDATION: checks PI Vision AppPool identity.
 		COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not ideal. 
 		For more information, see "Create a service account for PI Vision" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411
 
-		AU50003 - PI Vision SSL check
+		AU50003 - PI Vision SSL
 		VALIDATION: Checks whether SSL is enabled and enforced on the PI Vision Web Site.
 		COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
 		For more information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live Library. 
 		https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
 
-		AU50004 - PI Vision SPN check
+		AU50004 - PI Vision SPN
 		VALIDATION: Checks PI Vision SPN assignment. 
 		COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool account. This makes Kerberos Authentication possible.
 		For more information, see the PI Live Library link below. 
@@ -430,6 +442,13 @@ CONTRIBUTE
 	If you encounter a bug, please submit it as an issue on the GitHub repo
 	or fix the bug and submit a pull request!
         https://github.com/osisoft/PI-System-Audit-Tools/issues
+
+
+
+
+
+
+
 
 
 

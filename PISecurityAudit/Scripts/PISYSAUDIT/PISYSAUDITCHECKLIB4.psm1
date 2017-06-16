@@ -67,10 +67,10 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLAdHocQueries"             1 # AU40002 
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLDBMailXPs"                1 # AU40003
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLOLEAutomationProcs"       1 # AU40004
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLsa"                       1 # AU40005
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLRemoteAccess"             1 # AU40006
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLCrossDBOwnershipChaining" 1 # AU40007
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLCLR"                      1 # AU40008
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLCLR"                      1 # AU40005
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLCrossDBOwnershipChaining" 1 # AU40006
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLRemoteAccess"             1 # AU40007
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSQLsa"                       1 # AU40008
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt	
@@ -82,8 +82,8 @@ function Get-PISysAudit_CheckSQLXPCommandShell
 .SYNOPSIS
 AU40001 - SQL Server xp_CmdShell Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have xp_CmdShell enabled.<br/>
-COMPLIANCE: disable xp_CmdShell configuration option.  This option can be configured 
+VALIDATION: Verifies that SQL Server does not have xp_CmdShell enabled.<br/>
+COMPLIANCE: Disable xp_CmdShell configuration option.  This option can be configured 
 using the Policy-Based Management or the sp_configure stored procedure.  For more 
 information, see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms190693.aspx">https://msdn.microsoft.com/en-us/library/ms190693.aspx</a>
@@ -189,8 +189,8 @@ function Get-PISysAudit_CheckSQLAdHocQueries
 .SYNOPSIS
 AU40002 - SQL Server Adhoc Queries Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.<br/>    
-COMPLIANCE: disable Ad Hoc Distributed Queries configuration option.  This option can be 
+VALIDATION: Verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.<br/>    
+COMPLIANCE: Disable Ad Hoc Distributed Queries configuration option.  This option can be 
 configured using the Policy-Based Management or the sp_configure stored procedure. For more 
 information, see:<br/> 
 <a href="https://msdn.microsoft.com/en-us/library/ms187569.aspx">https://msdn.microsoft.com/en-us/library/ms187569.aspx </a>
@@ -296,8 +296,8 @@ function Get-PISysAudit_CheckSQLDBMailXPs
 .SYNOPSIS
 AU40003 - SQL Server DB Mail XPs Check
 .DESCRIPTION
-VALIDATION CHECK: verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.</br>
-FOR COMPLIANCE: disable Database Mail XPs configuration option.  This option can be configured 
+VALIDATION CHECK: Verifies that SQL Server does not have Ad Hoc Distributed Queries enabled.</br>
+FOR COMPLIANCE: Disable Database Mail XPs configuration option.  This option can be configured 
 using the Policy-Based Management or the sp_configure stored procedure. For more information, 
 see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms191189.aspx">https://msdn.microsoft.com/en-us/library/ms191189.aspx</a>
@@ -404,8 +404,8 @@ function Get-PISysAudit_CheckSQLOLEAutomationProcs
 .SYNOPSIS
 AU40004 - SQL Server OLE Automation Procedures Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have OLE Automation Procedures enabled.<br/> 
-COMPLIANCE: disable the OLE Automation Procedures configuration option.  This option can 
+VALIDATION: Verifies that SQL Server does not have OLE Automation Procedures enabled.<br/> 
+COMPLIANCE: Disable the OLE Automation Procedures configuration option.  This option can 
 be configured using the Policy-Based Management or the sp_configure stored procedure. For 
 more information, see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
@@ -511,8 +511,8 @@ function Get-PISysAudit_CheckSQLCLR
 .SYNOPSIS
 AU40005 - SQL Server CLR Configuration Option Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have CLR enabled.<br/> 
-COMPLIANCE: disable the CLR option.  This option can be configured using 
+VALIDATION: Verifies that SQL Server does not have CLR enabled.<br/> 
+COMPLIANCE: Disable the CLR option.  This option can be configured using 
 the Policy-Based Management or the sp_configure stored procedure. For 
 more information, see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
@@ -618,9 +618,9 @@ function Get-PISysAudit_CheckSQLCrossDBOwnershipChaining
 .SYNOPSIS
 AU40006 - SQL Server Cross DB Ownership Chaining Option Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have Cross DB Ownership 
+VALIDATION: Verifies that SQL Server does not have Cross DB Ownership 
 Chaining enabled.<br/> 
-COMPLIANCE: disable the Cross DB Ownership Chaining option.  This option 
+COMPLIANCE: Disable the Cross DB Ownership Chaining option.  This option 
 can be configured using the Policy-Based Management or the sp_configure 
 stored procedure. For more information, see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
@@ -726,9 +726,9 @@ function Get-PISysAudit_CheckSQLRemoteAccess
 .SYNOPSIS
 AU40007 - SQL Server Remote Access Option Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have Remote Access 
+VALIDATION: Verifies that SQL Server does not have Remote Access 
 enabled.<br/> 
-COMPLIANCE: disable the Remote Access option.  This option can 
+COMPLIANCE: Disable the Remote Access option.  This option can 
 be configured using the Policy-Based Management or the sp_configure 
 stored procedure. For more information, see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
@@ -834,9 +834,9 @@ function Get-PISysAudit_CheckSQLsa
 .SYNOPSIS
 AU40008 - SQL Server sa Login Check
 .DESCRIPTION
-VALIDATION: verifies that SQL Server does not have the sa login enabled 
+VALIDATION: Verifies that SQL Server does not have the sa login enabled 
 enabled.<br/> 
-COMPLIANCE: disable the sa login.  This option can 
+COMPLIANCE: Disable the sa login.  This option can 
 be configured using the Policy-Based Management or the sp_configure 
 stored procedure. For more information, see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/ms191188.aspx">https://msdn.microsoft.com/en-us/library/ms191188.aspx</a>
@@ -1047,10 +1047,10 @@ Export-ModuleMember Get-PISysAudit_CheckSQLXPCommandShell
 Export-ModuleMember Get-PISysAudit_CheckSQLAdHocQueries
 Export-ModuleMember Get-PISysAudit_CheckSQLDBMailXPs
 Export-ModuleMember Get-PISysAudit_CheckSQLOLEAutomationProcs
-Export-ModuleMember Get-PISysAudit_CheckSQLsa
-Export-ModuleMember Get-PISysAudit_CheckSQLRemoteAccess
-Export-ModuleMember Get-PISysAudit_CheckSQLCrossDBOwnershipChaining
 Export-ModuleMember Get-PISysAudit_CheckSQLCLR
+Export-ModuleMember Get-PISysAudit_CheckSQLCrossDBOwnershipChaining
+Export-ModuleMember Get-PISysAudit_CheckSQLRemoteAccess
+Export-ModuleMember Get-PISysAudit_CheckSQLsa
 # </Do not remove>
 
 # ........................................................................
