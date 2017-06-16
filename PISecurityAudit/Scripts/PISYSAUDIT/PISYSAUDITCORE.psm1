@@ -5352,6 +5352,21 @@ PROCESS
 	Write-PISysAudit_LogMessage $msg "Info" $fn -sc $true
 	$msg = "----- Audit Completed -----"
 	Write-PISysAudit_LogMessage $msg "Info" $fn 
+	
+	$InstallationType = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "InstallationType" | Select-Object -ExpandProperty "InstallationType" | Out-String
+	if($ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage' -and $InstallationType -ne 'Server Core')
+	{
+		$title = "PI Security Audit Report"
+		$message = "Would you like to view the PI Security Audit Report now?"
+		$yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes","Open the report in your default browser."
+		$no = New-Object System.Management.Automation.Host.ChoiceDescription "&No","View the report later."
+		$options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
+
+		$result = $host.ui.PromptForChoice($title, $message, $options, 0) 
+		if($result -eq 0)
+		{ Start-Process -FilePath $(PathConcat $exportPath -ChildPath $reportName) }
+	}
+
 }
 
 END {}

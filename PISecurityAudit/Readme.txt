@@ -7,14 +7,21 @@ If targeting a remote machine with the scripts then PS-Remoting must be enabled 
 	Test-WSMan -authentication default -ComputerName <TargetComputer>
 
 Modules: 
-WebAdministration Module: the IIS Management PowerShell module must be installed on the target web server to read IIS configuration data when performing a PI Vision role audit.
-OSIsoft.PowerShell: PowerShell Tools for the PI System are required for the PI Data Archive and PI AF Server checks.
+The following role audit checks have specific module requirements below.
+PI Vision: 
++WebAdministration (IIS Management) - must be installed on the target web server to read IIS configuration data when performing a PI Vision role audit.
+PI AF Server: 
++OSIsoft.PowerShell (PowerShell Tools for the PI System) - must be installed on machine running the PI Security Audit Tools script
+PI Data Archive: 
++OSIsoft.PowerShell (PowerShell Tools for the PI System) - must be installed on machine running the PI Security Audit Tools script
+SQL Server: 
++SQLPS - must be installed on machine running the PI Security Audit Tools script.  To install the SQLPS module with minimal other components on Windows 8/Server 2012 or later, go to https://www.microsoft.com/en-us/download/details.aspx?id=52676 and select ENU\x64\PowerShellTools.msi, ENU\x64\SharedManagementObjects.msi and ENU\x64\SQLSysClrTypes.msi.
 
 Permissions:
-PI Data Archive - Read access to PIDBSEC, PIMAPPING, PITRUST, PIUSER and PITUNING in database security.
+PI Data Archive - Read access to PIDBSEC, PIMAPPING, PIMSGSS, PITRUST, PIUSER and PITUNING in database security.
 PI AF Server - Process must be run as administrator to access AFDiag locally.
 PI Vision - Process must be run as administrator to access IIS Configuration data.
-SQL Server - Login with the public server role.
+SQL Server - The user executing the scripts must have a Login with the public server role.
 
 #############################
 # Preparing to run the tool #
