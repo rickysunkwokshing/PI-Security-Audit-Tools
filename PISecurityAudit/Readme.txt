@@ -72,6 +72,9 @@ Finally, when you are done adding components, launch the audit with the piaudit 
 
 Open the generated *.html file from the Export folder in your favorite browser and examine the results.  
 
+To run all checks, including potentially time consuming checks like connection auditing, increase the AuditLevel (alias: lvl).  Currently supported options are Basic and Verbose.
+	piaudit -cpt $cpt -lvl Verbose
+
 #############################
 # Running a batch of audits #
 #############################
