@@ -1376,9 +1376,10 @@ PROCESS
 		$version = $global:PIDataArchiveConfiguration.Connection.ServerVersion
 		if($version.Major -ge 3 -and $version.Minor -ge 4 -and $version.Build -ge 395)
 		{
-			$processedPIConnectionStats = $global:PIDataArchiveConfiguration.ConnectionStatistics
+			$processedPIConnectionStats = @()
+			$processedPIConnectionStats += $global:PIDataArchiveConfiguration.ConnectionStatistics
 
-			if($null -ne $processedPIConnectionStats)
+			if($null -ne $processedPIConnectionStats -and $processedPIConnectionStats.Count -ne 0)
 			{
 				$countSecured = $processedPIConnectionStats.SecureStatus | Where-Object { $_ -eq 'Secure' } | Measure-Object | Select-object -ExpandProperty count	
 				if($countSecured -eq $processedPIConnectionStats.Count)	
