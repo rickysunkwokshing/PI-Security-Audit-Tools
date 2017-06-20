@@ -2275,7 +2275,7 @@ PROCESS
 	try
 	{
 		If ($UserString.ToLower() -in 
-				@("localsystem", "networkservice", "localservice",
+				@("localsystem", "networkservice", "localservice", "local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
 					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
@@ -2450,8 +2450,11 @@ PROCESS
 			switch ($Account.UserName)
 			{
 				"LocalSystem" { $Account.UserName = "SYSTEM" }
+				"Local System" { $Account.UserName = "SYSTEM" }
 				"LocalService" { $Account.UserName = "Local Service" }
+				"Local Service" { $Account.UserName = "Local Service" }
 				"NetworkService" { $Account.UserName = "Network Service" }
+				"Network Service" { $Account.UserName = "Network Service" }
 			}
 			$filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
 		}

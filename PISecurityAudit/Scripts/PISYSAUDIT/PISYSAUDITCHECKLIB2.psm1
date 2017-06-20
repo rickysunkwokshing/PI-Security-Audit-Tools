@@ -1186,7 +1186,7 @@ PROCESS
 	try
 	{		
 		$osInstallationType = $global:MachineConfiguration.InstallationType
-		if($osInstallationType -eq 'Server Core')
+		if($osInstallationType -ne 'Server Core')
 		{
 			$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName	-dbgl $DBGLevel
 			$procBook = $installedPrograms | Where-Object DisplayName -Like 'PI Processbook*'
