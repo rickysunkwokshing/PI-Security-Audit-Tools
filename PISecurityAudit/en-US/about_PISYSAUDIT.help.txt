@@ -16,81 +16,7 @@ LONG DESCRIPTION
 	collection logic and four library scripts containing the validation logic for different 
 	topics such as best practices to harden the machine, PI Data Archive, etc. The module exposes 
 	several cmdlets either used for the internal logic or the external interface with the 
-	end-user.
-
-	The PI System Audit Module (PISysAudit) requires PowerShell version 2 and later, it can 
-	be executed locally or remotely and make use of existing command line utilities to 
-	perform many tasks. This allows being compatible with many versions of the PI System.
-
-	The current version of the PISysAudit module implements 16 validations covering: 
-	machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX) and SQL Server (AU4XXXX) 
-	best practices with the PI System.	
-        
-RUNNING THE PI SECURITY AUDIT SCRIPTS
-		
-	# Import the module
-	$modulePath = "<path to folder with pisysaudit.psd1>"
-	Import-Module $modulePath
-
-	# Example 1
-	# Example with all local and default parameters
-	piaudit
-
-	# Example 2
-	# Example with specific parameters for each server/PI Component.
-	$cpt = piauditparams $null "myPI" "PIServer"
-	$cpt = piauditparams $cpt "myPI" "PIAFServer"
-	$cpt = piauditparams $cpt "myPI" "SQLServer" -InstanceName "myinstance" 
-	# -IntegratedSecurity $false -user "sa" -pf "p1.dat"
-	$cpt = piauditparams $cpt "myPI" "PIVisionServer"
-	piaudit -cpt $cpt
-
-	# Example 3
-	# Save the password on disk
-	pwdondisk
-
-	# Example with specific parameters for each server/PI Component.
-	# Use the name of the password file to pass to use SQL Account authentication.
-	$cpt = piauditparams $null "myPI" "PIServer"
-	$cpt = piauditparams $cpt "myPI" "PIAFServer"
-	$cpt = piauditparams $cpt "myPI" "SQLServer" -InstanceName "myinstance" `
-	-IntegratedSecurity $false -user "sa" -pf "p1.dat"
-	$cpt = piauditparams $cpt "myPI" "PIVisionServer"
-	piaudit -cpt $cpt
-
-	# Example 4
-	# Example with specific parameters for each server/PI Component.
-	# You will be prompted for entering a password for the SQL Account authentication.
-	$cpt = piauditparams $null "myPI" "PIServer"
-	$cpt = piauditparams $cpt "myPI" "PIAFServer"
-	$cpt = piauditparams $cpt "myPI" "SQLServer" -InstanceName "myinstance" `
-	-IntegratedSecurity $false -user "sa"
-	$cpt = piauditparams $cpt "myPI" "PIVisionServer"
-	piaudit -cpt $cpt
-
-	# Example 5
-	# Disable the obfuscation of computer names in the report
-	piaudit -obf $false 
-
-	# Example 6
-	# Disable the output to screen when used with scheduled task.
-	piaudit -ShowUI $false 
-
-	# Example 7
-	# CSV file with parameters
-	piaudit -cpf "Servers.csv"
-	# Sample contents for CSV file.  Note: headings must be specified.
-	# Servers.csv
-	ComputerName,PISystemComponentType,InstanceName,IntegratedSecurity,SQLServerUserID,PasswordFile
-	mySQL1,sql,sqlexpress,false,myTestUser,
-	myPI1,pidataarchive,,,,
-	myPI1,piaf,,,,
-	# If no SQL Servers are included, the file can be simplified to two columns
-	# Servers.csv
-	ComputerName,PISystemComponentType
-	myPI1,piaf
-	myPI1,pidataarchive
-	myPI2,pivision
+	end-user.	
 
 VALIDATION CHECKS AND COMPLIANCE CONDITIONS
 	
@@ -437,22 +363,8 @@ EXTENSIBILITY
 CONTRIBUTE
 
         This project is published on GitHub:
-        https://github.com/osisoft/PI-System-Audit-Tools/issues
+        https://github.com/osisoft/PI-System-Audit-Tools/
         
 	If you encounter a bug, please submit it as an issue on the GitHub repo
 	or fix the bug and submit a pull request!
         https://github.com/osisoft/PI-System-Audit-Tools/issues
-
-
-
-
-
-
-
-
-
-
-
-
-
-
