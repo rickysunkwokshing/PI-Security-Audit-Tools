@@ -2275,8 +2275,10 @@ PROCESS
 	try
 	{
 		If ($UserString.ToLower() -in 
-				@("localsystem", "networkservice", "localservice", "local system", "network service", "local service",
+				@("localsystem", "networkservice", "localservice", 
+					"local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
+					"nt authority\local system", "nt authority\network service", "nt authority\local service",
 					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
@@ -3147,7 +3149,7 @@ PROCESS
 		$scriptBlock = { 
 			
 			[xml]$Policy = Get-AppLockerPolicy -Effective -XML 
-			$ServiceEnabled = $(Get-Service -Name AppIDSvc | Select-Object -ExpandProperty StartType | Out-String).ToLower() -ne "disabled"
+			$ServiceEnabled = $(Get-WmiObject -Class Win32_Service -Filter "Name='AppIdSvc'" -Property StartMode | Select-Object -ExpandProperty StartMode | Out-String).ToLower() -ne "disabled"
 
 			$AppLockerConfiguration = New-Object PSCustomObject
 			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name Policy -Value $Policy
