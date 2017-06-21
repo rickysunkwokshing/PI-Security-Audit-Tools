@@ -3942,7 +3942,7 @@ PROCESS
 		}
 		
 		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
-		$spnCheck = $(setspn -l $accountNane) 2>null 
+		$spnCheck = $(setspn -l $accountNane 2>$null) 
 
 		# Null if something went wrong
 		if($null -eq $spnCheck)
