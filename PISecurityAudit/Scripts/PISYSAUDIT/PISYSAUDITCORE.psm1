@@ -63,11 +63,13 @@ function SetFolders
 	
 	$exportPath = PathConcat -ParentPath $rootPath -ChildPath "Export"
 	if (!(Test-Path $exportPath)){
-	New-Item $exportPath -type directory
+	$result = New-Item $exportPath -type directory
+	Write-Host $("Export directory added: " + $result)
 	}
 	$scriptsPathTemp = PathConcat -ParentPath $scriptsPath -ChildPath "Temp"
 	if (!(Test-Path $scriptsPathTemp)){
-	New-Item $scriptsPathTemp -type directory
+	$result = New-Item $scriptsPathTemp -type directory
+	Write-Host $("Script temp directory added: " + $result)
 	}
 
 	$pwdPath = PathConcat -ParentPath $rootPath -ChildPath "pwd"		
