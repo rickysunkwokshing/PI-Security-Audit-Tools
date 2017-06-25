@@ -313,7 +313,7 @@ PROCESS
 		$ServiceName = 'afservice'
 		$ServiceAccount = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 		# No need to check specific privileges if the service account is an admin.
-		$IsServiceAccountLocalAdmin = Get-PISysAudit_GroupMembers -GroupName "Administrators" -GroupDomain "local" -LocalComputer $false -RemoteComputerName $RemoteComputerName -CheckUser $ServiceAccount
+		$IsServiceAccountLocalAdmin = Get-PISysAudit_GroupMembers -GroupName "Administrators" -GroupDomain "local" -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -CheckUser $ServiceAccount
 		if($ServiceAccount.ToLower() -eq $('nt service\' + $ServiceName))
 		{
 			$result = $true

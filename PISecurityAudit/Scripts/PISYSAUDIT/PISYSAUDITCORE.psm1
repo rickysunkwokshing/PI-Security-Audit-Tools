@@ -63,11 +63,13 @@ function SetFolders
 	
 	$exportPath = PathConcat -ParentPath $rootPath -ChildPath "Export"
 	if (!(Test-Path $exportPath)){
-	New-Item $exportPath -type directory
+	$result = New-Item $exportPath -type directory
+	Write-Host $("Export directory added: " + $result)
 	}
 	$scriptsPathTemp = PathConcat -ParentPath $scriptsPath -ChildPath "Temp"
 	if (!(Test-Path $scriptsPathTemp)){
-	New-Item $scriptsPathTemp -type directory
+	$result = New-Item $scriptsPathTemp -type directory
+	Write-Host $("Script temp directory added: " + $result)
 	}
 
 	$pwdPath = PathConcat -ParentPath $rootPath -ChildPath "pwd"		
@@ -2275,8 +2277,10 @@ PROCESS
 	try
 	{
 		If ($UserString.ToLower() -in 
-				@("localsystem", "networkservice", "localservice",
+				@("localsystem", "networkservice", "localservice", 
+					"local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
+					"nt authority\local system", "nt authority\network service", "nt authority\local service",
 					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
@@ -2450,8 +2454,11 @@ PROCESS
 			switch ($Account.UserName)
 			{
 				"LocalSystem" { $Account.UserName = "SYSTEM" }
+				"Local System" { $Account.UserName = "SYSTEM" }
 				"LocalService" { $Account.UserName = "Local Service" }
+				"Local Service" { $Account.UserName = "Local Service" }
 				"NetworkService" { $Account.UserName = "Network Service" }
+				"Network Service" { $Account.UserName = "Network Service" }
 			}
 			$filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
 		}
@@ -3144,7 +3151,7 @@ PROCESS
 		$scriptBlock = { 
 			
 			[xml]$Policy = Get-AppLockerPolicy -Effective -XML 
-			$ServiceEnabled = $(Get-Service -Name AppIDSvc | Select-Object -ExpandProperty StartType | Out-String).ToLower() -ne "disabled"
+			$ServiceEnabled = $(Get-WmiObject -Class Win32_Service -Filter "Name='AppIdSvc'" -Property StartMode | Select-Object -ExpandProperty StartMode | Out-String).ToLower() -ne "disabled"
 
 			$AppLockerConfiguration = New-Object PSCustomObject
 			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name Policy -Value $Policy
@@ -3937,7 +3944,7 @@ PROCESS
 		}
 		
 		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
-		$spnCheck = $(setspn -l $accountNane) 2>null 
+		$spnCheck = $(setspn -l $accountNane 2>$null) 
 
 		# Null if something went wrong
 		if($null -eq $spnCheck)
