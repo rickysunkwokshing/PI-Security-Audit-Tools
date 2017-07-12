@@ -231,7 +231,7 @@ PROCESS
 		# Form an integer value with all the version tokens.
 		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
 		$installVersionInt64 = [int64]$temp
-		if($installVersionInt64 -ge 3004)
+		if($installVersionInt64 -ge 3200)
 		{
 			$result = $true
 			$msg = "Version is compliant."
