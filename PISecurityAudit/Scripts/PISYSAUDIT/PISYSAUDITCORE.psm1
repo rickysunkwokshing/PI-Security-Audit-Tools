@@ -539,13 +539,10 @@ param(
 		
 		# Decrypt.
 		
-		# If you want to use Windows Data Protection API (DPAPI) to encrypt the standard string representation
-		# leave the key undefined. Visit this URL: http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
-		# This salt key had been generated with the Set-PISysAudit_SaltKey cmdlet.
-		# $mySaltKey = "Fnzg+mrVxXEEmfEMzFwiag=="
-		# $keyInBytes = [System.Convert]::FromBase64String($mySaltKey)
-		# $securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString -key $keyInBytes				
-		$securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString -key (1..16)			
+		# Key is undefined to use Windows Data Protection API (DPAPI) to encrypt the standard string.
+		# Visit this URL: http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
+						
+		$securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString		
 		
 		# Return the password.
 		return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePWD))					
@@ -1741,54 +1738,6 @@ END {}
 #End of exported function
 #***************************
 }
-				
-function Set-PISysAudit_SaltKey
-{
-<#  
-.SYNOPSIS
-(Core functionality) Create a crypto salt key (16 digits).
-.DESCRIPTION
-Create a crypto salt key (16 digits).
-#>
-BEGIN {}
-PROCESS
-{
-	$fn = GetFunctionName
-	
-	try
-	{
-		# Initialize the module if needed	
-		Initialize-PISysAudit
-			
-		# Read from the global constant bag.
-		$isPISysAuditInitialized = (Get-Variable "PISysAuditInitialized" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-		# If initialization failed, leave the function.
-		if(($null -eq $isPISysAuditInitialized) -or ($isPISysAuditInitialized -eq $false))
-		{
-			$msg = "This script won't execute because initialization has not completed"
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
-			return
-		}
-		
-		$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()		
-		$myKey = New-Object System.Byte[] 16
-		$rng.GetBytes($myKey)
-		return [System.Convert]::ToBase64String($myKey)		
-	}
-	catch
-	{
-		# Return the error message.
-		$msg = "The creation of a cryptokey has failed."								
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-	}
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
   
 function New-PISysAudit_PasswordOnDisk
 {
@@ -1838,13 +1787,9 @@ PROCESS
 		
 		# Encrypt.	
 		
-		# If you want to use Windows Data Protection API (DPAPI) to encrypt the standard string representation
-		# leave the key undefined. Visit this URL: http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
-		# This salt key had been generated with the Set-PISysAudit_SaltKey cmdlet.
-		# $mySaltKey = "Fnzg+mrVxXEEmfEMzFwiag=="
-		# $keyInBytes = [System.Convert]::FromBase64String($mySaltKey)			
-		# $securePWD = ConvertFrom-SecureString $pwd -key $keyInBytes
-		$securepwd = ConvertFrom-SecureString $pwd -key (1..16)
+		# Key is left undefined to leverage the Windows Data Protection API (DPAPI) to encrypt the standard string.
+		# Visit http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
+		$securepwd = ConvertFrom-SecureString $pwd
 				
 		# Save.
 		Out-File -FilePath $pwdFile -InputObject $securePWD
@@ -5442,7 +5387,6 @@ Set-Alias pwdondisk New-PISysAudit_PasswordOnDisk
 # <Do not remove>
 Export-ModuleMember PathConcat
 Export-ModuleMember Initialize-PISysAudit
-Export-ModuleMember Set-PISysAudit_SaltKey
 Export-ModuleMember Get-PISysAudit_EnvVariable
 Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey
