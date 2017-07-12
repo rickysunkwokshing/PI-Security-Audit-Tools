@@ -2,15 +2,13 @@
 
 ## Contents
 
-This project is a framework to baseline the security configuration of your PI System, built as a PowerShell module containing cmdlets to perform different calls to collect the data from the security settings of specified PI System components.
-
-The PI Security Audit Tools module (PISysAudit) can be executed locally or remotely to validate the security configuration of various PI System components: PI Data Archive, PI AF Server, PI Vision, SQL Server and the hosting OS.  
+The PI Security Audit Tools project is a framework to baseline the security configuration of your PI System.  The module (PISysAudit) can be executed locally or remotely to validate the security configuration of various PI System components: PI Data Archive, PI AF Server, PI Vision, SQL Server and the hosting OS.  
 
 ## Getting Started
 
-You can access the latest release version of the PI Security Audit Tools from the [Releases](https://github.com/osisoft/PI-Security-Audit-Tools/releases) section of this repository.
+Get the latest release version of the PI Security Audit Tools from [Releases](https://github.com/osisoft/PI-Security-Audit-Tools/releases).
 
-For setup and operation instructions, see the readme.txt [here](https://github.com/osisoft/PI-Security-Audit-Tools/blob/master/PISecurityAudit/Readme.txt) or in the PISecurityAudit folder.
+Find setup and operation instructions in the readme.txt [here](https://github.com/osisoft/PI-Security-Audit-Tools/blob/master/PISecurityAudit/Readme.txt) or in the PISecurityAudit folder when you download the tools.
 
 Check out the [Wiki](https://github.com/osisoft/PI-Security-Audit-Tools/wiki) for tutorials and more information on the project.
 
