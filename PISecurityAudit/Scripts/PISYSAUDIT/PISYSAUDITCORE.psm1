@@ -3770,28 +3770,31 @@ PROCESS
 				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
 				foreach($message in $connectionMessages)
 				{
-					# Extract the connection ID
-					$startID = $message.Message.IndexOf('ID:') + 3
-					$endID = $message.Message.IndexOf('. Address:')
-					[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
-					
-					# Check ID against the set of connections
-					if($connectionId -eq $PIConnection.ID)
+					if($message.ID -eq 7082)
 					{
-						# Parse the Method attribute out of the message text
-						$startMethod = $message.Message.IndexOf('. Method:') + 9
-						$connectionMethod = $message.Message.Substring($startMethod).Trim()
+						# Extract the connection ID
+						$startID = $message.Message.IndexOf('ID:') + 3
+						$endID = $message.Message.IndexOf('. Address:')
+						[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
+					
+						# Check ID against the set of connections
+						if($connectionId -eq $PIConnection.ID)
+						{
+							# Parse the Method attribute out of the message text
+							$startMethod = $message.Message.IndexOf('. Method:') + 9
+							$connectionMethod = $message.Message.Substring($startMethod).Trim()
 						
-						# Parse the cipher info
-						$startCipher = $connectionMethod.IndexOf('(') + 1
-						$endCipher = $connectionMethod.IndexOf(')')
-						$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+							# Parse the cipher info
+							$startCipher = $connectionMethod.IndexOf('(') + 1
+							$endCipher = $connectionMethod.IndexOf(')')
+							$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
 						
-						if($connectionMethod -match 'HMAC')
-						{ $SecureStatus = "Secure" }
-						else
-						{ $SecureStatus = "Not Secure" }
-						$SecureStatusDetail = $cipherInfo
+							if($connectionMethod -match 'HMAC')
+							{ $SecureStatus = "Secure" }
+							else
+							{ $SecureStatus = "Not Secure" }
+							$SecureStatusDetail = $cipherInfo
+						}
 					}
 				}
 			}
