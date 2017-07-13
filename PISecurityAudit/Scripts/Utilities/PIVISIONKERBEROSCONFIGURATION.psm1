@@ -66,7 +66,7 @@ Query AD for the object type of the service account.  This function requires RSA
 	# Check for Local Account, Machine Account or Null value
 	$blnDomainResolved = $null -ne $ServiceAccountDomain -and $ServiceAccountDomain -ne '.' -and $ServiceAccountDomain -ne 'MACHINEACCOUNT'
 	If (!$blnDomainResolved -and `
-	   ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "AFService")) 
+	   ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "Local System" -or $ServiceAccount -eq "NetworkService" -or $ServiceAccount -eq "Network Service" -or $ServiceAccount -eq "AFService")) 
 		{ 
 			# Truncate to the hostname for processing of logon type
 			$pos = $ComputerName.IndexOf('.')
@@ -132,6 +132,7 @@ Verify PI and AF Server SPN configuration. This function uses setspn.exe tool.
 		# BACK-END (PI/AF) SPN CHECK
 		
 		# Construct short and FQDN of the back end service.
+		$dot = "."
 		If ($PIorAFServer -match [regex]::Escape($dot)) { 
 		$fqdnpiaf = $PIorAFServer.ToLower() 
 		$pos = $fqdnpiaf.IndexOf(".")
@@ -151,7 +152,7 @@ Verify PI and AF Server SPN configuration. This function uses setspn.exe tool.
 		# PI/AF is remote. Delegation is required.
 		Else {
 			$result = Invoke-PISysAudit_SPN -svctype $serviceType -svcname $serviceName -lc $false -rcn $PIorAFServer -dbgl $DBGLevel
-			$dot = "."
+			
 			If ($result -ne $null) {
 
 				# All good.
@@ -229,8 +230,7 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 		$DBGLevel = 0	
 	)	
 
-    If ($ServiceAccount -eq "LocalSystem" -or $ServiceAccount -eq "NetworkService" `
-		-or $ServiceAccount -eq "AFService")  
+    If ($ServiceAccountType -eq 2)  
 	{ 
 		# Truncate to the hostname for processing of logon type
 		$pos = $ComputerName.IndexOf('.')
@@ -876,6 +876,9 @@ Function Initialize-KerberosConfigurationTest
 		[alias("cn")]
 		[string] $ComputerName,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean] $LocalComputer,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("kc")]
 		[ValidateSet('None','Classic','ResourceBased','Menu')]
 		[string] $KerberosCheck,
@@ -895,7 +898,7 @@ Function Initialize-KerberosConfigurationTest
 	$global:strSPNS = $null
 
 	# Test non-local computer to validate if WSMan is working.
-	if($ComputerName -eq "")
+	if($LocalComputer)
 	{							
 		$msgTemplate = "The server: {0} does not need WinRM communication because it will use a local connection"
 		$msg = [string]::Format($msgTemplate, $ComputerName)
@@ -934,7 +937,6 @@ Function Initialize-KerberosConfigurationTest
 	}
 
 	# Test for WebAdministration module
-	$LocalComputer = $ComputerName -eq ""
 	if(Test-WebAdministrationModuleAvailable -lc $LocalComputer -rcn $ComputerName -dbgl $DBGLevel)
 	{
 		$msg = 'WebAdministration module loaded successfully.'
@@ -950,7 +952,7 @@ Function Initialize-KerberosConfigurationTest
 "@
 		$msg = [string]::Format($msgTemplate, $ComputerName)
 		Write-PISysAudit_LogMessage $msg "Error" $fn
-		$result = 999
+		$result = 998
 		break
 	}
 
@@ -1037,13 +1039,48 @@ param(
 	# Initialize local variables
 	$fn = GetFunctionName
 	$FEKerberosDelegation = $null
-
-	# Determine whether execution of access calls will be local or remote
+	
+	# Obtain the machine name from the environment variable.
+	$localComputerName = get-content env:computername
+	
+	# Validate if the server name refers to the local one	
+	if(($ComputerName -eq "") -or ($ComputerName.ToLower() -eq "localhost"))
+	{												
+		$ComputerName = $localComputerName.ToLower()
+		$LocalComputer = $true
+	}
+	elseif($localComputerName.ToLower() -eq $ComputerName.ToLower())
+	{									
+		$ComputerName = $localComputerName.ToLower()
+		$LocalComputer = $true
+	}
+	else
+	{			
+		$LocalComputer = $false			
+		$ComputerName = $ComputerName.ToLower()
+	}
 	$RemoteComputerName = $ComputerName
-	If($ComputerName -eq ""){$LocalComputer = $true}
-	Else{$LocalComputer = $false}
 
-	$result = Initialize-KerberosConfigurationTest -cn $ComputerName -kc $KerberosCheck
+	$result = Initialize-KerberosConfigurationTest -cn $ComputerName -lc $LocalComputer -kc $KerberosCheck
+	
+	# If initialization fails with code 999 (WSMan) we can verify that the issue isn't due to an alias 
+	if($result -eq 999)
+	{
+		$resolvedName = Get-PISysAudit_ResolveDnsName -LookupName $ComputerName -Attribute HostName -DBGLevel $DBGLevel
+		if($resolvedName.ToLower() -eq $localComputerName.ToLower())
+		{ 
+			$LocalComputer = $true
+			$msg = "The server: {0} does not need WinRM communication because it will use a local connection (alias used)" -f $ComputerName
+			$result = Initialize-KerberosConfigurationTest -cn $ComputerName -lc $LocalComputer -kc $KerberosCheck
+			Write-Host $msg
+		}
+		else
+		{
+			$msg = "The server: {0} has a problem with WinRM communication" -f $ComputerName
+			Write-Warning $msg
+		}
+		
+	}
 
 switch ($result)
     {
@@ -1069,8 +1106,14 @@ switch ($result)
         }
 
 		# Initialization failed
+		998 {
+			Write-Warning "Initialization failed due to an issue loading the IIS module."
+			break
+        }
+
+		# Initialization failed
 		999 {
-			Write-Warning "Initialization failed."
+			Write-Warning "Initialization failed due to an issue verifying WSMan."
 			break
         }
     }
