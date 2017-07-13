@@ -1076,7 +1076,7 @@ param(
 		}
 		else
 		{
-			$msg = "The server: {0} has a problem with WinRM communication" -f $ComputerName
+			$msg = "The server: {0} has a problem with WinRM communication, please see https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Running-the-scripts-remotely for more information on running this tool remotely." -f $ComputerName
 			Write-Warning $msg
 		}
 		
