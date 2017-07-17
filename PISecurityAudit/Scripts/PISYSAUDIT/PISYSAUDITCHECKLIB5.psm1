@@ -191,7 +191,7 @@ function Get-PISysAudit_CheckPIVisionVersion
 {
 <#  
 .SYNOPSIS
-AU50001 - Check for latest version of PI Vision
+AU50001 - PI Vision Version
 .DESCRIPTION
 VALIDATION: verifies PI Vision version.<br/>
 COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
@@ -231,7 +231,7 @@ PROCESS
 		# Form an integer value with all the version tokens.
 		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
 		$installVersionInt64 = [int64]$temp
-		if($installVersionInt64 -ge 3004)
+		if($installVersionInt64 -ge 3200)
 		{
 			$result = $true
 			$msg = "Version is compliant."
@@ -271,7 +271,7 @@ function Get-PISysAudit_CheckPIVisionAppPools
 {
 <#  
 .SYNOPSIS
-AU50002 - Check PI Vision AppPools identity
+AU50002 - PI Vision AppPool Identities
 .DESCRIPTION
 VALIDATION: checks PI Vision AppPool identity.<br/>
 COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not ideal. 
@@ -387,7 +387,7 @@ function Get-PISysAudit_CheckPIVisionSSL
 {
 <#  
 .SYNOPSIS
-AU50003 - PI Vision SSL check
+AU50003 - PI Vision SSL
 .DESCRIPTION
 VALIDATION: Checks whether SSL is enabled and enforced on the PI Vision Web Site.<br/>
 COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL are allowed. The SSL certificate is issued by a Certificate Authority.
@@ -435,12 +435,12 @@ PROCESS
 			# Basic Authentication is disabled.
 			If ($basicAuth.Value -eq $False) 
 			{ 
-				$severity = "Medium" 
+				$severity = "High" 
 				$msg = "HTTPS binding is not enabled."
 			} 
 			Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 			{ 
-				$severity = "High"
+				$severity = "Critical"
 				$msg = "Basic Authentication is enabled, but HTTPS binding is not enabled. User credentials sent over the wire are not encrypted!"
 			}
 		} 
@@ -501,12 +501,12 @@ PROCESS
 				# Basic Authentication is disabled. Not too bad.
 				If ($basicAuth.Value -eq $False) 
 				{ 
-					$severity = "Medium" 
+					$severity = "High" 
 					$msg = "Connections without SSL are allowed."
 				} 
 				Else # Basic Authentication is enabled and yet, SSL is not enabled. Epic fail.
 				{ 
-					$severity = "High" 
+					$severity = "Critical" 
 					$msg = "Basic Authentication is enabled, but connections without SSL are allowed. User credentials sent over the wire may not be encrypted!"
 				}
 			}
@@ -540,7 +540,7 @@ function Get-PISysAudit_CheckPIVisionSPN
 {
 <#  
 .SYNOPSIS
-AU50004 - PI Vision SPN check
+AU50004 - PI Vision SPN
 .DESCRIPTION
 VALIDATION: Checks PI Vision SPN assignment. <br/>
 COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool account. This makes Kerberos Authentication possible.

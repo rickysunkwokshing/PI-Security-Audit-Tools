@@ -2,106 +2,13 @@
 
 ## Contents
 
-This project is a framework to baseline the security configuration of your PI System. This framework is built as a PowerShell module containing cmdlets to perform different calls to collect the data from the security settings of specified PI System components.
-
-A series of PowerShell script files (*.psm1) form a single module named PI System Audit Module (or PISysAudit Module) once loaded. You will find one core script containing the collection logic and library scripts containing the validation logic for different topics such as best practices to harden the machine, PI Server, etc. The module exposes several cmdlets either used for the internal logic or the external interface with the end-user.
-
-The PI System Audit Module (PISysAudit) can be executed locally or remotely and make use of existing command line utilities to perform many tasks.  
-
-The current version of the PISysAudit module (2.0.1.0) implements validations covering machine (AU1XXXX), PI Data Archive (AU2XXXX), PI AF Server (AU3XXXX), SQL Server (AU4XXXX) and PI Coresight Server (AU5XXXX) best practices with the PI System.
-
-### Validations
-
-```markdown
-AU10001 - Machine: Domain Membership
-AU10002 - Machine: OS SKU
-AU10003 - Machine: Validate if Windows firewall is enabled
-AU10004 - Machine: AppLocker state
-AU10005 - Machine: UAC enabled
-AU20001 - PI Data Archive: Table Security
-AU20002 - PI Data Archive: piadmin Usage
-AU20003 - PI Data Archive: Subsystem Version
-AU20004 - PI Data Archive: Edit Days
-AU20005 - PI Data Archive: Auto Trust Configuration
-AU20006 - PI Data Archive: Expensive Query Protection
-AU20007 - PI Data Archive: Check if explicit login is disabled
-AU20008 - PI Data Archive: Service Principal Name
-AU30001 - PI AF Server: Service Account
-AU30002 - PI AF Server: Impersonation mode for AF Data Sets
-AU30003 - PI AF Server: Service Access
-AU30004 - PI AF Server: Plugin Verify Level
-AU30005 - PI AF Server: File Extension Whitelist
-AU30006 - PI AF Server: Version
-AU30007 - PI AF Server: Service Principal Name
-AU30008 - PI AF Server: Admin Right
-AU40001 - SQL Server: xp_CmdShell
-AU40002 - SQL Server: Adhoc Queries
-AU40003 - SQL Server: DB Mail XPs
-AU40004 - SQL Server: OLE Automation Procedures
-AU40005 - SQL Server: CLR Configuration Option
-AU40006 - SQL Server: Cross DB Ownership Chaining Option
-AU40007 - SQL Server: Remote Access Option
-AU40008 - SQL Server: sa Login
-AU50001 - Coresight: Version
-AU50002 - Coresight: AppPools Identity
-AU50003 - Coresight: SSL Configuration
-AU50004 - Coresight: Service Principal Name
-```
+The PI Security Audit Tools project is a framework to baseline the security configuration of your PI System.  The module (PISysAudit) can be executed locally or remotely to validate the security configuration of various PI System components: PI Data Archive, PI AF Server, PI Vision, SQL Server and the hosting OS.  
 
 ## Getting Started
 
-You can access the latest release version of the PI Security Audit Tools from the [Releases](https://github.com/osisoft/PI-Security-Audit-Tools/releases) section of this repository.
+Get the latest release version of the PI Security Audit Tools from [Releases](https://github.com/osisoft/PI-Security-Audit-Tools/releases).
 
-SETUP INSTRUCTIONS:
-The PISysAudit module does not require installation; you only need to extract the package. You will need to import the module from the extracted location in order to use it. The file structure is the following:
-
-* PISecurityAudit = Contains the module definition.
-* PISecurityAudit\Scripts\piconfig = Contains the piconfig scripts leveraged by the PI Data Archive validation checks.
-* PISecurityAudit\Scripts = Contains command line utilities or PS scripts needed by the PS module
-* PISecurityAudit\Export = Contains the generated reports
-* PISecurityAudit\pwd = Contains saved password files using strong encryption
-
-For example, if you have decompressed the package inside your user folder (C:\users\<user>\documents\PISecurityAudit), you need to import the module the following:
-
-```powershell
-  Import-Module "C:\users\<user>\documents\PISecurityAudit\pisysaudit"
-```
-
-USAGE EXAMPLES:
-The audit is launched with the New-PISysAuditReport cmdlet (or you can use the alias: piaudit). Two examples are provided below to help you.
-
-Example 1:
-Use the command below to launch an audit with all PI Server, AF Server and SQL Server components installed locally. It makes use of all default parameters to perform the audit.
-
-```powershell
-    piaudit
-```
-
-Example 2:
-Use the commands below to launch the audit with two PI Servers, one AF Server and one SQL Server components installed on different machines than the one used to launch the script.
-
-```powershell
-    $cpt = piauditparams $null "Computer1" "PIServer"
-    $cpt = piauditparams $cpt "Computer2" "PIServer"
-    $cpt = piauditparams $cpt "Computer3" "PIAFServer"
-    $cpt = piauditparams $cpt "Computer4" "PICoresightServer"
-    $cpt = piauditparams $cpt "Computer5" "SQLServer" -InstanceName "sqlexpress"
-    piaudit -cpt $cpt
-```
-
-You get more details by invoking the help with the Get-Help cmdlet like the following:
-
-```powershell
-    Get-Help piaudit
-```
-
-For full contextual help, giving examples and a description of each audit check, remediations for failed checks and references for further information, use the following:
-
-```powershell
-    Get-Help about_PISYSAUDIT
-```
-
-You can also find several examples of commands and syntaxes for this module within examples.ps1 file (located in the ..\PISecurityAudit\Scripts folder).
+Find setup and operation instructions in the readme.txt [here](https://github.com/osisoft/PI-Security-Audit-Tools/blob/master/PISecurityAudit/Readme.txt) or in the PISecurityAudit folder when you download the tools.
 
 Check out the [Wiki](https://github.com/osisoft/PI-Security-Audit-Tools/wiki) for tutorials and more information on the project.
 

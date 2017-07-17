@@ -192,11 +192,11 @@ function Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 {
 <#  
 .SYNOPSIS
-AU20001 - PI Data Archive Table Security Check
+AU20001 - PI Data Archive Table Security
 .DESCRIPTION
-VALIDATION: examines the database security of the PI Data Archive and flags any 
+VALIDATION: Examines the database security of the PI Data Archive and flags any 
 ACLs that contain access for PIWorld as weak. <br/>
-COMPLIANCE: remove PIWorld access from all database security ACLs.  Note that prior
+COMPLIANCE: Remove PIWorld access from all database security ACLs.  Note that prior
 removing PIWorld access, you need to evaluate which applications are relying on that 
 access so that you can grant those applications access explicitly.  This check will
 also pass if PIWorld is disabled globally.
@@ -350,10 +350,10 @@ function Get-PISysAudit_CheckPIAdminUsage
 {
 <#  
 .SYNOPSIS
-AU20002 - PI Admin Usage Check
+AU20002 - PI Admin Usage
 .DESCRIPTION
-VALIDATION: verifies that the piadmin PI User is not used in mappings or trusts.<br/>
-COMPLIANCE: replace any trusts or mappings that use piadmin with a mapping or trust to a
+VALIDATION: Verifies that the piadmin PI User is not used in mappings or trusts.<br/>
+COMPLIANCE: Replace any trusts or mappings that use piadmin with a mapping or trust to a
 PI Identity with appropriate privilege for the applications that will use it.  Will also
 check if trusts and mappings to piadmin have been disabled globally.  This can be done by  
 checking "User cannot be used in a Trust" and "User cannot be used in a Mapping" in the 
@@ -510,8 +510,8 @@ function Get-PISysAudit_CheckPIServerVersion
 .SYNOPSIS
 AU20003 - PI Data Archive Version
 .DESCRIPTION
-VALIDATION: verifies that the PI Data Archive is using the most recent release. <br/>  
-COMPLIANCE: upgrade the PI Data Archive to the latest version, PI Data Archive 
+VALIDATION: Verifies that the PI Data Archive is using the most recent release. <br/>  
+COMPLIANCE: Upgrade the PI Data Archive to the latest version, PI Data Archive 
 2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
 section of the PI Data Archive Installation and Upgrade Guide, Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a>
@@ -544,8 +544,8 @@ PROCESS
 	try
 	{
 		# Update these for subsequent releases
-		$latestVersion = '3.4.405.1198'
-		$readable = '2016 R2'
+		$latestVersion = '3.4.410.1256'
+		$readable = '2017 SP1'
 
 		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
 		$versionInt = [int]($installationVersion -replace '\.', '')
@@ -592,7 +592,7 @@ function Get-PISysAudit_CheckEditDays
 {
 <#  
 .SYNOPSIS
-AU20004 - Check Edit Days
+AU20004 - Edit Days Specified
 .DESCRIPTION
 VALIDATION: verified that the Edit Days tuning parameter is set. <br/>
 COMPLIANCE: set to a value greater than zero.  EditDays defines the number of past 
@@ -681,9 +681,9 @@ function Get-PISysAudit_CheckAutoTrustConfig
 .SYNOPSIS
 AU20005 - Auto Trust Configuration
 .DESCRIPTION
-VALIDATION: verifies that the autotrustconfig tuning parameter is set to create 
+VALIDATION: Verifies that the autotrustconfig tuning parameter is set to create 
 either no trusts or a trust for the loopback automatically (127.0.0.1). <br/>
-COMPLIANCE: set the autotrustconfig tuning parameter to a value of 0 (do not 
+COMPLIANCE: Set the autotrustconfig tuning parameter to a value of 0 (do not 
 automatically create any PI Trust entries) or 1 (create the trust entry for the loopback 
 IP address 127.0.0.1 only). 
 #>
@@ -786,10 +786,10 @@ function Get-PISysAudit_CheckExpensiveQueryProtection
 {
 <#  
 .SYNOPSIS
-AU20006 - Expensive Query Protection Check
+AU20006 - Expensive Query Protection
 .DESCRIPTION
-VALIDATION: verify that the PI Data Archive has protection against expensive queries. <br/>
-COMPLIANCE: set the archive_maxqueryexecutionsec tuning parameter to a value between 60 
+VALIDATION: Verify that the PI Data Archive has protection against expensive queries. <br/>
+COMPLIANCE: Set the archive_maxqueryexecutionsec tuning parameter to a value between 60 
 and 300.  For more information on this parameter and other that can protect against expensive 
 queries, see the knowledgebase article 3224OSI8 <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/3224OSI8">https://techsupport.osisoft.com/Troubleshooting/KB/3224OSI8  </a>
@@ -896,10 +896,10 @@ function Get-PISysAudit_CheckExplicitLoginDisabled
 {
 <#  
 .SYNOPSIS
-AU20007 - Check if the explicit login is disabled
+AU20007 - Explicit Login Disabled
 .DESCRIPTION
-VALIDATION: verifies that explicit login is disabled as an authentication protocol. <br/>  
-COMPLIANCE: set the tuning parameter Server_AuthenticationPolicy to a value greater than 3.  
+VALIDATION: Verifies that explicit login is disabled as an authentication protocol. <br/>  
+COMPLIANCE: Set the tuning parameter Server_AuthenticationPolicy to a value greater than 3.  
 This is equivalent to the third notch, "Disable explicit login", or higher on the Security 
 Settings plugin in PI SMT.  For more information, see "Security Best Practice #2" and "Security 
 Best Practice #3" in KB00833. <br/>
@@ -956,20 +956,13 @@ PROCESS
 		{
 			$result = $false
 			$msgPolicy = "Using non-compliant policy:"
-			$Severity = "High"
 			
 			$piadminExplicitLoginDisabled = -not($(Get-PIIdentity -Connection $global:PIDataArchiveConfiguration.Connection -Name "piadmin").AllowExplicitLogin)
 			
 			if($piadminExplicitLoginDisabled)
-			{
-				$description += "Explicit login disabled for piadmin."
-				$Severity = "High"
-			}
+			{ $description += "Explicit login disabled for piadmin." }
 			else
-			{
-				$description += "Explicit login allowed for piadmin."
-				$Severity = "High"
-			}
+			{ $description += "Explicit login allowed for piadmin." }
 		}
 		else
 		{
@@ -993,7 +986,7 @@ PROCESS
 										-ain "Explicit login disabled" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity $Severity								
+										-Severity "Critical"								
 }
 
 END {}
@@ -1006,7 +999,7 @@ function Get-PISysAudit_CheckPISPN
 {
 <#  
 .SYNOPSIS
-AU20008 - Check PI Server SPN
+AU20008 - PI Server SPN
 .DESCRIPTION
 VALIDATION: Checks PI Data Archive SPN assignment.<br/>
 COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running pinetmgr. 
@@ -1087,7 +1080,7 @@ AU20009 - PI Collective
 .DESCRIPTION
 VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. <br/>
 COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
-	High Availability. <br/>
+High Availability which avoids a single point of failure and allows for less disruptive servicing.<br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1159,9 +1152,12 @@ function Get-PISysAudit_CheckInstalledClientSoftware
 AU20010 - No Client Software
 .DESCRIPTION
 VALIDATION: Checks if common client software is installed on the PI Data Archive machine. <br/>
-COMPLIANCE: Ensure the PI Processbookt and Microsoft Office are not installed
-	on the PI Data Archive machine, as these programs should be used on client
-	machines only. <br/>
+COMPLIANCE: Local logon access to the PI Data Archive server should be limited to administrators
+and only performed for maintenance tasks which require local logon.  Client tools should not be 
+necessary locally, and following the principle of least functionality, should be removed to reduce
+the available attack surface and required patch maintenance.  As a minimum measure, ensure common
+client tools such as PI Processbookt and Microsoft Office are not installedon the PI Data Archive 
+machines only. <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1189,28 +1185,37 @@ PROCESS
 	$msg = ""
 	try
 	{		
-		$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName	-dbgl $DBGLevel
-		$procBook = $installedPrograms | Where-Object DisplayName -Like 'PI Processbook*'
-		$msOffice = $installedPrograms | Where-Object DisplayName -Like 'Microsoft Office*'
-		if($procBook -and $msOffice)
+		$osInstallationType = $global:MachineConfiguration.InstallationType
+		if($osInstallationType -ne 'Server Core')
 		{
-			$result = $false
-			$msg = "PI Processbook and MS Office installed on PI Data Archive machine."
-		}
-		elseif($procBook)
-		{
-			$result = $false
-			$msg = "PI Processbook installed on PI Data Archive machine."
-		}
-		elseif($msOffice)
-		{
-			$result = $false
-			$msg = "Microsoft Office installed on PI Data Archive machine."
+			$installedPrograms = Get-PISysAudit_InstalledComponents -lc $LocalComputer -rcn $RemoteComputerName	-dbgl $DBGLevel
+			$procBook = $installedPrograms | Where-Object DisplayName -Like 'PI Processbook*'
+			$msOffice = $installedPrograms | Where-Object DisplayName -Like 'Microsoft Office*'
+			if($procBook -and $msOffice)
+			{
+				$result = $false
+				$msg = "PI Processbook and MS Office installed on PI Data Archive machine."
+			}
+			elseif($procBook)
+			{
+				$result = $false
+				$msg = "PI Processbook installed on PI Data Archive machine."
+			}
+			elseif($msOffice)
+			{
+				$result = $false
+				$msg = "Microsoft Office installed on PI Data Archive machine."
+			}
+			else
+			{
+				$result = $true
+				$msg = "Did not detect client software on PI Data Archive machine."
+			}
 		}
 		else
 		{
 			$result = $true
-			$msg = "Did not detect client software on PI Data Archive machine."
+			$msg = "Server core detected; no client software is on the PI Data Archive machine."
 		}
 	}
 	catch
@@ -1245,9 +1250,9 @@ AU20011 - PI Firewall Used
 .DESCRIPTION
 VALIDATION: Checks that PI Firewall is used. <br/>
 COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should 
-	be removed and replaced with specific IPs or subnets that may 
-	connect to the PI Data Archive. For more information on PI Firewall,
-	see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
+be removed and replaced with specific IPs or subnets that may 
+connect to the PI Data Archive. For more information on PI Firewall,
+see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1314,7 +1319,7 @@ PROCESS
 										-ain "PI Firewall Used" -aiv $result `
 										-aif $fn -msg $msg `
 										-Group1 "PI System" -Group2 "PI Data Archive" `
-										-Severity "Medium"								
+										-Severity "Low"								
 }
 
 END {}
@@ -1332,13 +1337,13 @@ AU20012 - Transport Security Used
 .DESCRIPTION
 VALIDATION: All connections are using transport security.
 COMPLIANCE: All connections should have transport security enabled. To
-	accomplish this, the application must connect with WIS, the PI Data 
-	Archive must be at PI Data Archive 2015 or later and the client 
-	application must be of a supported version:
+accomplish this, the application must connect with WIS, the PI Data 
+Archive must be at PI Data Archive 2015 or later and the client 
+application must be of a supported version:
 	+ PI API 2016 for Windows Integrated Security
 	+ PI SDK 1.3.6 or higher
 	+ PI AF SDK (all versions)
-	For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1371,9 +1376,10 @@ PROCESS
 		$version = $global:PIDataArchiveConfiguration.Connection.ServerVersion
 		if($version.Major -ge 3 -and $version.Minor -ge 4 -and $version.Build -ge 395)
 		{
-			$processedPIConnectionStats = $global:PIDataArchiveConfiguration.ConnectionStatistics
+			$processedPIConnectionStats = @()
+			$processedPIConnectionStats += $global:PIDataArchiveConfiguration.ConnectionStatistics
 
-			if($null -ne $processedPIConnectionStats)
+			if($null -ne $processedPIConnectionStats -and $processedPIConnectionStats.Count -ne 0)
 			{
 				$countSecured = $processedPIConnectionStats.SecureStatus | Where-Object { $_ -eq 'Secure' } | Measure-Object | Select-object -ExpandProperty count	
 				if($countSecured -eq $processedPIConnectionStats.Count)	
@@ -1456,9 +1462,9 @@ AU20013 - PI Backup Configured
 .DESCRIPTION
 VALIDATION: Ensures that PI Backups are configured and current. <br/>
 COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration
-	and data daily. It is best practice to back up to a local disk on the 
-	PI Data Archive machine, then copy the backup to an off-machine location. 
-	For more information, see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
+and data daily. It is best practice to back up to a local disk on the 
+PI Data Archive machine, then copy the backup to an off-machine location. 
+For more information, see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1587,18 +1593,18 @@ function Get-PISysAudit_CheckInvalidConnections
 {
 <#  
 .SYNOPSIS
-AU20014 - Invalid connections check
+AU20014 - No Invalid Connections
 .DESCRIPTION
 VALIDATION: All connections use an existing, enabled identity and protocol.
 COMPLIANCE: To comply with this check, connections should only be using the
 currently configured identity and mechanism.  A connection can only be in 
-this state if it is long lived and trust or mapping it was using was edited 
+this state if it is long lived and the trust or mapping it was using was edited 
 after the connection was established.  When a mapping or trust is changed, 
 the PI Data Archive requires a reconnect in order to update the credentials 
 of a connecting client application. This can lead to unintentional prolonged 
 access or delayed identification of access revocation having a greater impact 
-than expected. Note that access control for identities is effective immediately, 
-for example revoking access to a PI point from a specific identity.
+than expected. Note that access control, for example revoking access to a PI 
+point from a specific identity, is effective immediately. 
 For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8">https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     

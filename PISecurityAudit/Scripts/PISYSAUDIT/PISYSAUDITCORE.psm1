@@ -63,11 +63,13 @@ function SetFolders
 	
 	$exportPath = PathConcat -ParentPath $rootPath -ChildPath "Export"
 	if (!(Test-Path $exportPath)){
-	New-Item $exportPath -type directory
+	$result = New-Item $exportPath -type directory
+	Write-Host $("Export directory added: " + $result)
 	}
 	$scriptsPathTemp = PathConcat -ParentPath $scriptsPath -ChildPath "Temp"
 	if (!(Test-Path $scriptsPathTemp)){
-	New-Item $scriptsPathTemp -type directory
+	$result = New-Item $scriptsPathTemp -type directory
+	Write-Host $("Script temp directory added: " + $result)
 	}
 
 	$pwdPath = PathConcat -ParentPath $rootPath -ChildPath "pwd"		
@@ -537,13 +539,10 @@ param(
 		
 		# Decrypt.
 		
-		# If you want to use Windows Data Protection API (DPAPI) to encrypt the standard string representation
-		# leave the key undefined. Visit this URL: http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
-		# This salt key had been generated with the Set-PISysAudit_SaltKey cmdlet.
-		# $mySaltKey = "Fnzg+mrVxXEEmfEMzFwiag=="
-		# $keyInBytes = [System.Convert]::FromBase64String($mySaltKey)
-		# $securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString -key $keyInBytes				
-		$securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString -key (1..16)			
+		# Key is undefined to use Windows Data Protection API (DPAPI) to encrypt the standard string.
+		# Visit this URL: http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
+						
+		$securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString		
 		
 		# Return the password.
 		return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePWD))					
@@ -1739,54 +1738,6 @@ END {}
 #End of exported function
 #***************************
 }
-				
-function Set-PISysAudit_SaltKey
-{
-<#  
-.SYNOPSIS
-(Core functionality) Create a crypto salt key (16 digits).
-.DESCRIPTION
-Create a crypto salt key (16 digits).
-#>
-BEGIN {}
-PROCESS
-{
-	$fn = GetFunctionName
-	
-	try
-	{
-		# Initialize the module if needed	
-		Initialize-PISysAudit
-			
-		# Read from the global constant bag.
-		$isPISysAuditInitialized = (Get-Variable "PISysAuditInitialized" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
-		# If initialization failed, leave the function.
-		if(($null -eq $isPISysAuditInitialized) -or ($isPISysAuditInitialized -eq $false))
-		{
-			$msg = "This script won't execute because initialization has not completed"
-			Write-PISysAudit_LogMessage $msg "Warning" $fn
-			return
-		}
-		
-		$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()		
-		$myKey = New-Object System.Byte[] 16
-		$rng.GetBytes($myKey)
-		return [System.Convert]::ToBase64String($myKey)		
-	}
-	catch
-	{
-		# Return the error message.
-		$msg = "The creation of a cryptokey has failed."								
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-	}
-}
-
-END {}
-
-#***************************
-#End of exported function
-#***************************
-}
   
 function New-PISysAudit_PasswordOnDisk
 {
@@ -1836,13 +1787,9 @@ PROCESS
 		
 		# Encrypt.	
 		
-		# If you want to use Windows Data Protection API (DPAPI) to encrypt the standard string representation
-		# leave the key undefined. Visit this URL: http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
-		# This salt key had been generated with the Set-PISysAudit_SaltKey cmdlet.
-		# $mySaltKey = "Fnzg+mrVxXEEmfEMzFwiag=="
-		# $keyInBytes = [System.Convert]::FromBase64String($mySaltKey)			
-		# $securePWD = ConvertFrom-SecureString $pwd -key $keyInBytes
-		$securepwd = ConvertFrom-SecureString $pwd -key (1..16)
+		# Key is left undefined to leverage the Windows Data Protection API (DPAPI) to encrypt the standard string.
+		# Visit http://msdn.microsoft.com/en-us/library/ms995355.aspx to know more.
+		$securepwd = ConvertFrom-SecureString $pwd
 				
 		# Save.
 		Out-File -FilePath $pwdFile -InputObject $securePWD
@@ -2275,8 +2222,10 @@ PROCESS
 	try
 	{
 		If ($UserString.ToLower() -in 
-				@("localsystem", "networkservice", "localservice",
+				@("localsystem", "networkservice", "localservice", 
+					"local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
+					"nt authority\local system", "nt authority\network service", "nt authority\local service",
 					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
@@ -2450,8 +2399,11 @@ PROCESS
 			switch ($Account.UserName)
 			{
 				"LocalSystem" { $Account.UserName = "SYSTEM" }
+				"Local System" { $Account.UserName = "SYSTEM" }
 				"LocalService" { $Account.UserName = "Local Service" }
+				"Local Service" { $Account.UserName = "Local Service" }
 				"NetworkService" { $Account.UserName = "Network Service" }
+				"Network Service" { $Account.UserName = "Network Service" }
 			}
 			$filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
 		}
@@ -3144,7 +3096,7 @@ PROCESS
 		$scriptBlock = { 
 			
 			[xml]$Policy = Get-AppLockerPolicy -Effective -XML 
-			$ServiceEnabled = $(Get-Service -Name AppIDSvc | Select-Object -ExpandProperty StartType | Out-String).ToLower() -ne "disabled"
+			$ServiceEnabled = $(Get-WmiObject -Class Win32_Service -Filter "Name='AppIdSvc'" -Property StartMode | Select-Object -ExpandProperty StartMode | Out-String).ToLower() -ne "disabled"
 
 			$AppLockerConfiguration = New-Object PSCustomObject
 			$AppLockerConfiguration | Add-Member -MemberType NoteProperty -Name Policy -Value $Policy
@@ -3818,28 +3770,31 @@ PROCESS
 				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
 				foreach($message in $connectionMessages)
 				{
-					# Extract the connection ID
-					$startID = $message.Message.IndexOf('ID:') + 3
-					$endID = $message.Message.IndexOf('. Address:')
-					[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
-					
-					# Check ID against the set of connections
-					if($connectionId -eq $PIConnection.ID)
+					if($message.ID -eq 7082)
 					{
-						# Parse the Method attribute out of the message text
-						$startMethod = $message.Message.IndexOf('. Method:') + 9
-						$connectionMethod = $message.Message.Substring($startMethod).Trim()
+						# Extract the connection ID
+						$startID = $message.Message.IndexOf('ID:') + 3
+						$endID = $message.Message.IndexOf('. Address:')
+						[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
+					
+						# Check ID against the set of connections
+						if($connectionId -eq $PIConnection.ID)
+						{
+							# Parse the Method attribute out of the message text
+							$startMethod = $message.Message.IndexOf('. Method:') + 9
+							$connectionMethod = $message.Message.Substring($startMethod).Trim()
 						
-						# Parse the cipher info
-						$startCipher = $connectionMethod.IndexOf('(') + 1
-						$endCipher = $connectionMethod.IndexOf(')')
-						$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+							# Parse the cipher info
+							$startCipher = $connectionMethod.IndexOf('(') + 1
+							$endCipher = $connectionMethod.IndexOf(')')
+							$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
 						
-						if($connectionMethod -match 'HMAC')
-						{ $SecureStatus = "Secure" }
-						else
-						{ $SecureStatus = "Not Secure" }
-						$SecureStatusDetail = $cipherInfo
+							if($connectionMethod -match 'HMAC')
+							{ $SecureStatus = "Secure" }
+							else
+							{ $SecureStatus = "Not Secure" }
+							$SecureStatusDetail = $cipherInfo
+						}
 					}
 				}
 			}
@@ -3937,7 +3892,7 @@ PROCESS
 		}
 		
 		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
-		$spnCheck = $(setspn -l $accountNane) 2>null 
+		$spnCheck = $(setspn -l $accountNane 2>$null) 
 
 		# Null if something went wrong
 		if($null -eq $spnCheck)
@@ -5352,6 +5307,21 @@ PROCESS
 	Write-PISysAudit_LogMessage $msg "Info" $fn -sc $true
 	$msg = "----- Audit Completed -----"
 	Write-PISysAudit_LogMessage $msg "Info" $fn 
+	
+	$InstallationType = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "InstallationType" | Select-Object -ExpandProperty "InstallationType" | Out-String
+	if($ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage' -and $InstallationType -ne 'Server Core')
+	{
+		$title = "PI Security Audit Report"
+		$message = "Would you like to view the PI Security Audit Report now?"
+		$yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes","Open the report in your default browser."
+		$no = New-Object System.Management.Automation.Host.ChoiceDescription "&No","View the report later."
+		$options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
+
+		$result = $host.ui.PromptForChoice($title, $message, $options, 0) 
+		if($result -eq 0)
+		{ Start-Process -FilePath $(PathConcat $exportPath -ChildPath $reportName) }
+	}
+
 }
 
 END {}
@@ -5420,7 +5390,6 @@ Set-Alias pwdondisk New-PISysAudit_PasswordOnDisk
 # <Do not remove>
 Export-ModuleMember PathConcat
 Export-ModuleMember Initialize-PISysAudit
-Export-ModuleMember Set-PISysAudit_SaltKey
 Export-ModuleMember Get-PISysAudit_EnvVariable
 Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey

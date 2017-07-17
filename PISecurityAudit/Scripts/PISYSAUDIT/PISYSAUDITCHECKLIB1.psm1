@@ -149,10 +149,10 @@ function Get-PISysAudit_CheckDomainMemberShip
 {
 <#  
 .SYNOPSIS
-AU10001 - Domain Membership Check
+AU10001 - Domain Membership
 .DESCRIPTION
-VALIDATION: verifies that the machine is a member of an Active Directory Domain.<br/>  
-COMPLIANCE: join the machine to an Active Directory Domain.  Use of a domain is 
+VALIDATION: Verifies that the machine is a member of an Active Directory Domain.<br/>  
+COMPLIANCE: Join the machine to an Active Directory Domain.  Use of a domain is 
 encouraged as AD provides Kerberos authentication and is our best available technology 
 for securing a PI System.  Furthermore, the implementation of transport security in the 
 PI System relies on Windows Integrated Security and AD to automatically enable higher 
@@ -232,7 +232,7 @@ function Get-PISysAudit_CheckOSInstallationType
 .SYNOPSIS
 AU10002 - Operating System Installation Type
 .DESCRIPTION   
-VALIDATION: verifies that the OS installation type is server core for the 
+VALIDATION: Verifies that the OS installation type is server core for the 
 reduced surface area.<br/>
 COMPLIANCE: Installation Type should be Server Core. Different SKUs are
 available at the link below:<br/>
@@ -304,8 +304,8 @@ function Get-PISysAudit_CheckFirewallEnabled
 .SYNOPSIS
 AU10003 - Windows Firewall Enabled
 .DESCRIPTION
-VALIDATION: verifies that the Windows host based firewall is enabled.<br/> 
-COMPLIANCE: enable the Windows firewall for Domain, Private and Public Scope.  
+VALIDATION: Verifies that the Windows host based firewall is enabled.<br/> 
+COMPLIANCE: Enable the Windows firewall for Domain, Private and Public Scope.  
 A firewall's effectiveness is heavily dependent on the configuration.  
 For PI specific port requirements, please see:<br/> 
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01162"> https://techsupport.osisoft.com/Troubleshooting/KB/KB01162 </a> <br/>
@@ -397,8 +397,8 @@ function Get-PISysAudit_CheckAppLockerEnabled
 .SYNOPSIS
 AU10004 - AppLocker Enabled
 .DESCRIPTION
-VALIDATION: verifies that AppLocker is enabled. <br/>  
-COMPLIANCE: set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
+VALIDATION: Verifies that AppLocker is enabled. <br/>  
+COMPLIANCE: Set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
 primer on running AppLocker on a PI Data Archive, see: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00994">https://techsupport.osisoft.com/Troubleshooting/KB/KB00994</a>
 #>
@@ -507,12 +507,12 @@ function Get-PISysAudit_CheckUACEnabled
 .SYNOPSIS
 AU10005 - UAC Enabled
 .DESCRIPTION
-VALIDATION: verifies that UAC is enabled.  More precisely, it verifies the 
+VALIDATION: Verifies that UAC is enabled.  More precisely, it verifies the 
 following default features: EnableLUA, ConsentPromptBehaviorAdmin, 
 EnableInstallerDetection, PromptOnSecureDesktop and EnableSecureUIAPaths.
 Additionally, a check is performed for the feature ValidateAdminCodeSignatures.  
 Lower severity is assigned if this is the only feature disabled.<br/>
-COMPLIANCE: enable the flagged UAC features through Local Security Policy.  
+COMPLIANCE: Enable the flagged UAC features through Local Security Policy.  
 For more information on specific UAC features, see: <br/>
 <a href="https://technet.microsoft.com/en-us/library/dd835564(v=ws.10).aspx">https://technet.microsoft.com/en-us/library/dd835564(v=ws.10).aspx </a>
 #>
@@ -613,11 +613,16 @@ function Get-PISysAudit_CheckManagedPI
 {
 <#  
 .SYNOPSIS
-AU10006 - Monitored by OSIsoft NOC
+AU10006 - Health Monitoring (OSIsoft NOC)
 .DESCRIPTION
-VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled. <br/>
-COMPLIANCE: Ensure that PI Agent and PI Diagnostics are installed and running
-on the machine so that the OSIsoft NOC will detect issues. <br/>
+VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled, 
+indicating that the machine is monitored in the OSIsoft NOC. <br/>
+COMPLIANCE: The goal of this check is to ensure that the PI System component
+has monitoring for notification and response, of which mPI is one example.  
+If an equivalent independent solution is in place for monitoring, this check 
+can be safely ignored.  To ensure compliance with this check PI Agent and PI 
+Diagnostics need to be installed and running on the machine so that the 
+OSIsoft NOC will detect issues. <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -691,6 +696,8 @@ PROCESS
 				}
 			}
 		}
+		if($result -eq $false)
+		{ $msg += " If there is an independent solution implemented for monitoring, then this check can be safely ignored." }
 	}
 	catch
 	{
@@ -820,7 +827,7 @@ AU10008 - Software Updates
 VERIFICATION: Validates that the operating system and Microsoft applications 
 receive updates <br/>
 COMPLIANCE: Ensure that the operating system and the Microsoft applications
-have been updated in the last 60 days.
+have been updated in the last 120 days.
 <a href="https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date">https://support.microsoft.com/en-us/help/311047/how-to-keep-your-windows-computer-up-to-date</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -850,7 +857,7 @@ PROCESS
 	try
 	{
 		$isServerCore = $global:MachineConfiguration.InstallationType -eq "Server Core"
-		$cutoff = 60
+		$cutoff = 120
 		$cutoffDate = (Get-Date).AddDays(-1*$cutoff).ToFileTimeUtc()
 		# Get most recent OS patch
 		$lastInstalledHotFix = Get-PISysAudit_InstalledKBs -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -Type HotFix `
@@ -931,7 +938,7 @@ PROCESS
 									-ain "Software Updates" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
-									-Severity "High"
+									-Severity "Critical"
 }
 
 END {}
