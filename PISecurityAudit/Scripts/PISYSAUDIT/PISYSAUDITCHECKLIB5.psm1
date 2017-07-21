@@ -66,6 +66,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionAppPools" 1 # AU50002
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSSL"      1 # AU50003
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSPN"      1 # AU50004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebAPIVersion"  1 # AU50005
 	
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -132,6 +133,7 @@ PROCESS
 
 			# Registry keys
 			$Version = Get-ItemProperty -Path $($pisystemKey + $ProductName) -Name "CurrentVersion" | Select-Object -ExpandProperty "CurrentVersion"
+			$PIWebAPIVersion = Get-ItemProperty -Path $($pisystemKey + "WebAPI") -Name "Version" | Select-Object -ExpandProperty "Version"
 			$MachineDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
 			$Hostname = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
 			$Site = Get-ItemProperty -Path $($pisystemKey + $ProductName) -Name "WebSite" | Select-Object -ExpandProperty "WebSite"
@@ -153,6 +155,7 @@ PROCESS
 			$Configuration = New-Object PSCustomObject
 			$Configuration | Add-Member -MemberType NoteProperty -Name ProductName -Value $ProductName
 			$Configuration | Add-Member -MemberType NoteProperty -Name Version -Value $Version
+			$Configuration | Add-Member -MemberType NoteProperty -Name PIWebAPIVersion -Value $PIWebAPIVersion
 			$Configuration | Add-Member -MemberType NoteProperty -Name Hostname -Value $Hostname
 			$Configuration | Add-Member -MemberType NoteProperty -Name MachineDomain -Value $MachineDomain
 			$Configuration | Add-Member -MemberType NoteProperty -Name WebSite -Value $Site
@@ -193,8 +196,8 @@ function Get-PISysAudit_CheckPIVisionVersion
 .SYNOPSIS
 AU50001 - PI Vision Version
 .DESCRIPTION
-VALIDATION: verifies PI Vision version.<br/>
-COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
+VALIDATION: Verifies PI Vision version.<br/>
+COMPLIANCE: Upgrade to the latest version of PI Vision.  For more information, 
 see "Upgrade a PI Vision installation" in the PI Live Library.<br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a>
 #>
@@ -234,12 +237,12 @@ PROCESS
 		if($installVersionInt64 -ge 3200)
 		{
 			$result = $true
-			$msg = "Version is compliant."
+			$msg = "Version $installVersion is compliant."
 		}	
 		else 
 		{
 			$result = $false
-			$msg = "Version is not compliant."
+			$msg = "Version $installVersion is not compliant."
 		}
 	}
 	catch
@@ -658,6 +661,83 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPIWebAPIVersion
+{
+<#  
+.SYNOPSIS
+AU50005 - PI Web API Version
+.DESCRIPTION
+VALIDATION: Verifies PI Web API version.<br/>
+COMPLIANCE: Upgrade to the latest version of PI Web API. For more information,
+see "PI Web API Installation" in the PI Live Library.<br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	
+	try
+	{		
+		$installVersion = $global:PIVisionConfiguration.PIWebAPIVersion	
+		
+		$installVersionTokens = $installVersion.Split(".")
+		# Form an integer value with all the version tokens.
+		[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
+		$installVersionInt64 = [int64]$temp
+		if($installVersionInt64 -ge 190000)
+		{
+			$result = $true
+			$msg = "Version $installVersion is compliant."
+		}	
+		else 
+		{
+			$result = $false
+			$msg = "Version $installVersion is not compliant."
+		}	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU50005" `
+									-ain "PI Web API Version" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "PI System" -Group2 "PI Vision" `
+									-Severity "Medium"																																																
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
 
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
@@ -737,6 +817,7 @@ Export-ModuleMember Get-PISysAudit_CheckPIVisionVersion
 Export-ModuleMember Get-PISysAudit_CheckPIVisionAppPools
 Export-ModuleMember Get-PISysAudit_CheckPIVisionSSL
 Export-ModuleMember Get-PISysAudit_CheckPIVisionSPN
+Export-ModuleMember Get-PISysAudit_CheckPIWebAPIVersion
 # </Do not remove>
 
 # ........................................................................
