@@ -1107,18 +1107,43 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{	
-		$serviceType = $global:PIDataArchiveConfiguration.Connection.Service.Type.ToString()
-		if ($serviceType.ToLower() -eq 'collective')
+	{
+		$connection = $global:PIDataArchiveConfiguration.Connection
+
+		if($connection.GetType().ToString() -eq "OSIsoft.PI.Net.Connection") # PS Tools pre-2017
 		{
-			$result = $true
-			$msg = "PI Data Archive is a member of PI Collective '{0}'"
-			$msg = [string]::Format($msg, $global:PIDataArchiveConfiguration.Connection.Service.Name)
+			$serviceType = $connection.Service.Type.ToString()
+			if ($serviceType.ToLower() -eq 'collective')
+			{
+				$result = $true
+				$collectiveName = $connection.Service.Name
+				$msg = "PI Data Archive is a member of PI Collective '$collectiveName'"
+			}
+			else
+			{
+				$msg = "PI Data Archive is not a member of a PI Collective"
+				$result = $false
+			}
+		}
+		elseif($connection.GetType().ToString() -eq "OSIsoft.PI.Net.ClientChannel") # PS Tools 2017
+		{
+			$serviceType = $connection.CurrentRole.Type.ToString().ToLower()
+			if ($serviceType -eq 'primary' -or $serviceType -eq 'secondary')
+			{
+				$result = $true
+				$collectiveName = Get-PICollective $connection | Select-Object -ExpandProperty Name
+				$msg = "PI Data Archive is a member of PI Collective '$collectiveName'"
+			}
+			else
+			{
+				$msg = "PI Data Archive is not a member of a PI Collective"
+				$result = $false
+			}
 		}
 		else
 		{
-			$msg = "PI Data Archive is not a member of a PI Collective"
-			$result = $false
+			$result = "N/A"
+			$msg = "Unable to detect collective status from PI Data Archive connection."
 		}
 	}
 	catch
