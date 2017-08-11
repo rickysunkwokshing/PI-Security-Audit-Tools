@@ -3411,18 +3411,23 @@ PROCESS
 				$transposedStat | Add-Member -MemberType NoteProperty -Name 'AuthenticationProtocol' -Value $statAuthProtocol
 				$transposedStat | Add-Member -MemberType NoteProperty -Name 'Remote' -Value $IsRemote.ToString()
 				# Transpose the object into PSObject with NoteProperties
-				foreach($property in $stat.StatisticType)
+				$allStatisticTypes = @('ID','PIPath','Name','ProcessID','RegisteredAppName','RegisteredAppType','RegisteredAppID','ProtocolVersion','PeerAddress','PeerPort',
+									'ConnectionType','NetworkType','ConnectionStatus','ConnectedTime','LastCallTime','ElapsedTime','BytesSent','BytesReceived','MessageSent',
+									'MessageReceived','ReceiveErrors','SendErrors','APIConnectionCount','SDKConnectionCount','ServerID','PINetManagerVersion','OperatingSystemName',
+									'OperatingSystemVersion','OperatingSystemBuild','User','OSUser','Trust')
+				foreach($property in $allStatisticTypes)
 				{
-					# Apply timezone offset to ConnectedTime and LastCallTime properties
-					if($property -eq 'ConnectedTime' -or $property -eq 'LastCallTime')
-					{
-						$adjustedValue = (Get-Date $stat.Item($property).Value).AddMinutes($offsetMinutes)
-						$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $adjustedValue
+					if($stat.StatisticType -contains $property)
+					{ 
+						$value = $stat.Item($property).Value 
+						# Apply timezone offset to ConnectedTime and LastCallTime properties
+						if($property -eq 'ConnectedTime' -or $property -eq 'LastCallTime')
+						{ $value = (Get-Date $value).AddMinutes($offsetMinutes) }
 					}
 					else
-					{
-						$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $stat.Item($property).Value 
-					}
+					{ $value = "" }
+					
+					$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $value
 				}
 				$transposedStats += $transposedStat 
 			}
@@ -3734,6 +3739,7 @@ PROCESS
 	{
 		$logCutoffExceeded = 0
 		$timeBuffer = 3 # Second buffer checking connection messages
+		$wisMessageID = 7082
 
 		# Check Message Log Cutoff tuning parameter
 		$messageLog_DayLimitParameter = Get-PITuningParameter -Connection $PIDataArchiveConnection -Name 'MessageLog_DayLimit'
@@ -3757,6 +3763,18 @@ PROCESS
 				$SecureStatus = "Not Secure"
 				$SecureStatusDetail = "Insecure protocol ({0})" -f $PIConnection.AuthenticationProtocol
 			} 
+			elseif($PIConnection.AuthenticationProtocol -eq 'Windows' -and $PIConnection.Remote -eq $true `
+					-and ($PIConnection.RegisteredAppName -eq 'pibasess' -or $PIConnection.RegisteredAppName -eq 'pilicmgr')) # Collective communication requires special handling
+			{
+				# PINet version appears of form 'PI X.X.XXX.XXXX'
+				$PinetVersionTokens = $PIConnection.PINetManagerVersion.Substring(3).Split('.')
+				$temp = $PinetVersionTokens[0] + $PinetVersionTokens[1] + $PinetVersionTokens[2] + $PinetVersionTokens[3]
+				$PinetVersion = [Convert]::ToInt64($temp)
+				if($PinetVersion -ge 344101256)
+				{ $SecureStatus = "Secure"; $SecureStatusDetail = "HACertifiedSubsys" }
+				else
+				{ $SecureStatus = "Not Secure"; $SecureStatusDetail = "HACertifiedSubsys (pre-2017)" }
+			}
 			elseif($MessageLog_CutoffDate -gt $PIConnection.ConnectedTime) # Remove connections too old to exist in the logs
 			{
 				$logCutoffExceeded++
@@ -3767,33 +3785,60 @@ PROCESS
 			{
 				$connectedTime = $(Get-Date $PIConnection.ConnectedTime)
 				# Message ID 7082 corresponds to a successful connection with Windows
-				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id 7082 -Program pinetmgr
+				$connectionMessages = Get-PIMessage -Connection $PIDataArchiveConnection -StartTime $connectedTime.AddSeconds(-1*$timeBuffer) -EndTime $connectedTime.AddSeconds($timeBuffer) -Id $wisMessageID -Program pinetmgr
 				foreach($message in $connectionMessages)
 				{
-					if($message.ID -eq 7082)
+					if($message.ID -eq $wisMessageID)
 					{
 						# Extract the connection ID
-						$startID = $message.Message.IndexOf('ID:') + 3
+						$targetText = 'ID:'
+						$startID = $message.Message.IndexOf($targetText)
 						$endID = $message.Message.IndexOf('. Address:')
-						[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim()
-					
-						# Check ID against the set of connections
-						if($connectionId -eq $PIConnection.ID)
+						if($startID -eq -1 -or $endID -eq -1)
 						{
-							# Parse the Method attribute out of the message text
-							$startMethod = $message.Message.IndexOf('. Method:') + 9
-							$connectionMethod = $message.Message.Substring($startMethod).Trim()
+							$msg = "Unable to parse the connection message: {0}" -f $message.Message
+							Write-PISysAudit_LogMessage $msg "Warning" $fn
+						}
+						else
+						{ 
+							$startID += $targetText.Length
+							[int]$connectionId = $message.Message.Substring($startID, $endID - $startID).Trim() 
+							# Check ID against the set of connections
+							if($connectionId -eq $PIConnection.ID)
+							{
+								# Parse the Method attribute out of the message text
+								$targetText = '. Method:'
+								$startMethodPOS = $message.Message.IndexOf($targetText)
+								if($startMethodPOS -eq -1)
+								{
+									$msg = "Unable to parse the Method from connection mesage: {0}" -f $message.Message
+									Write-PISysAudit_LogMessage $msg "Warning" $fn
+								}
+								else
+								{
+									$startMethod = $startMethodPOS + $targetText.Length
+									$connectionMethod = $message.Message.Substring($startMethod).Trim()
 						
-							# Parse the cipher info
-							$startCipher = $connectionMethod.IndexOf('(') + 1
-							$endCipher = $connectionMethod.IndexOf(')')
-							$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
-						
-							if($connectionMethod -match 'HMAC')
-							{ $SecureStatus = "Secure" }
-							else
-							{ $SecureStatus = "Not Secure" }
-							$SecureStatusDetail = $cipherInfo
+									# Parse the cipher info
+									$startCipher = $connectionMethod.IndexOf('(')
+									$endCipher = $connectionMethod.IndexOf(')')
+									if ($startCipher -eq -1 -or $endCipher -eq -1)
+									{
+										$msg = "Unable to parse the Cipher from connection mesage: {0}" -f $message.Message
+										Write-PISysAudit_LogMessage $msg "Warning" $fn
+									}
+									else
+									{
+										$startCipher += 1
+										$cipherInfo =  $connectionMethod.Substring($startCipher, $endCipher - $startCipher)
+										if($connectionMethod -match 'HMAC')
+										{ $SecureStatus = "Secure" }
+										else
+										{ $SecureStatus = "Not Secure" }
+										$SecureStatusDetail = $cipherInfo
+									}
+								}
+							}
 						}
 					}
 				}
