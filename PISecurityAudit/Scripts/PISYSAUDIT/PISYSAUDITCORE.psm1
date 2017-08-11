@@ -3371,7 +3371,14 @@ PROCESS
 			foreach($property in $stat.StatisticType)
 			{
 				if($stat.StatisticType -contains $property -and "" -ne $stat.Item($property).Value.ToString())
-				{ $hasProperty += $property }
+				{ 
+					# Grouped connections will have a List object for a property, even if all entries are null.  This logic verifies
+					# the property has a non-null entry
+					if($stat.Item($property).Value.GetType().Name -eq "List``1")
+					{ foreach($entry in $stat.Item($property).Value) { if("" -ne $entry) { $hasProperty += $property; break } } }
+					else
+					{ $hasProperty += $property }
+				}
 			}
         
 			# Identify the Authentication Protocol
@@ -3419,14 +3426,24 @@ PROCESS
 				{
 					if($stat.StatisticType -contains $property)
 					{ 
-						$value = $stat.Item($property).Value 
+						if($stat.Item($property).Value.GetType().Name -eq "List``1")
+						{
+							# If the property is a list, flatten it to a string we can print to file.
+							$value = ""
+							$parsingChar = " | "
+							foreach($entry in $stat.Item($property).Value)
+							{ if("" -ne $entry) { $value += $entry + $parsingChar } }
+							if($value.IndexOf($parsingChar) -ne -1) 
+							{ $value = $value.Substring(0, $value.Length - $parsingChar.Length) }
+						}
+						else
+						{ $value = $stat.Item($property).Value }
 						# Apply timezone offset to ConnectedTime and LastCallTime properties
 						if($property -eq 'ConnectedTime' -or $property -eq 'LastCallTime')
 						{ $value = (Get-Date $value).AddMinutes($offsetMinutes) }
 					}
 					else
 					{ $value = "" }
-					
 					$transposedStat | Add-Member -MemberType NoteProperty -Name $property -Value $value
 				}
 				$transposedStats += $transposedStat 
