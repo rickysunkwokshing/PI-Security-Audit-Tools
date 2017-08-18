@@ -42,6 +42,7 @@
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB3.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB4.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB5.psm1" />
+    <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB6.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCORE.psm1" />
     <Compile Include="Scripts\UpdateValidationsInHelp.ps1" />
     <Compile Include="Scripts\Utilities\PIVISIONKERBEROSCONFIGURATION.psm1" />

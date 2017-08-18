@@ -701,6 +701,36 @@ param(
 	{ return $false }
 }
 
+function ValidateIfHasPIWebApiRole
+{
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(		
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+
+	$fn = GetFunctionName
+	
+	try
+	{
+		$result = $false
+		$RegKeyPath = "HKLM:\Software\PISystem\WebAPI"
+		$result = Get-PISysAudit_TestRegistryKey -lc $LocalComputer -rcn $RemoteComputerName -rkp $RegKeyPath -DBGLevel $DBGLevel					
+		return $result
+	}
+	catch
+	{ return $false }
+}
+
 function ExecuteWMIQuery
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -1672,6 +1702,124 @@ param(
 	{
 		# Return the error message.
 		$msg = "A problem occurred during the processing of PI Vision checks"					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
+		return
+	}		
+}
+
+function StartPIWebApiServerAudit
+{
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(										
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,		
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("cp")]		
+		$ComputerParams,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lvl")]
+		[int]
+		$AuditLevelInt = 1,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+					
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	
+	try
+	{
+		# Read from the global constant bag.
+		$ShowUI = (Get-Variable "PISysAuditShowUI" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
+		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value	
+			
+		# Validate that PI Web API is installed
+		if((ValidateIfHasPIWebApiRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel) -eq $false)
+		{
+			# Return the error message.
+			$msgTemplate = "The computer {0} does not have the PI Web API role or the validation failed"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Web API Server Audit" -fn $fn -msg $msg
+			return
+		}
+
+		# Set message templates.
+		$activityMsgTemplate1 = "Check PI Web API component on '{0}' computer"
+		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
+		$statusMsgCompleted = "Completed"
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0} and arguments are:" `
+												+ " Audit Table = {1}, Server Name = {2}," `
+												+ " Debug Level = {3}"
+
+		try
+		{
+			Write-Progress -Activity $activityMsg1 -Status "Gathering PI Web API Configuration" -ParentId 1
+			Get-PISysAudit_GlobalPIWebApiConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+		}
+		catch
+		{
+			# Return the error message.
+			$msgTemplate = "An error occurred while accessing the global configuration of PI Web API on {0}"
+			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Web API Server Audit" -fn $fn -msg $msg
+			return
+		}
+
+		# Get the list of functions to execute.
+		$listOfFunctions = Get-PISysAudit_FunctionsFromLibrary6 -lvl $AuditLevelInt
+		# There is nothing to execute.
+		if($listOfFunctions.Count -eq 0)		
+		{
+			# Return the error message.
+			$msg = "No PI Web API checks have been found."
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			return
+		}							
+				
+		# Proceed with all the compliance checks.
+		$i = 0
+		foreach($function in $listOfFunctions.GetEnumerator())
+		{									
+			# Set the progress.
+			if($ShowUI)
+			{
+				# Increment the counter.
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
+			}
+
+			# ............................................................................................................
+			# Verbose at Debug Level 2+
+			# Show some extra messages.
+			# ............................................................................................................							
+			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, $ComputerParams.ComputerName, $DBGLevel)
+			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+			
+			# Call the function.
+			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel														
+		}
+		# Set the progress.
+		if($ShowUI)
+		{ 
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -PercentComplete 100
+			Write-Progress -activity $activityMsg1 -Status $statusMsgCompleted -ParentId 1 -Completed 
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of PI Web API checks"					
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return
 	}		
@@ -4505,6 +4653,8 @@ PI System Component to audit.
 PI, PIDataArchive, PIServer refer to a PI Data Archive component.
 PIAF, PIAFServer, AF refer to a PI AF Server component.
 SQL, SQLServer refer to a SQL Server component.
+PIVision, Vision refer to a PI Vision server component.
+PIWebAPI, WebAPI refer to a PI Web API component.
 .PARAMETER InstanceName
 Parameter to specify the instance name of your SQL Server. If a blank string
 or "default" or "mssqlserver" is passed, this will refer to the default
@@ -4547,7 +4697,8 @@ param(
 					"SQLServer", "SQL", "PICoresightServer", 
 					"CoresightServer", "PICoresight", 
 					"Coresight", "PICS", "CS", "PIVision",
-					"PIVisionServer","Vision","VisionServer","PV")]
+					"PIVisionServer","Vision","VisionServer","PV",
+					"PIWebAPIServer", "PIWebAPI", "WebAPI", "WebAPIServer")]
 		[alias("type")]
 		[string]		
 		$PISystemComponentType,
@@ -4733,6 +4884,24 @@ PROCESS
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
 		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+	}
+	elseif (($PISystemComponentType.ToLower() -eq "piwebapiserver") -or `
+		($PISystemComponentType.ToLower() -eq "piwebapi") -or `
+		($PISystemComponentType.ToLower() -eq "webapiserver") -or `
+		($PISystemComponentType.ToLower() -eq "webapi")
+	)
+	{
+		# Set the properties.
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
+		# Use normalized type description as 'PIWebApiServer'
+		$AuditRoleType = "PIWebApiServer"
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
+		# Nullify all of the MS SQL specific values
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
+		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null
 	}
 
 	# Add hashtable item and computer audit if not already in params table
@@ -5310,7 +5479,12 @@ PROCESS
 				elseif($role.AuditRoleType -eq "SQLServer")
 				{ StartSQLServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
 				elseif($role.AuditRoleType -eq "PIVisionServer")
-				{ StartPIVisionServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel}
+				{ 
+					StartPIVisionServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel
+					StartPIWebApiServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel
+				}
+				elseif($role.AuditRoleType -eq "PIWebApiServer")
+				{ StartPIWebApiServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
 
 				$currCheck++
 			}
