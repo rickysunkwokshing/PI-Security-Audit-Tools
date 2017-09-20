@@ -15,12 +15,26 @@ function Get-TargetResource
 
     Write-Verbose "Connecting to: $($PIDataArchive)"
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
-	Write-Verbose "Getting PI Identity: $($Name)"
+	
+    Write-Verbose "Getting PI Identity: $($Name)"
     $PIIdentity = Get-PIIdentity -Connection $Connection -Name $Name  
+    
     if($null -eq $PIIdentity)
-    { $Ensure = "Absent" }
+    { 
+        $Ensure = "Absent" 
+    }
     else
-    { Write-Verbose -Message "Name: $($Name). Enabled: $($PIIdentity.IsEnabled)." }
+    { 
+        $Ensure = "Present"
+        Write-Verbose "GetResult: Name: $Name"
+        Write-Verbose "GetResult: IsEnabled: $($PIIdentity.IsEnabled)."
+        Write-Verbose "GetResult: CanDelete: $($PIIdentity.CanDelete)."
+        Write-Verbose "GetResult: AllowUseInTrusts: $($PIIdentity.AllowTrusts)."
+        Write-Verbose "GetResult: AllowExplicitLogin: $($PIIdentity.AllowExplicitLogin)."
+        Write-Verbose "GetResult: AllowUseInMappings: $($PIIdentity.AllowUseInMappings)."
+        Write-Verbose "GetResult: Description: $($PIIdentity.Description)."
+    }
+
     return @{
                 CanDelete = $PIIdentity.CanDelete
                 IsEnabled = $PIIdentity.IsEnabled
@@ -30,18 +44,8 @@ function Get-TargetResource
                 Name = $Name
                 AllowExplicitLogin = $PIIdentity.AllowExplicitLogin
                 AllowUseInMappings = $PIIdentity.AllowMappings
+                Description = $PIIdentity.Description
             }
-
-    <# return @{
-                CanDelete = [System.Boolean]
-                IsEnabled = [System.Boolean]
-                PIDataArchive = [System.String]
-                Ensure = [System.String]
-                AllowUseInTrusts = [System.Boolean]
-                Name = [System.String]
-                AllowExplicitLogin = [System.Boolean]
-                AllowUseInMappings = [System.Boolean]
-                } #>
 }
 
 
@@ -75,11 +79,11 @@ function Set-TargetResource
         $AllowExplicitLogin=$false,
 
         [System.Boolean]
-        $AllowUseInMappings=$true
-    )
+        $AllowUseInMappings=$true,
 
-    # Remove items from explicit parameter list which won't be specified when performing the write operation.
-    @('Ensure','PIDataArchive','AllowExplicitLogin') | Foreach-Object { $null = $PSBoundParameters.Remove($_) }
+        [System.String]
+        $Description=""
+    )
 
     # Connect and get the resource
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
@@ -88,36 +92,36 @@ function Set-TargetResource
     # If the resource is supposed to be present we will either add it or set it.
     if($Ensure -eq 'Present')
     {  
-        # Load all function parameters.
-        $ParametersToKeep = $MyInvocation.MyCommand.Parameters
-        
-        # Remove the parameters explicitly specified or not used for the write operation.
-        $ParametersToChange = @('Ensure', 'PIDataArchive')
-        $ParametersToChange += $PSBoundParameters.Keys
-        $ParametersToChange | Foreach-Object { $null = $ParametersToKeep.Remove($_) }
-
-        # Set the parameter values we want to keep to the current resource values.
-        Foreach($Parameter in $ParametersToKeep.Keys)
-        { 
-            Set-Variable -Name $Parameter -Value $($PIIdentity.$Parameter) -Scope Local 
-        }
-
         # Perform the set operation to correct the resource.
         if($PIIdentity.Ensure -eq "Present")
         {
+            # Since the identity is present, we must perform due diligence to preserve settings
+            # not explicitly defined in the config. Remove $PSBoundParameters and those not used 
+            # for the write operation (Ensure, PIDataArchive).
+            $ParametersToOmit = @('Ensure', 'PIDataArchive') + $PSBoundParameters.Keys
+            $ParametersToOmit | Foreach-Object { $null = $PIIdentity.Remove($_) }
+
+            # Set the parameter values we want to keep to the current resource values.
+            Foreach($Parameter in $PIIdentity.GetEnumerator())
+            { 
+                Set-Variable -Name $Parameter.Key -Value $Parameter.Value -Scope Local 
+            }
+
             Write-Verbose "Setting PI Identity $($Name)"
             Set-PIIdentity -Connection $Connection -Name $Name `
                                 -CanDelete:$CanDelete -Enabled:$IsEnabled `
                                 -AllowUseInMappings:$AllowUseInMappings -AllowUseInTrusts:$AllowUseInTrusts `
-                                -AllowExplicitLogin:$AllowExplicitLogin
+                                -AllowExplicitLogin:$AllowExplicitLogin -Description $Description
         }
         else
         {
-            # Add a new identity.
+            # Add the Absent identity. When adding the new identity, we do not need to worry about 
+            # clobbering existing properties because there are none.
             Write-Verbose "Adding PI Identity $($Name)"          
             Add-PIIdentity -Connection $Connection -Name $Name `
                                 -DisallowDelete:$(!$CanDelete) -Disabled:$(!$IsEnabled) `
-                                -DisallowUseInMappings:$(!$AllowUseInMappings) -DisallowUseInTrusts:$(!$AllowUseInTrusts)
+                                -DisallowUseInMappings:$(!$AllowUseInMappings) -DisallowUseInTrusts:$(!$AllowUseInTrusts) `
+                                -Description $Description
         }
     }
     # If the resource is supposed to be absent we remove it.
@@ -160,27 +164,36 @@ function Test-TargetResource
         $AllowExplicitLogin,
 
         [System.Boolean]
-        $AllowUseInMappings
+        $AllowUseInMappings,
+
+        [System.String]
+        $Description
     )
     
     # Take out parameters that are not actionable
     @('Ensure','PIDataArchive') | Foreach-Object { $null = $PSBoundParameters.Remove($_) }
 
-    $Result = $false
     $PIIdentity = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
+    
     if($PIIdentity.Ensure -eq 'Absent')
     {
-        Write-Verbose "$($Name) is null"
+        Write-Verbose "PI Identity $Name is Absent"
         if($Ensure -eq 'Absent')
-        { $Result = $true }
+        { 
+            return $true 
+        }
         else
-        { $Result = $false }
+        { 
+            return $false 
+        }
     }
     else
     {
-        Write-Verbose "$($Name) is Present"
+        Write-Verbose "PI Identity $Name is Present"
         if($Ensure -eq 'Absent')
-        { $Result = $false }
+        { 
+            return $false
+        }
         else
         {
             Foreach($Parameter in $PSBoundParameters.GetEnumerator())
@@ -195,10 +208,9 @@ function Test-TargetResource
                     }
                 }
             } 
-            $Result = $true 
+            return $true 
         }
     }
-    return $Result
 }
 
 Export-ModuleMember -Function *-TargetResource
