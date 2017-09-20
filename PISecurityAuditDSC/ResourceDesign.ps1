@@ -19,7 +19,7 @@ New-xDscResource -Name 'xPITuningParameter' -ModuleName 'PISecurityDSC' -Friendl
 $Properties = @{}
 $Properties += @{
     'Name' = (New-xDscResourceProperty -Name 'Name' -Type String -Attribute Key -Description 'unique name' );
-    'AllowExplicitLogin' = (New-xDscResourceProperty -Name 'AllowExplicitLogin' -Type Boolean -Attribute Write );
+    'AllowExplicitLogin' = (New-xDscResourceProperty -Name 'AllowExplicitLogin' -Type Boolean -Attribute Read );
     'AllowUseInTrusts' = (New-xDscResourceProperty -Name 'AllowUseInTrusts' -Type Boolean -Attribute Write );
     'AllowUseInMappings' = (New-xDscResourceProperty -Name 'AllowUseInMappings' -Type Boolean -Attribute Write );
     'CanDelete' = (New-xDscResourceProperty -Name 'CanDelete' -Type Boolean -Attribute Write );
@@ -35,3 +35,22 @@ $Properties += @{
 }
 $Properties += $CommonProperties
 New-xDscResource -Name 'xPIFirewall' -ModuleName 'PISecurityDSC' -FriendlyName 'PIFirewall' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
+
+$Properties = @{}
+$Properties += @{ 
+    'Name' = (New-xDscResourceProperty -Name 'Name' -Type String -Attribute Key );
+    'Identity' = (New-xDscResourceProperty -Name 'Identity' -Type String -Attribute Write );
+    'PrincipalName' = (New-xDscResourceProperty -Name 'PrincipalName' -Type String -Attribute Write );
+    'Description' = (New-xDscResourceProperty -Name 'Description' -Type String -Attribute Write );
+    'Disabled' = (New-xDscResourceProperty -Name 'Disabled' -Type Boolean -Attribute Write );  
+}
+$Properties += $CommonProperties
+New-xDscResource -Name 'xPIMapping' -ModuleName 'PISecurityDSC' -FriendlyName 'PIMapping' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
+
+$Properties = @{}
+$Properties += @{ 
+    'Name' = (New-xDscResourceProperty -Name 'Name' -Type String -Attribute Key );
+    'Security' = (New-xDscResourceProperty -Name 'Security' -Type String -Attribute Write );
+}
+$Properties += $CommonProperties
+New-xDscResource -Name 'xPIDatabaseSecurity' -ModuleName 'PISecurityDSC' -FriendlyName 'PIDatabaseSecurity' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path

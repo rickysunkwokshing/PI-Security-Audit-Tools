@@ -10,5 +10,6 @@ class xPIIdentity : OMI_BaseResource
     [Key, Description("unique name")] String Name;
     [Read] Boolean AllowExplicitLogin;
     [Write] Boolean AllowUseInMappings;
+	[Write] String Description;
 };
 
