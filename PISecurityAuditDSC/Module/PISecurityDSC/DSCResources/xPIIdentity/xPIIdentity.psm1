@@ -17,34 +17,31 @@ function Get-TargetResource
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
 	
     Write-Verbose "Getting PI Identity: $($Name)"
-    $PIIdentity = Get-PIIdentity -Connection $Connection -Name $Name  
+    $PIResource = Get-PIIdentity -Connection $Connection -Name $Name  
     
-    if($null -eq $PIIdentity)
+    if($null -eq $PIResource)
     { 
         $Ensure = "Absent" 
     }
     else
     { 
         $Ensure = "Present"
-        Write-Verbose "GetResult: Name: $Name"
-        Write-Verbose "GetResult: IsEnabled: $($PIIdentity.IsEnabled)."
-        Write-Verbose "GetResult: CanDelete: $($PIIdentity.CanDelete)."
-        Write-Verbose "GetResult: AllowUseInTrusts: $($PIIdentity.AllowTrusts)."
-        Write-Verbose "GetResult: AllowExplicitLogin: $($PIIdentity.AllowExplicitLogin)."
-        Write-Verbose "GetResult: AllowUseInMappings: $($PIIdentity.AllowUseInMappings)."
-        Write-Verbose "GetResult: Description: $($PIIdentity.Description)."
+        Foreach($Property in $($PIResource | Get-Member -MemberType Property | select -ExpandProperty Name))
+        {
+            Write-Verbose "GetResult: $($Property): $($PIResource.$Property)."
+        }
     }
 
     return @{
-                CanDelete = $PIIdentity.CanDelete
-                IsEnabled = $PIIdentity.IsEnabled
+                CanDelete = $PIResource.CanDelete
+                IsEnabled = $PIResource.IsEnabled
                 PIDataArchive = $PIDataArchive
                 Ensure = $Ensure
-                AllowUseInTrusts = $PIIdentity.AllowTrusts
+                AllowUseInTrusts = $PIResource.AllowTrusts
                 Name = $Name
-                AllowExplicitLogin = $PIIdentity.AllowExplicitLogin
-                AllowUseInMappings = $PIIdentity.AllowMappings
-                Description = $PIIdentity.Description
+                AllowExplicitLogin = $PIResource.AllowExplicitLogin
+                AllowUseInMappings = $PIResource.AllowMappings
+                Description = $PIResource.Description
             }
 }
 
@@ -87,22 +84,22 @@ function Set-TargetResource
 
     # Connect and get the resource
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
-    $PIIdentity = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
     # If the resource is supposed to be present we will either add it or set it.
     if($Ensure -eq 'Present')
     {  
         # Perform the set operation to correct the resource.
-        if($PIIdentity.Ensure -eq "Present")
+        if($PIResource.Ensure -eq "Present")
         {
             # Since the identity is present, we must perform due diligence to preserve settings
             # not explicitly defined in the config. Remove $PSBoundParameters and those not used 
             # for the write operation (Ensure, PIDataArchive).
             $ParametersToOmit = @('Ensure', 'PIDataArchive') + $PSBoundParameters.Keys
-            $ParametersToOmit | Foreach-Object { $null = $PIIdentity.Remove($_) }
+            $ParametersToOmit | Foreach-Object { $null = $PIResource.Remove($_) }
 
             # Set the parameter values we want to keep to the current resource values.
-            Foreach($Parameter in $PIIdentity.GetEnumerator())
+            Foreach($Parameter in $PIResource.GetEnumerator())
             { 
                 Set-Variable -Name $Parameter.Key -Value $Parameter.Value -Scope Local 
             }
@@ -173,9 +170,9 @@ function Test-TargetResource
     # Take out parameters that are not actionable
     @('Ensure','PIDataArchive') | Foreach-Object { $null = $PSBoundParameters.Remove($_) }
 
-    $PIIdentity = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
-    if($PIIdentity.Ensure -eq 'Absent')
+    if($PIResource.Ensure -eq 'Absent')
     {
         Write-Verbose "PI Identity $Name is Absent"
         if($Ensure -eq 'Absent')
@@ -199,10 +196,10 @@ function Test-TargetResource
             Foreach($Parameter in $PSBoundParameters.GetEnumerator())
             {
                 # Nonrelevant fields can be skipped.
-                if($PIIdentity.Keys -contains $Parameter.Key)
+                if($PIResource.Keys -contains $Parameter.Key)
                 {
                     # Make sure all applicable fields match.
-                    if($($PIIdentity.$($Parameter.Key)) -ne $Parameter.Value)
+                    if($($PIResource.$($Parameter.Key)) -ne $Parameter.Value)
                     {
                         return $false
                     }
