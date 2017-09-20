@@ -12,6 +12,9 @@
 # Note: This is only used by command line
 ###############################################################################
 #*.cs     diff=csharp
+*.psm1    diff
+*.psd1    diff
+*.mof     diff
 
 ###############################################################################
 # Set the merge driver for project and solution files
