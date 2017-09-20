@@ -61,7 +61,7 @@
                 PIDataArchive = $ComputerName
             }
         }
-
+        
         # Restrict use of the piadmin superuser
         PIIdentity Restrict_piadmin
         {
@@ -71,10 +71,10 @@
             Ensure = "Present"
             PIDataArchive = $ComputerName
         }
-
-        <# Not Implemented
+        
+        
         # Set PI Mappings 
-        PIMapping DefaultMapping_piadmins
+        PIMapping DefaultMapping_Admins
         {
             Name = 'Windows_S-1-5-32-544'
             PrincipalName = 'BUILTIN\Administrators'
@@ -84,7 +84,7 @@
             PIDataArchive = $ComputerName
         }
 
-        PIMapping DefaultMapping_piadmins
+        PIMapping DefaultMapping_Everyone
         {
             Name = 'Windows_S-1-1-0'
             PrincipalName = '\Everyone'
@@ -93,7 +93,8 @@
             Ensure = "Present"
             PIDataArchive = $ComputerName
         }
-        
+
+        <# Not Implemented
         # Set PI Database Security Rules
         $DatabaseSecurityRules = @(
                                     @{Name='PIAFLINK';Security='piadmins: A(r,w)'},

@@ -13,24 +13,34 @@ function Get-TargetResource
         $Name
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
-
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-
-    <#
-    $returnValue = @{
-    PrincipalName = [System.String]
-    Description = [System.String]
-    PIDataArchive = [System.String]
-    Ensure = [System.String]
-    Disabled = [System.Boolean]
-    Name = [System.String]
-    Identity = [System.String]
+    Write-Verbose "Connecting to: $PIDataArchive"
+    $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
+	
+    Write-Verbose "Getting PI Mapping: $Name"
+    $PIResource = Get-PIMapping -Connection $Connection -Name $Name  
+    
+    if($null -eq $PIResource)
+    { 
+        $Ensure = "Absent" 
+    }
+    else
+    { 
+        $Ensure = "Present"
+        Foreach($Property in $($PIResource | Get-Member -MemberType Property | select -ExpandProperty Name))
+        {
+            Write-Verbose "GetResult: $($Property): $($PIResource.$Property)."
+        }
     }
 
-    $returnValue
-    #>
+    return @{
+                PrincipalName = $PIResource.PrincipalName
+                Description = $PIResource.Description
+                PIDataArchive = $PIDataArchive
+                Ensure = $Ensure
+                Disabled = $PIResource.IsEnabled
+                Name = $Name
+                Identity = $PIResource.Identity
+            }
 }
 
 
@@ -43,7 +53,7 @@ function Set-TargetResource
         $PrincipalName,
 
         [System.String]
-        $Description,
+        $Description="",
 
         [parameter(Mandatory = $true)]
         [System.String]
@@ -54,7 +64,7 @@ function Set-TargetResource
         $Ensure,
 
         [System.Boolean]
-        $Disabled,
+        $Disabled=$false,
 
         [parameter(Mandatory = $true)]
         [System.String]
@@ -64,14 +74,48 @@ function Set-TargetResource
         $Identity
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
+   # Connect and get the resource
+    $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
+    
+    # If the resource is supposed to be present we will either add it or set it.
+    if($Ensure -eq 'Present')
+    {  
+        # Perform the set operation to correct the resource.
+        if($PIResource.Ensure -eq "Present")
+        {
+            # Since the mapping is present, we must perform due diligence to preserve settings
+            # not explicitly defined in the config. Remove $PSBoundParameters and those not used 
+            # for the write operation (Ensure, PIDataArchive).
+            $ParametersToOmit = @('Ensure', 'PIDataArchive') + $PSBoundParameters.Keys
+            $ParametersToOmit | Foreach-Object { $null = $PIResource.Remove($_) }
 
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
+            # Set the parameter values we want to keep to the current resource values.
+            Foreach($Parameter in $PIResource.GetEnumerator())
+            { 
+                Set-Variable -Name $Parameter.Key -Value $Parameter.Value -Scope Local 
+            }
 
-    #Include this line if the resource requires a system reboot.
-    #$global:DSCMachineStatus = 1
-
-
+            Write-Verbose "Setting PI Mapping $($Name)"
+            Set-PIMapping -Connection $Connection -Name $Name `
+                            -Identity $Identity -PrincipalName $PrincipalName `
+                            -Description $Description -Disabled:$Disabled
+        }
+        else
+        {
+            # Add the Absent mapping. 
+            Write-Verbose "Adding PI Mapping $($Name)"          
+            Add-PIMapping -Connection $Connection -Name $Name `
+                            -Identity $Identity -PrincipalName $PrincipalName `
+                            -Description $Description -Disabled:$(!$Disabled)
+        }
+    }
+    # If the resource is supposed to be absent we remove it.
+    else
+    {
+        Write-Verbose "Removing PI Mapping $($Name)"
+        Remove-PIMapping -Connection $Connection -Name $Name   
+    }
 }
 
 
@@ -106,16 +150,47 @@ function Test-TargetResource
         $Identity
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
+     # Take out parameters that are not actionable
+    @('Ensure','PIDataArchive') | Foreach-Object { $null = $PSBoundParameters.Remove($_) }
 
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-
-    <#
-    $result = [System.Boolean]
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
-    $result
-    #>
+    if($PIResource.Ensure -eq 'Absent')
+    {
+        Write-Verbose "PI Mapping $Name is Absent"
+        if($Ensure -eq 'Absent')
+        { 
+            return $true 
+        }
+        else
+        { 
+            return $false 
+        }
+    }
+    else
+    {
+        Write-Verbose "PI Mapping $Name is Present"
+        if($Ensure -eq 'Absent')
+        { 
+            return $false
+        }
+        else
+        {
+            Foreach($Parameter in $PSBoundParameters.GetEnumerator())
+            {
+                # Nonrelevant fields can be skipped.
+                if($PIResource.Keys -contains $Parameter.Key)
+                {
+                    # Make sure all applicable fields match.
+                    if($($PIResource.$($Parameter.Key)) -ne $Parameter.Value)
+                    {
+                        return $false
+                    }
+                }
+            } 
+            return $true 
+        }
+    }
 }
 
 
