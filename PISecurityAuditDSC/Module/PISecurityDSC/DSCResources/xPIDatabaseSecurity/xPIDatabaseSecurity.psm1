@@ -1,3 +1,6 @@
+Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
+                               -ChildPath 'CommonResourceHelper.psm1')
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -13,21 +16,16 @@ function Get-TargetResource
         $PIDataArchive
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
+    $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
+    $PIResource = Get-PIDatabaseSecurity -Connection $Connection -Name $Name
+    $Ensure = Get-PIResource_Ensure -PIResource $PIResource -Verbose:$VerbosePreference
 
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-
-    <#
-    $returnValue = @{
-    Security = [System.String]
-    Name = [System.String]
-    Ensure = [System.String]
-    PIDataArchive = [System.String]
-    }
-
-    $returnValue
-    #>
+    return @{
+                Security = $PIResource.Security.ToString()
+                Name = $Name
+                Ensure = $Ensure
+                PIDataArchive = $PIDataArchive
+            }
 }
 
 
@@ -52,14 +50,16 @@ function Set-TargetResource
         $PIDataArchive
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
-
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-    #Include this line if the resource requires a system reboot.
-    #$global:DSCMachineStatus = 1
-
-
+    $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
+    
+    if($Ensure -eq 'Absent')
+    { 
+        Set-PIDatabaseSecurity -Connection $Connection -Name $Name -Security "" 
+    }
+    else
+    { 
+        Set-PIDatabaseSecurity -Connection $Connection -Name $Name -Security $Security 
+    }
 }
 
 
@@ -85,16 +85,39 @@ function Test-TargetResource
         $PIDataArchive
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
 
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-
-    <#
-    $result = [System.Boolean]
-    
-    $result
-    #>
+    if($PIResource.Ensure -eq 'Present')
+    {
+        if($Ensure -eq 'Present')
+        { 
+            if($PIResource.Security -eq $Security)
+            { 
+                $Result = $true 
+            }
+            else 
+            { 
+                $Result = $false 
+            }
+        }
+        else
+        {
+            $Result = $false
+        }    
+    }
+    else
+    {
+        if($Ensure -eq 'Present')
+        { 
+            $Result = $false 
+        }
+        else
+        { 
+            $Result = $true 
+        }
+    }
+    Write-Verbose $Result
+    return $Result
 }
 
 

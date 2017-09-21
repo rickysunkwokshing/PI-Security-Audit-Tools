@@ -1,3 +1,6 @@
+Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
+                               -ChildPath 'CommonResourceHelper.psm1')
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -13,28 +16,17 @@ function Get-TargetResource
         $PIDataArchive
     )
 
-    Write-Verbose "Connecting to: $($PIDataArchive)"
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
-	Write-Verbose "Getting tuning parameter: $($Name)"
-    $TuningParameter = Get-PITuningParameter -Connection $Connection -Name $Name
-    if($null -eq $TuningParameter)
-    { $Ensure = 'Absent' }
-    else
-    { Write-Verbose -Message "Name: $($TuningParameter.Name). Value: $($TuningParameter.Value). Default: $($TuningParameter.Default)." }
+    $PIResource = Get-PITuningParameter -Connection $Connection -Name $Name
+    $Ensure = Get-PIResource_Ensure -PIResource $PIResource -Verbose:$VerbosePreference
+
     return @{
-				    Name = $TuningParameter.Name;
-                    Default = $TuningParameter.Default;
+				    Name = $PIResource.Name;
+                    Default = $PIResource.Default;
                     Ensure = $Ensure;
-                    Value = $TuningParameter.Value;
+                    Value = $PIResource.Value;
                     PIDataArchive = $PIDataArchive;
             }
-<# return @{
-               Name = [System.String]
-               Default = [System.String]
-               Ensure = [System.String]
-               Value = [System.String]
-               PIDataArchive = [System.String]
-           } #>
 }
 
 function Set-TargetResource
