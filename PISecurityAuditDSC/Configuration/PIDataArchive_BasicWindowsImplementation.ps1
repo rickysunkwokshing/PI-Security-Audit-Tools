@@ -1,4 +1,4 @@
-﻿Configuration PISecurityAuditDSCBaseline
+﻿Configuration PIDataArchive_BasicWindowsImplementation
 {
     param(
         [String]$ComputerName = "localhost"
@@ -8,14 +8,6 @@
 
     Node $ComputerName
     {
-        
-        PITuningParameter EditDays
-        {
-            Name = "EditDays"
-            Value = "180"
-            Ensure = "Present"
-            PIDataArchive = $ComputerName
-        }
         
         # Enumerate Basic WIS Roles
         $BasicWISRoles = @(
@@ -62,17 +54,6 @@
                 PIDataArchive = $ComputerName
             }
         }
-        
-        # Restrict use of the piadmin superuser
-        PIIdentity Restrict_piadmin
-        {
-            Name = "piadmin"
-            AllowUseInTrusts = $false
-            AllowUseInMappings = $false
-            Ensure = "Present"
-            PIDataArchive = $ComputerName
-        }
-        
         
         # Set PI Mappings 
         PIMapping DefaultMapping_Admins
@@ -132,4 +113,4 @@
         
     }
 }
-PISecurityAuditDSCBaseline
+PIDataArchive_BasicWindowsImplementation
