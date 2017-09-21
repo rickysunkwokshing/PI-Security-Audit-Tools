@@ -8,6 +8,7 @@
 
     Node $ComputerName
     {
+        
         PITuningParameter EditDays
         {
             Name = "EditDays"
@@ -94,7 +95,6 @@
             PIDataArchive = $ComputerName
         }
 
-        <# Not Implemented
         # Set PI Database Security Rules
         $DatabaseSecurityRules = @(
                                     @{Name='PIAFLINK';Security='piadmins: A(r,w)'},
@@ -116,7 +116,7 @@
                                     @{Name='PITransferRecords';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PITRUST';Security='piadmins: A(r,w)'},
                                     @{Name='PITUNING';Security='piadmins: A(r,w)'},
-                                    @{Name='PIUSER';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'}
+                                    @{Name='PIUSER';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'} #>
                                   )
 
         Foreach($DatabaseSecurityRule in $DatabaseSecurityRules)
@@ -129,7 +129,7 @@
                 PIDataArchive = $ComputerName
             }
         }
-        #>
+        
     }
 }
 PISecurityAuditDSCBaseline

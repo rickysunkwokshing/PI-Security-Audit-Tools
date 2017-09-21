@@ -1,3 +1,6 @@
+Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
+                               -ChildPath 'CommonResourceHelper.psm1')
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -13,24 +16,9 @@ function Get-TargetResource
         $Name
     )
 
-    Write-Verbose "Connecting to: $($PIDataArchive)"
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
-	
-    Write-Verbose "Getting PI Identity: $($Name)"
     $PIResource = Get-PIIdentity -Connection $Connection -Name $Name  
-    
-    if($null -eq $PIResource)
-    { 
-        $Ensure = "Absent" 
-    }
-    else
-    { 
-        $Ensure = "Present"
-        Foreach($Property in $($PIResource | Get-Member -MemberType Property | select -ExpandProperty Name))
-        {
-            Write-Verbose "GetResult: $($Property): $($PIResource.$Property)."
-        }
-    }
+    $Ensure = Get-PIResource_Ensure -PIResource $PIResource -Verbose:$VerbosePreference
 
     return @{
                 CanDelete = $PIResource.CanDelete
