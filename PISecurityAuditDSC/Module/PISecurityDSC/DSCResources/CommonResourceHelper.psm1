@@ -21,38 +21,21 @@
     return $Ensure
 }
 
-function Convert-PISecurityStringToHashTable
+function Compare-PIDataArchiveACL
 {
+    [CmdletBinding()]
+    [OutputType([System.Boolean])]
     param(
         [parameter(Mandatory=$true)]
         [System.String]
-        $SecurityString
+        $DesiredSecurity,
+        
+        [parameter(Mandatory=$true)]
+        [System.String]
+        $CurrentSecurity
     )
-    [Hashtable]$SecurityTable = @{}
-    # Break pipe delimited ACL into entries
-    # Entry format: <Identity>: A(<Read, Write or 0>)
-    # Example: 'piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'
-    $SecurityEntries = $SecurityString.Split('|').Trim()
-
-    # Construct the desired security hashtable
-    foreach($Entry in $SecurityEntries)
-    {
-        # Split entry into the identity and access
-        $tokens = $Entry.Split(':').Trim()
-        # Assign accordingly
-        $Identity = $tokens[0]
-        $AccessRaw = $tokens[1]
-        # Convert the access to the same format as the current state representation.
-        switch ($AccessRaw)
-        {
-            'A(r,w)' {$Access = 'Read, Write';break}
-            'A(r)' {$Access = 'Read';break}
-            'A(w)' {$Access = 'Write';break}
-            'A()' {$Access = 0;break}
-        }
-        $SecurityTable.Add($Identity,$Access)
-    }
-    return $SecurityTable
+    
+    return $($(Compare-Object -ReferenceObject $DesiredSecurity.Split('|').Trim() -DifferenceObject $CurrentSecurity.Split('|').Trim()).Length -eq 0)
 }
 
-Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Convert-PISecurityStringToHashTable' )
+Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL' )

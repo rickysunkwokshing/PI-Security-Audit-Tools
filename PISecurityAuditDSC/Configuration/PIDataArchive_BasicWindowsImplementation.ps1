@@ -8,6 +8,7 @@
 
     Node $ComputerName
     {
+        <#
         # Enumerate Basic WIS Roles
         $BasicWISRoles = @(
                             @{Name='PI Buffers';Description='Identity for PI Buffer Subsystem and PI Buffer Server';},
@@ -31,7 +32,7 @@
                 PIDataArchive = $ComputerName
             }
         } 
-
+          
         # Enumerate default identities to disable
         $DefaultPIIdentities = @(
                                     'PIOperators',
@@ -112,7 +113,34 @@
                 PIDataArchive = $ComputerName
             }
         }
+        #>
         
+        # Set security on default points
+        $DefaultPIPoints = @(
+                            'SINUSOID',
+                            'SINUSOIDU',
+                            'CDT158',
+                            'CDM158',
+                            'CDEP158',
+                            'BA:TEMP.1',
+                            'BA:LEVEL.1',
+                            'BA:CONC.1',
+                            'BA:ACTIVE.1',
+                            'BA:PHASE.1'
+                            )
+
+        Foreach($DefaultPIPoint in $DefaultPIPoints)
+        {
+            PIPoint "DefaultPointSecurity_$DefaultPIPoint"
+            {
+                Name = $DefaultPIPoint
+                Ensure = 'Present'
+                PtSecurity = 'piadmins: A(r,w) | PI Buffers: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'
+                DataSecurity = 'piadmins: A(r,w) | PI Buffers: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'
+                PIDataArchive = $ComputerName
+            }
+        }
+        #>
     }
 }
 PIDataArchive_BasicWindowsImplementation

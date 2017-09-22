@@ -1,7 +1,7 @@
 ﻿
 Import-Module xDSCResourceDesigner
 
-$Path = 'C:\Testbed\PISecurityAuditDSC\Module\'
+$Path = "$env:piauditrepo\PISecurityAuditDSC\Module\"
 $CommonProperties = @{
     'Ensure' = (New-xDscResourceProperty -Name 'Ensure' -Type String -Attribute Write -ValidateSet 'Present', 'Absent');
     'PIDataArchive' = (New-xDscResourceProperty -Name 'PIDataArchive' -Type String -Attribute Required -Description 'PI Data Archive name for connection');
@@ -53,4 +53,13 @@ $Properties += @{
     'Security' = (New-xDscResourceProperty -Name 'Security' -Type String -Attribute Write );
 }
 $Properties += $CommonProperties
-New-xDscResource -Name 'xPIDatabaseSecurity' -ModuleName 'PISecurityDSC' -FriendlyName 'PIDatabaseSecurity' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
+
+$Properties = @{}
+$Properties += @{ 
+    'Name' = (New-xDscResourceProperty -Name 'Name' -Type Sint32 -Attribute Key );
+    'DataSecurity' = (New-xDscResourceProperty -Name 'DataSecurity' -Type String -Attribute Write );
+    'PtSecurity' = (New-xDscResourceProperty -Name 'PtSecurity' -Type String -Attribute Write );
+}
+$Properties += $CommonProperties
+
+New-xDscResource -Name 'xPIPoint' -ModuleName 'PISecurityDSC' -FriendlyName 'PIPoint' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
