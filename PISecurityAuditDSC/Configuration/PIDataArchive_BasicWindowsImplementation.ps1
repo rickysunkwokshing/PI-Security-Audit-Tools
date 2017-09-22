@@ -1,14 +1,16 @@
 ﻿Configuration PIDataArchive_BasicWindowsImplementation
 {
     param(
-        [String]$ComputerName = "localhost"
+        [String]$ComputerName = 'localhost',
+        [String]$PIAdministratorsADGroup = 'BUILTIN\Administrators',
+        [String]$PIUsersADGroup = '\Everyone'
          )
 
     Import-DscResource -ModuleName PISecurityDSC
 
     Node $ComputerName
     {
-        <#
+        
         # Enumerate Basic WIS Roles
         $BasicWISRoles = @(
                             @{Name='PI Buffers';Description='Identity for PI Buffer Subsystem and PI Buffer Server';},
@@ -35,12 +37,8 @@
           
         # Enumerate default identities to disable
         $DefaultPIIdentities = @(
-                                    'PIOperators',
-                                    'PISupervisors',
-                                    'PIEngineers',
-                                    'PIWorld',
-                                    'pidemo',
-                                    'piusers'
+                                    'PIOperators','PISupervisors','PIEngineers',
+                                    'PIWorld','pidemo','piusers'
                                 )
         
         Foreach($DefaultPIIdentity in $DefaultPIIdentities)
@@ -56,22 +54,22 @@
         }
         
         # Set PI Mappings 
-        PIMapping DefaultMapping_Admins
+        PIMapping DefaultMapping_PIAdmins
         {
-            Name = 'Windows_S-1-5-32-544'
-            PrincipalName = 'BUILTIN\Administrators'
+            Name = $PIAdministratorsADGroup
+            PrincipalName = $PIAdministratorsADGroup
             Identity = "piadmins"
-            Disabled = $false
+            Enabled = $true
             Ensure = "Present"
             PIDataArchive = $ComputerName
         }
 
-        PIMapping DefaultMapping_Everyone
+        PIMapping DefaultMapping_PIUsers
         {
-            Name = 'Windows_S-1-1-0'
-            PrincipalName = '\Everyone'
+            Name = $PIUsersADGroup
+            PrincipalName = $PIUsersADGroup
             Identity = "PI Users"
-            Disabled = $false
+            Enabled = $true
             Ensure = "Present"
             PIDataArchive = $ComputerName
         }
@@ -94,7 +92,7 @@
                                     @{Name='PIHeadingSets';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PIMAPPING';Security='piadmins: A(r,w) | PI Web Apps: A(r)'},
                                     @{Name='PIModules';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
-                                    @{Name='PIMSGSS';Security='piadmins: A(r,w) | PIWorld: A(r,w)| PI Users: A(r,w)'},
+                                    @{Name='PIMSGSS';Security='piadmins: A(r,w) | PIWorld: A(r,w) | PI Users: A(r,w)'},
                                     @{Name='PIPOINT';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Buffers: A(r,w) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'},
                                     @{Name='PIReplication';Security='piadmins: A(r,w)'},
                                     @{Name='PITransferRecords';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
@@ -113,20 +111,11 @@
                 PIDataArchive = $ComputerName
             }
         }
-        #>
         
         # Set security on default points
         $DefaultPIPoints = @(
-                            'SINUSOID',
-                            'SINUSOIDU',
-                            'CDT158',
-                            'CDM158',
-                            'CDEP158',
-                            'BA:TEMP.1',
-                            'BA:LEVEL.1',
-                            'BA:CONC.1',
-                            'BA:ACTIVE.1',
-                            'BA:PHASE.1'
+                            'SINUSOID','SINUSOIDU','CDT158','CDM158','CDEP158',
+                            'BA:TEMP.1','BA:LEVEL.1','BA:CONC.1','BA:ACTIVE.1','BA:PHASE.1'
                             )
 
         Foreach($DefaultPIPoint in $DefaultPIPoints)
@@ -140,7 +129,6 @@
                 PIDataArchive = $ComputerName
             }
         }
-        #>
     }
 }
 PIDataArchive_BasicWindowsImplementation

@@ -121,7 +121,7 @@ function Test-TargetResource
     if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
         Write-Verbose "Testing against value: $Security"
-        return $(Compare-PIDataArchiveACL -DesiredSecurity $Security -CurrentSecurity $PIResource.Security)    
+        return $(Compare-PIDataArchiveACL -Desired $Security -Current $PIResource.Security)    
     }
     return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
 }

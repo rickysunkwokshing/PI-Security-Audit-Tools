@@ -1,7 +1,6 @@
 ﻿function Get-PIResource_Ensure
 {
     param(
-        [parameter(Mandatory = $true)]
         [object]
         $PIResource
     )
@@ -28,14 +27,14 @@ function Compare-PIDataArchiveACL
     param(
         [parameter(Mandatory=$true)]
         [System.String]
-        $DesiredSecurity,
+        $Desired,
         
         [parameter(Mandatory=$true)]
         [System.String]
-        $CurrentSecurity
+        $Current
     )
     
-    return $($(Compare-Object -ReferenceObject $DesiredSecurity.Split('|').Trim() -DifferenceObject $CurrentSecurity.Split('|').Trim()).Length -eq 0)
+    return $($(Compare-Object -ReferenceObject $Desired.Split('|').Trim() -DifferenceObject $Current.Split('|').Trim()).Length -eq 0)
 }
 
 Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL' )

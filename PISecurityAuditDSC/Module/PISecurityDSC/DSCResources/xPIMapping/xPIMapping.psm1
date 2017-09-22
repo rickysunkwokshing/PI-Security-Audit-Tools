@@ -25,7 +25,7 @@ function Get-TargetResource
                 Description = $PIResource.Description
                 PIDataArchive = $PIDataArchive
                 Ensure = $Ensure
-                Disabled = $PIResource.IsEnabled
+                Enabled = $PIResource.IsEnabled
                 Name = $Name
                 Identity = $PIResource.Identity
             }
@@ -52,7 +52,7 @@ function Set-TargetResource
         $Ensure,
 
         [System.Boolean]
-        $Disabled=$false,
+        $Enabled=$true,
 
         [parameter(Mandatory = $true)]
         [System.String]
@@ -87,7 +87,7 @@ function Set-TargetResource
             Write-Verbose "Setting PI Mapping $($Name)"
             Set-PIMapping -Connection $Connection -Name $Name `
                             -Identity $Identity -PrincipalName $PrincipalName `
-                            -Description $Description -Disabled:$Disabled
+                            -Description $Description -Disabled:$(!$Enabled)
         }
         else
         {
@@ -95,7 +95,7 @@ function Set-TargetResource
             Write-Verbose "Adding PI Mapping $($Name)"          
             Add-PIMapping -Connection $Connection -Name $Name `
                             -Identity $Identity -PrincipalName $PrincipalName `
-                            -Description $Description -Disabled:$(!$Disabled)
+                            -Description $Description -Disabled:$(!$Enabled)
         }
     }
     # If the resource is supposed to be absent we remove it.
@@ -128,7 +128,7 @@ function Test-TargetResource
         $Ensure,
 
         [System.Boolean]
-        $Disabled,
+        $Enabled,
 
         [parameter(Mandatory = $true)]
         [System.String]
@@ -146,14 +146,7 @@ function Test-TargetResource
     if($PIResource.Ensure -eq 'Absent')
     {
         Write-Verbose "PI Mapping $Name is Absent"
-        if($Ensure -eq 'Absent')
-        { 
-            return $true 
-        }
-        else
-        { 
-            return $false 
-        }
+        return $($Ensure -eq 'Absent')
     }
     else
     {
@@ -183,4 +176,3 @@ function Test-TargetResource
 
 
 Export-ModuleMember -Function *-TargetResource
-
