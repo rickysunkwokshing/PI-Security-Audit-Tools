@@ -8,7 +8,6 @@
 
     Node $ComputerName
     {
-        
         # Enumerate Basic WIS Roles
         $BasicWISRoles = @(
                             @{Name='PI Buffers';Description='Identity for PI Buffer Subsystem and PI Buffer Server';},
@@ -75,16 +74,19 @@
             Ensure = "Present"
             PIDataArchive = $ComputerName
         }
-
+        
         # Set PI Database Security Rules
         $DatabaseSecurityRules = @(
                                     @{Name='PIAFLINK';Security='piadmins: A(r,w)'},
                                     @{Name='PIARCADMIN';Security='piadmins: A(r,w)'},
                                     @{Name='PIARCDATA';Security='piadmins: A(r,w)'},
                                     @{Name='PIAUDIT';Security='piadmins: A(r,w)'},
-                                    @{Name='PIBACKUP';Security='piadmins: A(r,w)'},
+                                    @{Name='PIBACKUP';Security='piadmins: A(r,w)'}, 
                                     @{Name='PIBatch';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
-                                    @{Name='PIBATCHLEGACY';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
+                                    # PIBACTHLEGACY applies to the old batch subsystem which predates the PI Batch Database.
+                                    # Unless the pibatch service is running, and there is a need to keep it running, this
+                                    # entry can be safely ignored. 
+                                    # @{Name='PIBATCHLEGACY';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PICampaign';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PIDBSEC';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'},
                                     @{Name='PIDS';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Points&Analysis Creator: A(r,w)'},
@@ -97,7 +99,7 @@
                                     @{Name='PITransferRecords';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PITRUST';Security='piadmins: A(r,w)'},
                                     @{Name='PITUNING';Security='piadmins: A(r,w)'},
-                                    @{Name='PIUSER';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'} #>
+                                    @{Name='PIUSER';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'}
                                   )
 
         Foreach($DatabaseSecurityRule in $DatabaseSecurityRules)
