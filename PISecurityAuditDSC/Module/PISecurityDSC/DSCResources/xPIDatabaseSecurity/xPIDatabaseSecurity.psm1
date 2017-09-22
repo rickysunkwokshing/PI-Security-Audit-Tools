@@ -54,7 +54,9 @@ function Set-TargetResource
     
     if($Ensure -eq 'Absent')
     { 
-        Set-PIDatabaseSecurity -Connection $Connection -Name $Name -Security "" 
+        # Setting database security to only piadmin access is as restrictive as it can be 
+        # since piadmin cannot be denied.
+        Set-PIDatabaseSecurity -Connection $Connection -Name $Name -Security "piadmin: A(r,w)" 
     }
     else
     { 
@@ -116,80 +118,12 @@ function Test-TargetResource
 
     $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
 
-    if($PIResource.Ensure -eq 'Present')
+    if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
-        if($Ensure -eq 'Present')
-        {
-            Write-Verbose "Testing against value: $Security"
-            $DoACLsMatch = Test-PIDatabaseSecurityACL -DesiredSecurity $Security -CurrentSecurity $PIResource.Security
-            if($DoACLsMatch)
-            { 
-                $Result = $true 
-            }
-            else 
-            { 
-                $Result = $false 
-            }
-        }
-        else
-        {
-            $Result = $false
-        }    
+        Write-Verbose "Testing against value: $Security"
+        return $(Compare-PIDataArchiveACL -Desired $Security -Current $PIResource.Security)    
     }
-    else
-    {
-        if($Ensure -eq 'Present')
-        { 
-            $Result = $false 
-        }
-        else
-        { 
-            $Result = $true 
-        }
-    }
-    Write-Verbose "Test result: $Result"
-    return $Result
-}
-
-function Test-PIDatabaseSecurityACL
-{
-    [CmdletBinding()]
-    [OutputType([System.Boolean])]
-    param(
-        [parameter(Mandatory=$true)]
-        [System.String]
-        $DesiredSecurity,
-        
-        [parameter(Mandatory=$true)]
-        [System.String]
-        $CurrentSecurity
-    )
-
-    $DesiredSecurityTable = Convert-PISecurityStringToHashTable -SecurityString $DesiredSecurity
-    $CurrentSecurityTable = Convert-PISecurityStringToHashTable -SecurityString $CurrentSecurity
-    if($CurrentSecurityTable.Count -ne $DesiredSecurityTable.Count)
-    {
-        return $false
-    }
-    else
-    {
-        foreach($Entry in $CurrentSecurityTable.GetEnumerator())
-        {
-            if(-not($DesiredSecurityTable.ContainsKey($Entry.Name)))
-            {
-                return $false
-            }
-            else
-            {
-                if($DesiredSecurityTable[$Entry.Name] -ne $Entry.Value)
-                {
-                    return $false
-                }
-            }
-        }
-        return $true
-    }
+    return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
 }
 
 Export-ModuleMember -Function *-TargetResource
-
