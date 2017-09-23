@@ -1,3 +1,6 @@
+Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
+                               -ChildPath 'CommonResourceHelper.psm1')
+
 function Get-TargetResource
 {
     [CmdletBinding()]
@@ -13,21 +16,16 @@ function Get-TargetResource
         $PIDataArchive
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
+    $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
+    $PIResource = Get-PIFirewall -Connection $Connection -Hostmask $Hostmask -ErrorAction SilentlyContinue
+    $Ensure = Get-PIResource_Ensure -PIResource $PIResource -Verbose:$VerbosePreference
 
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-
-    <#
-    $returnValue = @{
-    Ensure = [System.String]
-    Value = [System.String]
-    Hostmask = [System.String]
-    PIDataArchive = [System.String]
-    }
-
-    $returnValue
-    #>
+    return @{
+                Ensure = $Ensure
+                Value = $PIResource.Value
+                Hostmask = $PIResource.Hostmask
+                PIDataArchive = $PIDataArchive
+            }
 }
 
 
@@ -53,14 +51,16 @@ function Set-TargetResource
         $PIDataArchive
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
-
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-    #Include this line if the resource requires a system reboot.
-    #$global:DSCMachineStatus = 1
-
-
+    $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
+    
+    if($Ensure -eq 'Absent')
+    { 
+        Remove-PIFirewall -Connection $Connection -Hostmask $Hostmask
+    }
+    else
+    { 
+        Add-PIFirewall -Connection $Connection -Hostmask $Hostmask -Value $Value 
+    }
 }
 
 
@@ -87,18 +87,14 @@ function Test-TargetResource
         $PIDataArchive
     )
 
-    #Write-Verbose "Use this cmdlet to deliver information about command processing."
-
-    #Write-Debug "Use this cmdlet to write debug information while troubleshooting."
-
-
-    <#
-    $result = [System.Boolean]
+    $PIResource = Get-TargetResource -Hostmask $Hostmask -PIDataArchive $PIDataArchive
     
-    $result
-    #>
+    if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
+    {
+        Write-Verbose "Testing desired: $Value against current: $($PIResource.Value)"
+        return $($Value -and $PIResource.Value)
+    }
+    return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
 }
 
-
 Export-ModuleMember -Function *-TargetResource
-
