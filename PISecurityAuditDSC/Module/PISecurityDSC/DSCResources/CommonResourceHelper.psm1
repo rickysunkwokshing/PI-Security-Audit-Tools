@@ -14,7 +14,15 @@
         $Ensure = "Present"
         Foreach($Property in $($PIResource | Get-Member -MemberType Property | select -ExpandProperty Name))
         {
-            Write-Verbose "GetResult: $($Property): $($PIResource.$Property.ToString())."
+            if($null -eq $PIResource.$Property)
+            {
+                $Value = 'NULL'
+            }
+            else
+            {
+                $Value = $PIResource.$Property.ToString()
+            }
+            Write-Verbose "GetResult: $($Property): $($Value)."
         }
     }
     return $Ensure
