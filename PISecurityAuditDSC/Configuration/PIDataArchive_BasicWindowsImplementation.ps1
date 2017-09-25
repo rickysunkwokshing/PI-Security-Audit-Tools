@@ -1,17 +1,83 @@
-﻿Configuration PIDataArchive_BasicWindowsImplementation
+﻿<#
+.SYNOPSIS
+
+This example configuration covers a basic implementation of Windows Integrated
+Security for the PI Data Archive.
+
+.DESCRIPTION
+   
+This configuration is meant to configure a new install of a PI Data Archive to 
+use the standard WIS implementation.
+
+.PARAMETER NodeName
+
+Name of the PI Data Archive server.
+
+.PARAMETER PIAdministratorsADGroup
+
+Windows identity to associate with an administrative role in PI.  Ideally, this 
+should be a group.
+
+.PARAMETER PIUsersADGroup
+
+Windows identity to associate with a read only user role in PI.  Ideally, this 
+should be a group.
+
+.PARAMETER PIBuffersADGroup
+
+Windows identity to associate with instances of PI Buffer Subsystem.  Ideally, this 
+should be a group.
+
+.PARAMETER PIInterfacesADGroup
+
+Windows identity to associate with PI Interfaces.  Ideally, this should be a group.
+
+.PARAMETER PIPointsAnalysisCreatorADGroup
+
+Windows identity to associate with a power user role in PI for those who need to 
+create PI Points.  Ideally, this should be a group.
+
+.PARAMETER PIWebAppsADGroup
+
+Windows identity to associate with PI Web Applications such as PI Vision.  Ideally, 
+this should be a group.
+
+.EXAMPLE 
+.\PIDataArchive_BasicWindowsImplementation -NodeName "myPI" -PIAdministratorsADGroup 'mydomain\PI Admins' -PIUsersADGroup 'mydomain\PI Users'
+
+#>
+Configuration PIDataArchive_BasicWindowsImplementation
 {
     param(
-        [String]$ComputerName = 'localhost',
-        [String]$PIAdministratorsADGroup = 'BUILTIN\Administrators',
-        [String]$PIUsersADGroup = '\Everyone'
+        [String]
+        $NodeName = 'localhost',
+        
+        [String]
+        $PIAdministratorsADGroup = 'BUILTIN\Administrators',
+        
+        [String]
+        $PIUsersADGroup = '\Everyone',
+        
+        [String]
+        $PIBuffersADGroup = '',
+        
+        [String]
+        $PIInterfacesADGroup = '',
+        
+        [String]
+        $PIPointsAnalysisCreatorADGroup = '',
+        
+        [String]
+        $PIWebAppsADGroup = ''
+        
          )
 
     Import-DscResource -ModuleName PISecurityDSC
 
-    Node $ComputerName
+    Node $NodeName
     {
         
-        # Enumerate Basic WIS Roles
+        # Create identities for basic WIS roles
         $BasicWISRoles = @(
                             @{Name='PI Buffers';Description='Identity for PI Buffer Subsystem and PI Buffer Server';},
                             @{Name='PI Interfaces';Description='Identity for PI Interfaces';},
@@ -31,11 +97,11 @@
                 AllowUseInMappings = $true
                 AllowUseInTrusts = $true
                 Ensure = "Present"
-                PIDataArchive = $ComputerName
+                PIDataArchive = $NodeName
             }
         } 
-          
-        # Enumerate default identities to disable
+
+        # Disable default identities
         $DefaultPIIdentities = @(
                                     'PIOperators','PISupervisors','PIEngineers',
                                     'PIWorld','pidemo','piusers'
@@ -49,29 +115,35 @@
                 IsEnabled = $false
                 AllowUseInTrusts = $false
                 Ensure = "Present"
-                PIDataArchive = $ComputerName
+                PIDataArchive = $NodeName
             }
         }
         
         # Set PI Mappings 
-        PIMapping DefaultMapping_PIAdmins
-        {
-            Name = $PIAdministratorsADGroup
-            PrincipalName = $PIAdministratorsADGroup
-            Identity = "piadmins"
-            Enabled = $true
-            Ensure = "Present"
-            PIDataArchive = $ComputerName
-        }
+        $DesiredMappings = @(
+                                
+                                @{Name=$PIAdministratorsADGroup;Identity='piadmins'},
+                                @{Name=$PIBuffersADGroup;Identity='PI Buffers'},
+                                @{Name=$PIInterfacesADGroup;Identity='PI Interfaces'},
+                                @{Name=$PIPointsAnalysisCreatorADGroup;Identity='PI Points&Analysis Creator'},
+                                @{Name=$PIUsersADGroup;Identity='PI Users'},
+                                @{Name=$PIWebAppsADGroup;Identity='PI Web Apps'}
+                            )
 
-        PIMapping DefaultMapping_PIUsers
+        Foreach($DesiredMapping in $DesiredMappings)
         {
-            Name = $PIUsersADGroup
-            PrincipalName = $PIUsersADGroup
-            Identity = "PI Users"
-            Enabled = $true
-            Ensure = "Present"
-            PIDataArchive = $ComputerName
+            if($null -ne $DesiredMapping.Name -and '' -ne $DesiredMapping.Name)
+            {
+                PIMapping "SetMapping_$($DesiredMapping.Name)"
+                {
+                    Name = $DesiredMapping.Name
+                    PrincipalName = $DesiredMapping.Name
+                    Identity = $DesiredMapping.Identity
+                    Enabled = $true
+                    Ensure = "Present"
+                    PIDataArchive = $NodeName
+                }
+            }
         }
         
         # Set PI Database Security Rules
@@ -108,11 +180,11 @@
                 Name = $DatabaseSecurityRule.Name
                 Security = $DatabaseSecurityRule.Security
                 Ensure = "Present"
-                PIDataArchive = $ComputerName
+                PIDataArchive = $NodeName
             }
         }
         
-        # Set security on default points
+        # Define security for default points
         $DefaultPIPoints = @(
                             'SINUSOID','SINUSOIDU','CDT158','CDM158','CDEP158',
                             'BA:TEMP.1','BA:LEVEL.1','BA:CONC.1','BA:ACTIVE.1','BA:PHASE.1'
@@ -126,9 +198,10 @@
                 Ensure = 'Present'
                 PtSecurity = 'piadmins: A(r,w) | PI Buffers: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'
                 DataSecurity = 'piadmins: A(r,w) | PI Buffers: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'
-                PIDataArchive = $ComputerName
+                PIDataArchive = $NodeName
             }
         }
     }
 }
+
 PIDataArchive_BasicWindowsImplementation

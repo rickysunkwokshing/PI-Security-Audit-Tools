@@ -1,28 +1,78 @@
+<#
+.SYNOPSIS
+
+This example configuration covers deterministic configuration items that are
+validated during the PI Security Audit Tools validation checks for the PI 
+Data Archive.
+
+.DESCRIPTION
+    
+While some validation checks are more involved, there are many which can be 
+corrected with a simple there are many checks which cover
+
+.PARAMETER DaysToAllowEdits
+
+Defines the number of days to allow edits to archive and snapshot data.  Any 
+non-zero value is accepted, though the value should be chosen to reflect the 
+practical reality of your environment.
+
+.PARAMETER MaxQueryExecutionSeconds
+
+Defines the maximum time that a query will be allowed to run.  Accepted values
+are between 60 and 300 seconds.
+
+.PARAMETER AutoTrustConfig
+
+Defines trusts that are automatically created by the PI Data Archive.  Accepted
+values include:
+ 0 - No trusts created
+ 1 - Loopback trust created for 127.0.0.1
+
+.PARAMETER PIFirewallHostmasks
+
+The PI Firewall provides an additional layer of protection by only allowing 
+connections to the PI Data Archive from approved sources. 
+
+.PARAMETER AuthenticationPolicy
+
+Similar to the 'Security Slider' in PI SMT, this determines the authentication 
+protocols available to PI Data Archive clients.  Accepted values:
+ 3  -  block explicit login (DEFAULT)
+ 19 -  block PI SDK applications from using trusts
+ 51 -  block all applications from using trusts
+
+.EXAMPLE 
+.\PIDataArchive_AuditBaseline -NodeName "myPI" -DaysToAllowEdit 60 -MaxQueryExecutionSeconds 300 -AutoTrustConfig 0 -PIFirewallHostmasks @('10.10.*.*','10.1.*.*') -AuthenticationPolicy 51
+
+#>
 Configuration PIDataArchive_AuditBaseline
 {
     param(
-        [String]$ComputerName = 'localhost',
-        # Days to allow edits
-        [Int32]$DaysToAllowEdit=365,
-        # Maximum time for a query to run
+        [String] 
+        $NodeName = 'localhost',
+        
+        [Int32] 
+        $DaysToAllowEdit = 365,
+       
         [ValidateRange(60,300)]
-        [Int32]$Archive_MaxQueryExecutionSec=260,
-        # Autotrustconfig
+        [Int32] 
+        $MaxQueryExecutionSeconds=260,
+        
         [ValidateSet('0','1')]
-        [Int32]$AutoTrustConfig=0,
-        # Host masks for valid PI Data Archive clients
-        [String[]]$PIFirewall_Hostmasks = @('10.*.*.*','192.168.*.*'),
-        # Authentication policy: 
-        # 3 (block explicit login) 
-        # 19 (block sdk trusts)
-        # 51 (block all trusts)
+        [Int32] 
+        $AutoTrustConfig=0,
+        
+        [String[]] 
+        $PIFirewallHostmasks = @('10.*.*.*','192.168.*.*'),
+        
         [ValidateSet('3','19','51')]
-        [Int32]$Server_AuthenticationPolicy='51'
+        [Int32] 
+        $AuthenticationPolicy='3'
          )
 
     Import-DscResource -ModuleName PISecurityDSC
 
-    Node $ComputerName
+    Node $NodeName
     {
         # AU20001 - Disable PIWorld
         PIIdentity "AU20001: PIWorld usage"
@@ -31,7 +81,7 @@ Configuration PIDataArchive_AuditBaseline
             IsEnabled = $false
             AllowUseInTrusts = $false
             Ensure = "Present"
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
         }
         
         # AU20002 - Restrict use of the piadmin superuser
@@ -41,7 +91,7 @@ Configuration PIDataArchive_AuditBaseline
             AllowUseInTrusts = $false
             AllowUseInMappings = $false
             Ensure = "Present"
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
         }
 
         # AU20004 - Specify EditDays
@@ -50,7 +100,7 @@ Configuration PIDataArchive_AuditBaseline
             Name = "EditDays"
             Value = $DaysToAllowEdit
             Ensure = "Present"
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
         }
 
         # AU20005 - Auto Trust configuration
@@ -59,37 +109,37 @@ Configuration PIDataArchive_AuditBaseline
             Name = "AutoTrustConfig"
             Value = $AutoTrustConfig
             Ensure = "Present"
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
         }
 
         # AU20006 - Expensive query protection
         PITuningParameter 'AU20006: Archive_MaxQueryExecutionSec'
         {
             Name = "Archive_MaxQueryExecutionSec"
-            Value = $Archive_MaxQueryExecutionSec
+            Value = $MaxQueryExecutionSeconds
             Ensure = "Present"
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
         }
 
         # AU20007 - Explicit Login Disabled
         PITuningParameter 'AU20007: Server_AuthenticationPolicy'
         {
             Name = "Server_AuthenticationPolicy"
-            Value = $Server_AuthenticationPolicy
+            Value = $AuthenticationPolicy
             Ensure = "Present"
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
         }
         
         # AU20011 - PI Firewall
         $i = 0
-        foreach($Hostmask in $PIFirewall_Hostmasks)
+        foreach($Hostmask in $PIFirewallHostmasks)
         {
             PIFirewall "AU20011 - PIFirewall Add $i"
             {
                 Hostmask = $Hostmask
                 Ensure = "Present"
                 Value = "Allow" 
-                PIDataArchive = $ComputerName
+                PIDataArchive = $NodeName
             }
             $i++
         }
@@ -99,9 +149,10 @@ Configuration PIDataArchive_AuditBaseline
             Hostmask = '*.*.*.*'
             Ensure = "Absent"
             Value = "Allow" 
-            PIDataArchive = $ComputerName
+            PIDataArchive = $NodeName
             DependsOn = "[PIFirewall]AU20011 - PIFirewall Add 0"
         }
     }
 }
+
 PIDataArchive_AuditBaseline
