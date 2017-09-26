@@ -71,11 +71,13 @@ function Compare-PIResourceGenericProperties
                 Write-Verbose "Checking $($Parameter.Key) current value: ($($Current.$($Parameter.Key))) against desired value: ($($Parameter.Value))"
                 if($($Current.$($Parameter.Key)) -ne $Parameter.Value)
                 {
+                    Write-Verbose "Undesired property found: $($Parameter.Key)"
                     return $false
                 }
             }
         } 
-    
+
+        Write-Verbose "No undesired properties found."
         return $true
     }
     else

@@ -101,10 +101,28 @@ Configuration PIDataArchive_BasicWindowsImplementation
             }
         } 
 
+        # Remove default identities
+        $DefaultPIIdentities = @(
+                                    'PIOperators',
+                                    'PISupervisors',
+                                    'PIEngineers',
+                                    'pidemo'
+                                )
+        
+        Foreach($DefaultPIIdentity in $DefaultPIIdentities)
+        {
+            PIIdentity "DisableDefaultIdentity_$DefaultPIIdentity"
+            {
+                Name = $DefaultPIIdentity
+                Ensure = "Absent"
+                PIDataArchive = $NodeName
+            }
+        }
+
         # Disable default identities
         $DefaultPIIdentities = @(
-                                    'PIOperators','PISupervisors','PIEngineers',
-                                    'PIWorld','pidemo','piusers'
+                                    'PIWorld',
+                                    'piusers'
                                 )
         
         Foreach($DefaultPIIdentity in $DefaultPIIdentities)
