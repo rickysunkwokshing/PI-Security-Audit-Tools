@@ -87,14 +87,9 @@ function Test-TargetResource
         $PIDataArchive
     )
 
-    $PIResource = Get-TargetResource -Hostmask $Hostmask -PIDataArchive $PIDataArchive
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
-    if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
-    {
-        Write-Verbose "Testing desired: $Value against current: $($PIResource.Value)"
-        return $($Value -and $PIResource.Value)
-    }
-    return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
+    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource)
 }
 
 Export-ModuleMember -Function *-TargetResource

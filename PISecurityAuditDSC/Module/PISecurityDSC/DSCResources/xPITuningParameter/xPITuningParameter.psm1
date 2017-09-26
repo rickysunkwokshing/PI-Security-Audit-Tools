@@ -51,14 +51,14 @@ function Set-TargetResource
     )
     
     $Connection = Connect-PIDataArchive -PIDataArchiveMachineName $PIDataArchive
-    $TuningParameter = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
-    $IsDesired = Test-TargetResource -Ensure $Ensure -Name $Name -Value $Value -PIDataArchive $PIDataArchive
-    if(!$IsDesired)
-    {
-        if($Ensure -eq 'Absent')
-        { Set-PITuningParameter -Connection $Connection -Name $Name -Value $null }
-        else
-        { Set-PITuningParameter -Connection $Connection -Name $Name -Value $Value }
+    
+    if($Ensure -eq 'Absent')
+    { 
+        Set-PITuningParameter -Connection $Connection -Name $Name -Value $null 
+    }
+    else
+    { 
+        Set-PITuningParameter -Connection $Connection -Name $Name -Value $Value 
     }
 }
 
@@ -84,29 +84,16 @@ function Test-TargetResource
         $PIDataArchive
     )
 
-    $Result = $false
-    $TuningParameter = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
-    if($TuningParameter.Ensure -eq 'Absent')
+    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
+    
+    if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
-        Write-Verbose "$($Name) is null"
-        if($Ensure -eq 'Absent')
-        { $Result = $true }
-        else
-        { $Result = $false }
+        return $($PIResource.Value -eq $Value -or ($null -eq $PIResource.Value -and $PIResource.Default -eq $Value))
     }
     else
     {
-        if($Ensure -eq 'Absent')
-        { $Result = $false }
-        else
-        {
-            if($TuningParameter.Value -eq $Value -or ($null -eq $TuningParameter.Value -and $TuningParameter.Default -eq $Value))
-            { $Result = $true }
-            else 
-            { $Result = $false }
-        }
+        return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
     }
-    return $Result
 }
 
 Export-ModuleMember -Function *-TargetResource

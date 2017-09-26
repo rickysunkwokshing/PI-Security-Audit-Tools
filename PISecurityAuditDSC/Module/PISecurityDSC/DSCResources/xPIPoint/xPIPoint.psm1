@@ -96,13 +96,15 @@ function Test-TargetResource
     
     if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
-        Write-Verbose "Testing desired: $PtSecurity against current: $($PIResource.PtSecurity)"
         $PtSecurityMatch = Compare-PIDataArchiveACL -Desired $PtSecurity -Current $PIResource.PtSecurity
-        Write-Verbose "Testing desired: $DataSecurity against current: $($PIResource.DataSecurity)"
         $DataSecurityMatch = Compare-PIDataArchiveACL -Desired $DataSecurity -Current $PIResource.DataSecurity
+        
         return $($PtSecurityMatch -and $DataSecurityMatch)
     }
-    return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
+    else
+    {
+        return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
+    }
 }
 
 Export-ModuleMember -Function *-TargetResource

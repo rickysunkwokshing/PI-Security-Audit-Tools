@@ -25,6 +25,7 @@
             Write-Verbose "GetResult: $($Property): $($Value)."
         }
     }
+
     return $Ensure
 }
 
@@ -42,7 +43,45 @@ function Compare-PIDataArchiveACL
         $Current
     )
     
+    Write-Verbose "Testing desired: $Desired against current: $Current"
+
     return $($(Compare-Object -ReferenceObject $Desired.Split('|').Trim() -DifferenceObject $Current.Split('|').Trim()).Length -eq 0)
 }
 
-Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL' )
+function Compare-PIResourceGenericProperties
+{
+    param(
+        [parameter(Mandatory=$true)]
+        [System.Object]
+        $Desired,
+        
+        [parameter(Mandatory=$true)]
+        [System.Collections.Hashtable]
+        $Current
+    )
+
+    if($Current.Ensure -eq 'Present' -and $Desired['Ensure'] -eq 'Present')
+    {
+        Foreach($Parameter in $Desired.GetEnumerator())
+        {
+            # Nonrelevant fields can be skipped.
+            if($Current.Keys -contains $Parameter.Key)
+            {
+                # Make sure all applicable fields match.
+                Write-Verbose "Checking $($Parameter.Key) current value: ($($Current.$($Parameter.Key))) against desired value: ($($Parameter.Value))"
+                if($($Current.$($Parameter.Key)) -ne $Parameter.Value)
+                {
+                    return $false
+                }
+            }
+        } 
+    
+        return $true
+    }
+    else
+    {
+        return $($Current.Ensure -eq 'Absent' -and $Desired['Ensure'] -eq 'Absent')
+    }
+}
+
+Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL', 'Compare-PIResourceGenericProperties' )
