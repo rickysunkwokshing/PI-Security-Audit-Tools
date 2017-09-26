@@ -138,40 +138,9 @@ function Test-TargetResource
         $Identity
     )
 
-     # Take out parameters that are not actionable
-    @('Ensure','PIDataArchive') | Foreach-Object { $null = $PSBoundParameters.Remove($_) }
-
     $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
-    if($PIResource.Ensure -eq 'Absent')
-    {
-        Write-Verbose "PI Mapping $Name is Absent"
-        return $($Ensure -eq 'Absent')
-    }
-    else
-    {
-        Write-Verbose "PI Mapping $Name is Present"
-        if($Ensure -eq 'Absent')
-        { 
-            return $false
-        }
-        else
-        {
-            Foreach($Parameter in $PSBoundParameters.GetEnumerator())
-            {
-                # Nonrelevant fields can be skipped.
-                if($PIResource.Keys -contains $Parameter.Key)
-                {
-                    # Make sure all applicable fields match.
-                    if($($PIResource.$($Parameter.Key)) -ne $Parameter.Value)
-                    {
-                        return $false
-                    }
-                }
-            } 
-            return $true 
-        }
-    }
+    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource)
 }
 
 

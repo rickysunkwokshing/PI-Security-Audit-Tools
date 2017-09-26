@@ -80,9 +80,9 @@ function Set-TargetResource
         # Perform the set operation to correct the resource.
         if($PIResource.Ensure -eq "Present")
         {
-            # Since the identity is present, we must perform due diligence to preserve settings
-            # not explicitly defined in the config. Remove $PSBoundParameters and those not used 
-            # for the write operation (Ensure, PIDataArchive).
+            <# Since the identity is present, we must perform due diligence to preserve settings
+            not explicitly defined in the config. Remove $PSBoundParameters and those not used 
+            for the write operation (Ensure, PIDataArchive). #>
             $ParametersToOmit = @('Ensure', 'PIDataArchive') + $PSBoundParameters.Keys
             $ParametersToOmit | Foreach-Object { $null = $PIResource.Remove($_) }
 
@@ -100,8 +100,8 @@ function Set-TargetResource
         }
         else
         {
-            # Add the Absent identity. When adding the new identity, we do not need to worry about 
-            # clobbering existing properties because there are none.
+            <# Add the Absent identity. When adding the new identity, we do not need to worry about 
+            clobbering existing properties because there are none. #>
             Write-Verbose "Adding PI Identity $($Name)"          
             Add-PIIdentity -Connection $Connection -Name $Name `
                                 -DisallowDelete:$(!$CanDelete) -Disabled:$(!$IsEnabled) `
@@ -154,48 +154,10 @@ function Test-TargetResource
         [System.String]
         $Description
     )
-    
-    # Take out parameters that are not actionable
-    @('Ensure','PIDataArchive') | Foreach-Object { $null = $PSBoundParameters.Remove($_) }
 
     $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
-    if($PIResource.Ensure -eq 'Absent')
-    {
-        Write-Verbose "PI Identity $Name is Absent"
-        if($Ensure -eq 'Absent')
-        { 
-            return $true 
-        }
-        else
-        { 
-            return $false 
-        }
-    }
-    else
-    {
-        Write-Verbose "PI Identity $Name is Present"
-        if($Ensure -eq 'Absent')
-        { 
-            return $false
-        }
-        else
-        {
-            Foreach($Parameter in $PSBoundParameters.GetEnumerator())
-            {
-                # Nonrelevant fields can be skipped.
-                if($PIResource.Keys -contains $Parameter.Key)
-                {
-                    # Make sure all applicable fields match.
-                    if($($PIResource.$($Parameter.Key)) -ne $Parameter.Value)
-                    {
-                        return $false
-                    }
-                }
-            } 
-            return $true 
-        }
-    }
+    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource)
 }
 
 Export-ModuleMember -Function *-TargetResource

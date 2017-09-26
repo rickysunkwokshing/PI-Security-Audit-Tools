@@ -54,8 +54,8 @@ function Set-TargetResource
     
     if($Ensure -eq 'Absent')
     { 
-        # Setting database security to only piadmin access is as restrictive as it can be 
-        # since piadmin cannot be denied.
+        <# Setting database security to only piadmin access is as restrictive as it can be 
+        since piadmin cannot be denied. #>
         Set-PIDatabaseSecurity -Connection $Connection -Name $Name -Security "piadmin: A(r,w)" 
     }
     else
@@ -120,10 +120,12 @@ function Test-TargetResource
 
     if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
-        Write-Verbose "Testing against value: $Security"
         return $(Compare-PIDataArchiveACL -Desired $Security -Current $PIResource.Security)    
     }
-    return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
+    else
+    {
+        return $($PIResource.Ensure -eq 'Absent' -and $Ensure -eq 'Absent')
+    }
 }
 
 Export-ModuleMember -Function *-TargetResource
