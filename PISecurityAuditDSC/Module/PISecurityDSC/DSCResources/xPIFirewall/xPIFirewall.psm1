@@ -22,7 +22,7 @@ function Get-TargetResource
 
     return @{
                 Ensure = $Ensure
-                Value = $PIResource.Value
+                Value = $PIResource.Access
                 Hostmask = $PIResource.Hostmask
                 PIDataArchive = $PIDataArchive
             }
@@ -87,7 +87,7 @@ function Test-TargetResource
         $PIDataArchive
     )
 
-    $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
+    $PIResource = Get-TargetResource -Hostmask $Hostmask -PIDataArchive $PIDataArchive
     
     return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource)
 }
