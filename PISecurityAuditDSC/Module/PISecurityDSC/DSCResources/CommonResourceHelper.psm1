@@ -1,5 +1,6 @@
 ﻿function Get-PIResource_Ensure
 {
+    [CmdletBinding()]
     param(
         [object]
         $PIResource
@@ -50,6 +51,7 @@ function Compare-PIDataArchiveACL
 
 function Compare-PIResourceGenericProperties
 {
+    [CmdletBinding()]
     param(
         [parameter(Mandatory=$true)]
         [System.Object]
