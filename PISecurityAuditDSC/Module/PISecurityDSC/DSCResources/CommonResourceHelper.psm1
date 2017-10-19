@@ -88,4 +88,14 @@ function Compare-PIResourceGenericProperties
     }
 }
 
-Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL', 'Compare-PIResourceGenericProperties' )
+function IsNullOrEmpty
+{
+param(
+    [Object]
+    $Value
+)
+
+    return $($null -eq $Value -or "" -eq $Value)
+}
+
+Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL', 'Compare-PIResourceGenericProperties', 'IsNullOrEmpty' )
