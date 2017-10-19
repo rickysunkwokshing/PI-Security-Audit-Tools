@@ -120,7 +120,7 @@ function Test-TargetResource
 
     if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
-        return $(Compare-PIDataArchiveACL -Desired $Security -Current $PIResource.Security)    
+        return $(Compare-PIDataArchiveACL -Desired $Security -Current $PIResource.Security -Verbose:$VerbosePreference)    
     }
     else
     {

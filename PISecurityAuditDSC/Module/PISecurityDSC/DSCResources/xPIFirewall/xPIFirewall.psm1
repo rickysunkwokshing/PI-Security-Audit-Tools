@@ -89,7 +89,7 @@ function Test-TargetResource
 
     $PIResource = Get-TargetResource -Hostmask $Hostmask -PIDataArchive $PIDataArchive
     
-    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource)
+    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource -Verbose:$VerbosePreference)
 }
 
 Export-ModuleMember -Function *-TargetResource

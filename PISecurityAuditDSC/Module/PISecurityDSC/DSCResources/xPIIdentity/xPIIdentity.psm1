@@ -157,7 +157,7 @@ function Test-TargetResource
 
     $PIResource = Get-TargetResource -Name $Name -PIDataArchive $PIDataArchive
     
-    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource)
+    return $(Compare-PIResourceGenericProperties -Desired $PSBoundParameters -Current $PIResource -Verbose:$VerbosePreference)
 }
 
 Export-ModuleMember -Function *-TargetResource

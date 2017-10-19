@@ -88,7 +88,7 @@ function Test-TargetResource
     
     if($PIResource.Ensure -eq 'Present' -and $Ensure -eq 'Present')
     {
-        return $($PIResource.Value -eq $Value -or ($null -eq $PIResource.Value -and $PIResource.Default -eq $Value))
+        return $($PIResource.Value -eq $Value -or ($(IsNullOrEmpty $PIResource.Value) -and $PIResource.Default -eq $Value))
     }
     else
     {
