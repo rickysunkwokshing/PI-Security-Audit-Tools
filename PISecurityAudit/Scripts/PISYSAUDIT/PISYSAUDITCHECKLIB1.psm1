@@ -234,9 +234,16 @@ AU10002 - Operating System Installation Type
 .DESCRIPTION   
 VALIDATION: Verifies that the OS installation type is server core for the 
 reduced surface area.<br/>
-COMPLIANCE: Installation Type should be Server Core. Different SKUs are
-available at the link below:<br/>
-<a href="http://msdn.microsoft.com/en-us/library/ms724358.aspx">http://msdn.microsoft.com/en-us/library/ms724358.aspx</a><br/>  
+COMPLIANCE: The operating system installation type should be Server Core. 
+This check is rated as a critical severity because as an application, PI 
+can only be as secure as the platform it runs on. Server core provides a 
+dramatically reduced software footprint compared to the standard server 
+installation with all graphic components. Fewer application running and 
+fewer services communicating over the network amount to a reduced attack 
+surface area overall. The critical severity rating is intended to reflect 
+our stance that if an administrator were to only implement one change, 
+switching to server core would have the greatest impact.
+</br>
 For more on the advantages of Windows Server Core, please see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx </a>
 #>
@@ -267,12 +274,16 @@ PROCESS
 	try
 	{				
 		$InstallationType = $global:MachineConfiguration.InstallationType
-		if($InstallationType -eq "Server Core") { $result =  $true } else { $result = $false }
-
-		# Set a message to return with the audit object.
-		$msgTemplate = "The following installation type is used: {0}"
-		$msg = [string]::Format($msgTemplate, $InstallationType)
-
+		if($InstallationType -eq "Server Core") 
+		{ 
+			$result =  $true 
+			$msg = "Server Core installation detected."
+		} 
+		else 
+		{ 
+			$result = $false 
+			$msg = "Installation is not Server Core. The following installation type is used: " + $InstallationType + ". Leveraging a Core installation offers dramatically reduced attack surface over other installation types."
+		}
 	}
 	catch
 	{
