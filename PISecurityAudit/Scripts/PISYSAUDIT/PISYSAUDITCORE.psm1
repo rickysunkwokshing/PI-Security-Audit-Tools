@@ -76,16 +76,19 @@ function SetFolders
 	$logFile = PathConcat -ParentPath $exportPath -ChildPath "PISystemAudit.log"		
 
 	# Store them at within the global scope range.	
-	New-Variable -Name "ScriptsPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $scriptsPath
-	New-Variable -Name "ScriptsPathTemp" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $scriptsPathTemp			
-	New-Variable -Name "PasswordPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $pwdPath
-	if($null -eq (Get-Variable "ExportPath" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	$globalVariables = @{
+							ScriptsPath=$scriptsPath;
+							ScriptsPathTemp=$scriptsPathTemp;
+							PasswordPath=$pwdPath;
+							ExportPath=$exportPath;
+							PISystemAuditLogFile=$logFile;
+						}
+	foreach($globalVariable in $globalVariables.GetEnumerator())
 	{
-		New-Variable -Name "ExportPath" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $exportPath
-	}
-	if($null -eq (Get-Variable "PISystemAuditLogFile" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
-	{
-		New-Variable -Name "PISystemAuditLogFile" -Option "Constant" -Scope "Global" -Visibility "Public" -Value $logFile	
+		if($null -eq (Get-Variable ($globalVariable.Key) -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+		{
+			New-Variable -Name ($globalVariable.Key) -Option "Constant" -Scope "Global" -Visibility "Public" -Value ($globalVariable.Value)
+		}
 	}
 }
 
@@ -1850,14 +1853,13 @@ PROCESS
 {		
 	# Read from the global constant bag.
 	$isPISysAuditInitialized = (Get-Variable "PISysAuditInitialized" -Scope "Global" -ErrorAction "SilentlyContinue").Value		
-			
-	# Set folders.
+	
+	# Set folder names required by the script.
+	SetFolders
+		
 	# Set the initialization flag..
 	if(($null -eq $isPISysAuditInitialized) -or ($isPISysAuditInitialized -eq $false))
 	{			
-		# Set folder names required by the script.
-		SetFolders
-		
 		# Set global variable checking for elevated status.
 		$IsElevated = CheckIfRunningElevated
 		New-Variable -Name "PISysAuditIsElevated" -Scope "Global" -Visibility "Public" -Value $IsElevated
