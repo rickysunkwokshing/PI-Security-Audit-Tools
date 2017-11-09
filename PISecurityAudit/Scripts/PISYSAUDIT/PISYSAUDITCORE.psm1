@@ -3172,10 +3172,18 @@ PROCESS
 			}
 			else
 			{
+				# Disabling the Use of Windows Firewall Across Your Network
+				# https://technet.microsoft.com/en-us/library/bb490624.aspx
+				$policyKey = 'HKLM:\SOFTWARE\Policies\Microsoft\WindowsFirewall'
+				if((Test-Path $policyKey) -eq $false)
+				{
+					$policyKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy'
+				}
+
 				# These keys return 0 if disabled, 1 if enabled
-				$domain  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\DomainProfile | Select-Object -ExpandProperty EnableFirewall
-				$private = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\StandardProfile | Select-Object -ExpandProperty EnableFirewall
-				$public  = Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\PublicProfile | Select-Object -ExpandProperty EnableFirewall
+				$domain  = Get-ItemProperty -Path ($policyKey + "\DomainProfile") | Select-Object -ExpandProperty EnableFirewall
+				$private = Get-ItemProperty -Path ($policyKey + "\StandardProfile") | Select-Object -ExpandProperty EnableFirewall
+				$public  = Get-ItemProperty -Path ($policyKey + "\PublicProfile") | Select-Object -ExpandProperty EnableFirewall
 
 				# Assemble and return a list of objects that will mimic the profile objects returned by Get-NetFirewallProfile
 				$firewallState = @()

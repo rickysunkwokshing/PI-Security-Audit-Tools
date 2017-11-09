@@ -348,7 +348,8 @@ PROCESS
 		
 		foreach($profile in $firewallState) 
 		{ 
-			If($profile.Enabled)
+			# Explicitly check if [bool]$true because GPOboolean "False" will give misleading result in PS4
+			If($profile.Enabled -eq $true)
 			{ $validationCounter++ } 
 			Else
 			{ $disabledProfiles += " " + $profile.Name + ";" }
