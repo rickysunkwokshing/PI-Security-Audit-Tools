@@ -5470,7 +5470,9 @@ PROCESS
 			}
 			else
 			{
-				$msg = "The server: {0} has a problem with WinRM communication" -f $computerRole.ComputerName
+				$msg = "Unable to connect to server: " + $computerRole.ComputerName + ". Please try running the audit scripts locally on the target machine. " 
+				$msg += "This issue usually occurs if PSRemoting is disabled, or authentication failed during the PSRemoting connection attempt. "
+				$msg += "For more information see 'Running the scripts remotely' in the wiki (https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Running-the-scripts-remotely)"
 				Write-PISysAudit_LogMessage $msg "Error" $fn
 				New-PISysAuditError -lc $computerRole.IsLocal -rcn $computerRole.ComputerName `
 										-at $auditHashTable -an 'Computer' -fn $fn -msg $msg
