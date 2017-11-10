@@ -194,9 +194,14 @@ function Get-PISysAudit_CheckPIVisionVersion
 AU50001 - PI Vision Version
 .DESCRIPTION
 VALIDATION: Verifies PI Vision version.<br/>
-COMPLIANCE: Upgrade to the latest version of PI Vision.  For more information, 
-see "Upgrade a PI Vision installation" in the PI Live Library.<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a>
+COMPLIANCE: Upgrade to the latest version of PI Vision. See the PI 
+Vision product page for the latest version and associated documentation:<br/>
+<a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ </a><br/>
+For more information on the upgrade procedure, see "Upgrade a PI Vision 
+installation" in the PI Live Library.<br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a><br/>
+Associated security bulletins:<br/>
+<a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -239,7 +244,8 @@ PROCESS
 		else 
 		{
 			$result = $false
-			$msg = "Version $installVersion is not compliant."
+			$msg = "Noncompliant version ($installVersion) detected. Upgrading to the latest PI Vision version is recommended. "
+			$msg += "See https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ for the latest version and associated documentation."
 		}
 	}
 	catch

@@ -156,9 +156,14 @@ function Get-PISysAudit_CheckPIWebApiVersion
 AU60001 - PI Web API Version
 .DESCRIPTION
 VALIDATION: Verifies PI Web API version.<br/>
-COMPLIANCE: Upgrade to the latest version of PI Web API. For more information,
-see "PI Web API Installation" in the PI Live Library.<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B</a>
+COMPLIANCE: Upgrade to the latest version of PI Web API. See the PI 
+Web API product page for the latest version and associated documentation:<br/>
+<a href="https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/">https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/ </a><br/>
+For more information on the upgrade procedure, see "PI Web API Installation" 
+in the PI Live Library.<br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B</a><br/>
+Associated security bulletins:<br/>
+<a href="https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts">https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -200,7 +205,8 @@ PROCESS
 		else 
 		{
 			$result = $false
-			$msg = "Version $installVersion is not compliant."
+			$msg = "Noncompliant version ($installVersion) detected. Upgrading to the latest PI Web API version is recommended. "
+			$msg += "See https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/ for the latest version and associated documentation."
 		}	
 	}
 	catch
