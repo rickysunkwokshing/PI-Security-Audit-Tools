@@ -5498,10 +5498,14 @@ PROCESS
 				elseif($role.AuditRoleType -eq "PIVisionServer")
 				{ 
 					StartPIVisionServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel
+					# Call PI Web API implicitly for PI Vision audit.
 					StartPIWebApiServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel
 				}
-				elseif($role.AuditRoleType -eq "PIWebApiServer")
-				{ StartPIWebApiServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel }
+				elseif($role.AuditRoleType -eq "PIWebApiServer" -and !('PIVisionServer' -in $item.Value.AuditRoleType))
+				{ 
+					# Skip the explicit call to PI Web API audit if this machine includes a PI Vision role.
+					StartPIWebApiServerAudit $auditHashTable $role -lvl $AuditLevelInt -dbgl $DBGLevel 
+				}
 
 				$currCheck++
 			}

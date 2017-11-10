@@ -511,10 +511,15 @@ function Get-PISysAudit_CheckPIServerVersion
 AU20003 - PI Data Archive Version
 .DESCRIPTION
 VALIDATION: Verifies that the PI Data Archive is using the most recent release. <br/>  
-COMPLIANCE: Upgrade the PI Data Archive to the latest version, PI Data Archive 
-2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
-section of the PI Data Archive Installation and Upgrade Guide, Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a>
+COMPLIANCE: Upgrade the PI Data Archive to the latest version. See the PI Data 
+Archive product page for the latest version and associated documentation:<br/>
+<a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive </a><br/>
+For more information on the upgrade procedure, see the "Upgrade a PI Data Archive 
+Server" section of the PI Data Archive Installation and Upgrade Guide, in Live 
+Library: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
+Associated security bulletins:<br/>
+<a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -543,10 +548,9 @@ PROCESS
 	$Severity = "Unknown"
 	try
 	{
-		# Update these for subsequent releases
-		$latestVersion = '3.4.410.1256'
-		$readable = '2017 SP1'
-
+		$latestVersion = '3.4.405.1198'
+		$readable = '2016 R2'
+		
 		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
 		$versionInt = [int]($installationVersion -replace '\.', '')
 		$latestInt = [int]($latestVersion -replace '\.', '')
@@ -555,7 +559,8 @@ PROCESS
 		{
 			$result = $false
 			$Severity = 'High'
-			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
+			$msg = "Noncompliant version (" + $installationVersion + ") detected. Upgrading to the latest PI Data Archive version is recommended. "
+			$msg += "See https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive for the latest version and associated documentation."
 		}
 		else
 		{
