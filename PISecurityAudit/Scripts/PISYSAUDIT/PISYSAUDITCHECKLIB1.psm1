@@ -784,17 +784,17 @@ PROCESS
 			# Attribute is 0 or 1 for enabled/disabled
 			$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
 			$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
-			if($adminIsEnabled -and $userIsEnabled)
+			if($adminIsEnabled -eq 1 -and $userIsEnabled -eq 1)
 			{
 				$result = $true
 				$msg = "IE Enhanced Security is enabled for Users and Admins."
 			}
-			elseif($adminIsEnabled)
+			elseif($adminIsEnabled -eq 1)
 			{
 				$result = $false
 				$msg = "IE Enhanced Security is disabled for Users."
 			}
-			elseif($userIsEnabled)
+			elseif($userIsEnabled -eq 1)
 			{
 				$result = $false
 				$msg = "IE Enhanced Security is disabled for Admins."
