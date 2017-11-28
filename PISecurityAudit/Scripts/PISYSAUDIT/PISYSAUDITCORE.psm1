@@ -2246,7 +2246,15 @@ PROCESS
 	{
 		$scriptBlock = { 
 				param([string]$Path, [string]$Name) 
-				$Value = Get-ItemProperty -Path $Path -Name $Name | Select-Object -ExpandProperty $Name 
+				if(Test-Path -Path $Path)
+				{
+					$Value = Get-ItemProperty -Path $Path -Name $Name | Select-Object -ExpandProperty $Name
+				}
+				else
+				{
+					$Value = $null
+				}
+				 
 				return $Value
 			}
 
