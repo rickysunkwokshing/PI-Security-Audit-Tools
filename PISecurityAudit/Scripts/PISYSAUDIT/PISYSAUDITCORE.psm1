@@ -141,6 +141,16 @@ param(
 	}	
 }
 
+function NewAuditFunction
+{
+    Param($name, $level, $id)
+    $obj = New-Object pscustomobject
+    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
+    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
+    $obj | Add-Member -MemberType NoteProperty -Name 'ID' -Value $id
+	return $obj
+}
+
 function WriteHostPartialResult
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
@@ -1002,6 +1012,104 @@ function Test-PowerShellToolsForPISystemAvailable
 	}
 }
 
+function PathConcat {
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("pp")]
+		[string]
+		$ParentPath,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("cp")]
+		[string]
+		$ChildPath,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+
+		try {
+		$FullPath = ($ParentPath.TrimEnd('\', '/') + '\' + $ChildPath.TrimStart('\', '/'))
+		return $FullPath
+		}
+		catch {
+		# Return the error message.
+		$msgTemplate = "An error occurred building file path {0} with PowerShell."
+		$msg = [string]::Format($msgTemplate, $FullPath)
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		return
+		}
+}
+
+function ExecuteComplianceChecks
+{
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,		
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$true, Position=1, ParameterSetName = "Default")]
+		[alias("lof")]		
+		$ListOfFunctions,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("act")]
+		[string]
+		$Activity = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)	
+					
+		# Get and store the function Name.
+		$fn = GetFunctionName
+
+		# Set message templates.		
+		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
+		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
+
+		# Proceed with all the compliance checks.
+		$i = 0
+		foreach($function in $ListOfFunctions.GetEnumerator())
+		{		
+			# Set the progress.
+			if($ShowUI)
+			{
+				# Increment the counter.
+				$i++
+				$auditItem = (Get-Help $function.Name).Synopsis
+				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $ListOfFunctions.Count.ToString(), $auditItem)
+				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
+				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
+			}
+						
+			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, `
+										$LocalComputer, $RemoteComputerName, $DBGLevel)
+			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+			
+			if($global:SuppressCheckIDList -notcontains $function.ID)
+			{
+				# Call the function to execute the check.
+				& $function.Name $AuditTable -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+			}
+			else
+			{
+				$msg = "Suppressing audit check " + $function.ID + " against " + $computerParams.ComputerName
+				Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
+			}																																			
+		}
+}
+
 function StartComputerAudit
 {
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
@@ -1057,42 +1165,12 @@ param(
 				
 		# Set message templates.
 		$activityMsgTemplate1 = "Check computer '{0}'..."
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
-		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
-				
-		# Process.
-		$i = 0	
-		
-		# Set activity message.			
+		$statusMsgCompleted = "Completed"		
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)								
 
 		# Proceed with all the compliance checks.
-		foreach($function in $listOfFunctions.GetEnumerator())
-		{																									
-			# Set the progress.
-			if($ShowUI)
-			{
-				# Increment the counter.
-				$i++
-				$auditItem = (Get-Help $function.Name).Synopsis
-				$ActivityMsg1 = [string]::Format($activityMsgTemplate1, $computerParams.ComputerName)
-				$StatusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
-				Write-Progress -activity $ActivityMsg1 -Status $StatusMsg -ParentId 1 -PercentComplete $pctComplete
-			}
+		ExecuteComplianceChecks -AuditTable $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lof $listOfFunctions -dbgl $DBGLevel -act $activityMsg1
 			
-			# ............................................................................................................
-			# Verbose at Debug Level 2+
-			# Show some extra messages.
-			# ............................................................................................................						
-			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, `
-										$computerParams.IsLocal, $computerParams.ComputerName, $DBGLevel)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Call the function.
-			& $function.Name $AuditTable -lc $computerParams.IsLocal -rcn $computerParams.ComputerName -dbgl $DBGLevel						
-		}			
 		# Set the progress.
 		if($ShowUI)
 		{ 
@@ -1197,36 +1275,10 @@ param(
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI Data Archive component on '{0}' computer"
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 															
 		# Proceed with all the compliance checks.
-		$i = 0
-		foreach($function in $listOfFunctions.GetEnumerator())
-		{		
-			# Set the progress.
-			if($ShowUI)
-			{
-				# Increment the counter.
-				$i++
-				$auditItem = (Get-Help $function.Name).Synopsis
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
-				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
-			}
-			
-			# ............................................................................................................
-			# Verbose at Debug Level 2+
-			# Show some extra messages.
-			# ............................................................................................................				
-			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, `
-										$ComputerParams.IsLocal, $ComputerParams.ComputerName, $DBGLevel)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Call the function.
-			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel																																							
-		}
+		ExecuteComplianceChecks -AuditTable $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lof $listOfFunctions -dbgl $DBGLevel -act $activityMsg1
 
 		# Disconnect if PowerShell Tools are used.
 		if($global:PIDataArchiveConfiguration.Connection){
@@ -1247,37 +1299,6 @@ param(
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_				
 		return
 	}			
-}
-
-function PathConcat {
-param(							
-		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
-		[alias("pp")]
-		[string]
-		$ParentPath,
-		[parameter(Mandatory=$true, ParameterSetName = "Default")]
-		[alias("cp")]
-		[string]
-		$ChildPath,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("dbgl")]
-		[int]
-		$DBGLevel = 0)
-		
-	# Get and store the function Name.
-	$fn = GetFunctionName
-
-		try {
-		$FullPath = ($ParentPath.TrimEnd('\', '/') + '\' + $ChildPath.TrimStart('\', '/'))
-		return $FullPath
-		}
-		catch {
-		# Return the error message.
-		$msgTemplate = "An error occurred building file path {0} with PowerShell."
-		$msg = [string]::Format($msgTemplate, $FullPath)
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-		return
-		}
 }
 
 function StartPIAFServerAudit
@@ -1371,41 +1392,14 @@ param(
 		# Set message templates.		
 		$activityMsgTemplate1 = "Check PI AF Server component on '{0}' computer"
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
-		$statusMsgProgressTemplate1 = "Perform check {0}/{1}: {2}"
 		$statusMsgCompleted = "Completed"
-		$complianceCheckFunctionTemplate = "Compliance Check function: {0}, arguments: {1}, {2}, {3}, {4}"
 				
 		# Prepare data required for multiple compliance checks
 
 		Write-Progress -Activity $activityMsg1 -Status "Gathering PI AF Server Configuration"
 		$global:AFDiagOutput = Invoke-PISysAudit_AFDiagCommand -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
 										
-		# Proceed with all the compliance checks.
-		$i = 0
-		foreach($function in $listOfFunctions.GetEnumerator())
-		{									
-			# Set the progress.
-			if($ShowUI)
-			{
-				# Increment the counter.
-				$i++
-				$auditItem = (Get-Help $function.Name).Synopsis
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
-				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete	
-			}
-			
-			# ............................................................................................................
-			# Verbose at Debug Level 2+
-			# Show some extra messages.
-			# ............................................................................................................				
-			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, `
-										$ComputerParams.IsLocal, $ComputerParams.ComputerName, $DBGLevel)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Call the function.
-			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel
-		}
+		ExecuteComplianceChecks -AuditTable $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lof $listOfFunctions -dbgl $DBGLevel -act $activityMsg1
 
 		# Set the progress.
 		if($ShowUI)
@@ -1524,7 +1518,7 @@ param(
 												+ " Audit Table = {1}, Server Name = {2}, SQL Server Instance Name = {3}," `
 												+ " Use Integrated Security  = {4}, User name = {5}, Password file = {6}, Debug Level = {7}"								
 	
-		# Proceed with all the compliance checks.
+		# Proceed with all the compliance checks. 
 		$i = 0
 		foreach($function in $listOfFunctions.GetEnumerator())
 		{									
@@ -1670,30 +1664,8 @@ param(
 		}							
 				
 		# Proceed with all the compliance checks.
-		$i = 0
-		foreach($function in $listOfFunctions.GetEnumerator())
-		{									
-			# Set the progress.
-			if($ShowUI)
-			{
-				# Increment the counter.
-				$i++
-				$auditItem = (Get-Help $function.Name).Synopsis
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
-				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
-			}
+		ExecuteComplianceChecks -AuditTable $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lof $listOfFunctions -dbgl $DBGLevel -act $activityMsg1
 
-			# ............................................................................................................
-			# Verbose at Debug Level 2+
-			# Show some extra messages.
-			# ............................................................................................................							
-			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, $ComputerParams.ComputerName, $DBGLevel)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Call the function.
-			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel														
-		}
 		# Set the progress.
 		if($ShowUI)
 		{ 
@@ -1788,30 +1760,8 @@ param(
 		}							
 				
 		# Proceed with all the compliance checks.
-		$i = 0
-		foreach($function in $listOfFunctions.GetEnumerator())
-		{									
-			# Set the progress.
-			if($ShowUI)
-			{
-				# Increment the counter.
-				$i++
-				$auditItem = (Get-Help $function.Name).Synopsis
-				$statusMsg = [string]::Format($statusMsgProgressTemplate1, $i, $listOfFunctions.Count.ToString(), $auditItem)
-				$pctComplete = ($i-1) / $listOfFunctions.Count * 100
-				Write-Progress -activity $activityMsg1 -Status $statusMsg -ParentId 1 -PercentComplete $pctComplete
-			}
+		ExecuteComplianceChecks -AuditTable $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -lof $listOfFunctions -dbgl $DBGLevel -act $activityMsg1
 
-			# ............................................................................................................
-			# Verbose at Debug Level 2+
-			# Show some extra messages.
-			# ............................................................................................................							
-			$msg = [string]::Format($complianceCheckFunctionTemplate, $function.Name, $AuditTable, $ComputerParams.ComputerName, $DBGLevel)
-			Write-PISysAudit_LogMessage $msg "Debug" $fn -dbgl $DBGLevel -rdbgl 2
-			
-			# Call the function.
-			& $function.Name $AuditTable -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -dbgl $DBGLevel														
-		}
 		# Set the progress.
 		if($ShowUI)
 		{ 
@@ -5064,6 +5014,18 @@ PROCESS
 
 			$fileToExport = PathConcat -ParentPath $exportPath -ChildPath $fileName
 
+			# Note about suppressed Check IDs
+			$suppressedCheckIDs = ""
+			if($global:SuppressCheckIDList.Length -ne 0)
+			{
+				$suppressedCheckIDs = "The following validation checks were explicitly suppressed: "
+				foreach($suppressedCheckID in $global:SuppressCheckIDList)
+				{
+					$suppressedCheckIDs += $suppressedCheckID + "; "
+				}
+				$suppressedCheckIDs = $suppressedCheckIDs.Trim(';')
+			}
+
 			# Construct HTML table for errors
 			$errorRows = ""
 			if($errs){ 
@@ -5233,6 +5195,7 @@ PROCESS
 					<div style="padding-bottom:1em">
 						<h2>AUDIT SUMMARY </h2>
 						<h4>$reportTimestamp</h4> 
+						<h6>$suppressedCheckIDs</h6>
 					</div>
 
 					$errorTable
@@ -5372,6 +5335,10 @@ param(
 		[string]
 		$AuditLevel = "Basic",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("scid")]
+		[string[]]
+		$SuppressCheckID = @(),
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)		
@@ -5387,6 +5354,16 @@ PROCESS
 	# ............................................................................................................
 	Initialize-PISysAudit -ShowUI $ShowUI -dbgl $DBGLevel
 	
+	if($null -eq (Get-Variable "SuppressCheckIDList" -Scope "Global" -ErrorAction "SilentlyContinue").Value)
+	{
+		New-Variable -Name "SuppressCheckIDList" -Scope "Global" -Visibility "Public" -Value $SuppressCheckID
+	}
+	else
+	{
+		Set-Variable -Name "SuppressCheckIDList" -Scope "Global" -Visibility "Public" -Value $SuppressCheckID
+	}
+	
+
 	# Read from the global constant bag.
 	$isPISysAuditInitialized = (Get-Variable "PISysAuditInitialized" -Scope "Global" -ErrorAction "SilentlyContinue").Value					
 		
@@ -5648,6 +5625,7 @@ Set-Alias pwdondisk New-PISysAudit_PasswordOnDisk
 # Export Module Member
 # ........................................................................
 # <Do not remove>
+Export-ModuleMember NewAuditFunction
 Export-ModuleMember PathConcat
 Export-ModuleMember Initialize-PISysAudit
 Export-ModuleMember Get-PISysAudit_EnvVariable
