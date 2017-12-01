@@ -5290,6 +5290,11 @@ Enable or disable creation of detailed HTML report at end of audit.
 Alias: -lvl
 Choose level of audit to be performed. Higher levels may result
 in slow runtimes.
+.PARAMETER SuppressCheckID
+Alias: -scid
+Provide an array of IDs for validation checks to skip.  The intention
+for this setting is to allow administrators to whitelist specific checks
+that are not applicable to their implementation. 
 .PARAMETER DBGLevel
 Alias: -dbgl
 DebugLevel: 0 for no verbose, 1 for intermediary message
