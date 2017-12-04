@@ -2334,7 +2334,7 @@ PROCESS
 					"local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
 					"nt authority\local system", "nt authority\network service", "nt authority\local service",
-					 "applicationpoolidentity", "nt service\afservice", "nt service\piwebapi", "nt service\picrawler" ))
+					 "applicationpoolidentity", "nt service\afservice", "nt service\pinetmgr", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
 			$parsingPosDL = $UserString.IndexOf('\')
@@ -3722,6 +3722,13 @@ PROCESS
 		# Get Hostname.
 		$hostname = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" "ComputerName" -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 
+		# Machine is not joined to a Windows Domain.
+		If (!$MachineDomain) { 
+		$msg = "Machine $hostname is not joined to Windows Domain. SPN checks don't apply."	
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		return $null
+		}
+
 		# Build FQDN using hostname and domain strings.
 		$fqdn = $hostname + "." + $MachineDomain
 
@@ -3805,7 +3812,6 @@ PROCESS
 				$svcacc = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 			}
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
-
 			# Proceed with checking SPN for PI Vision or non-IIS app (PI/AF).
 			# Distinguish between Domain/Virtual account and Machine Accounts.
 			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
