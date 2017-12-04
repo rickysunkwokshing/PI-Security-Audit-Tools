@@ -35,15 +35,6 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
-function NewAuditFunction
-{
-    Param($name, $level)
-    $obj = New-Object pscustomobject
-    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
-    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
-    return $obj
-}
-
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -63,20 +54,20 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 # AU20001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 # AU20002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerVersion"                      1 # AU20003
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 # AU20004
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 # AU20005
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 # AU20006
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 # AU20007
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 # AU20008
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 # AU20012
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 # AU20013
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 # AU20014
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 "AU20001"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 "AU20002"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerVersion"                      1 "AU20003"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 "AU20004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 "AU20005"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 "AU20006"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 "AU20007"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 "AU20008"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 "AU20009"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 "AU20010"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 "AU20011"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 "AU20012"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 "AU20013"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 "AU20014"
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt

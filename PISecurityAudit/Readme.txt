@@ -141,6 +141,15 @@ piaudit -obf $true
 # Disable the output to screen when used with scheduled task.
 piaudit -ShowUI $false
 
+# Example 7
+# Run an audit of the PI Data Archive, PI AF Server and computer roles 
+# and omit the following checks.
+# AU10006 - Health Monitoring (OSIsoft NOC)
+# AU20008 - PI Server SPN
+$cpt = piauditparams $null "myPIServer" "PIDataArchive"
+$cpt = piauditparams $cpt "myPIAFServer" "PIAFServer"
+piaudit -cpt $cpt -scid @('AU10006','AU20008')
+
 #############
 # Resources #
 #############

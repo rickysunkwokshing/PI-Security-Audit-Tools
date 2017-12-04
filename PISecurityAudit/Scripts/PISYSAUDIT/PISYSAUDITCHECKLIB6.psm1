@@ -34,15 +34,6 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
-function NewAuditFunction
-{
-    Param($name, $level)
-    $obj = New-Object pscustomobject
-    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
-    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
-    return $obj
-}
-
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -62,8 +53,8 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebAPIVersion"  1 # AU60001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiCSRF"     1 # AU60002
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebAPIVersion"  1 "AU60001"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiCSRF"     1 "AU60002"
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
