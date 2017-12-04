@@ -35,15 +35,6 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
-function NewAuditFunction
-{
-    Param($name, $level)
-    $obj = New-Object pscustomobject
-    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
-    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
-    return $obj
-}
-
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -63,17 +54,17 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the PI AF Server compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServiceConfiguredAccount"    1 # AU30001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPImpersonationModeForAFDataSets" 1 # AU30002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServicePrivileges"           1 # AU30003
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPlugInVerifyLevel"               1 # AU30004
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFileExtensionWhitelist"          1 # AU30005
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerVersion"                 1 # AU30006
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFSPN"                           1 # AU30007
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 # AU30008
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 # AU30009
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWorldIdentity"                 1 # AU30010
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWriteAccess"                   1 # AU30011
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServiceConfiguredAccount"    1 "AU30001"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPImpersonationModeForAFDataSets" 1 "AU30002"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAFServicePrivileges"           1 "AU30003"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPlugInVerifyLevel"               1 "AU30004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFileExtensionWhitelist"          1 "AU30005"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerVersion"                 1 "AU30006"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFSPN"                           1 "AU30007"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFServerAdminRight"              1 "AU30008"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFConnectionString"              1 "AU30009"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWorldIdentity"                 1 "AU30010"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAFWriteAccess"                   1 "AU30011"
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -622,9 +613,14 @@ function Get-PISysAudit_CheckAFServerVersion
 AU30006 - PI AF Server Version
 .DESCRIPTION
 VALIDATION: Verifies PI AF Server version. <br/>
-COMPLIANCE: Upgrade to the latest version of PI AF Server.  For more information, 
-see "PI AF Server upgrades" in the PI Live Library. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a>
+COMPLIANCE: Upgrade to the latest version of PI AF Server. See the PI AF 
+product page for the latest version and associated documentation:<br/>
+<a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF">https://techsupport.osisoft.com/Products/PI-Server/PI-AF </a><br/>
+For more information on the upgrade procedure, see "PI AF Server 
+upgrades" in the PI Live Library. <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a><br/>
+Associated security bulletins:<br/>
+<a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -665,7 +661,7 @@ PROCESS
 				# Form an integer value with all the version tokens.
 				[string]$temp = $InstallVersionTokens[0] + $installVersionTokens[1] + $installVersionTokens[2] + $installVersionTokens[3]
 				$installVersionInt64 = [Convert]::ToInt64($temp)
-				if($installVersionInt64 -gt 2850000)
+				if($installVersionInt64 -gt 2900000)
 				{
 					$result = $true
 					$msg = "Server version is compliant."
@@ -673,8 +669,8 @@ PROCESS
 				else
 				{
 					$result = $false
-					$msg = "Server version is non-compliant: {0}."
-					$msg = [string]::Format($msg, $installVersion)
+					$msg = "Noncompliant version ($installVersion) detected. Upgrading to the latest PI AF version is recommended. "
+					$msg += "See https://techsupport.osisoft.com/Products/PI-Server/PI-AF/ for the latest version and associated documentation."
 				}		
 			}
 			else

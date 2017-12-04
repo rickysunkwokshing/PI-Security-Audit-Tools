@@ -35,15 +35,6 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
-function NewAuditFunction
-{
-    Param($name, $level)
-    $obj = New-Object pscustomobject
-    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
-    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
-    return $obj
-}
-
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -63,15 +54,15 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckDomainMemberShip"   1    # AU10001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckOSInstallationType" 1    # AU10002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFirewallEnabled"    1    # AU10003
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAppLockerEnabled"   1    # AU10004
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1    # AU10005
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1    # AU10006
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1    # AU10007
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdates"    1    # AU10008
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInternetAccess"     1    # AU10009
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckDomainMemberShip"   1 "AU10001"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckOSInstallationType" 1 "AU10002"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFirewallEnabled"    1 "AU10003"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAppLockerEnabled"   1 "AU10004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1 "AU10005"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1 "AU10006"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1 "AU10007"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdates"    1 "AU10008"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInternetAccess"     1 "AU10009"
 
 			
 	# Return all items at or below the specified AuditLevelInt
@@ -234,9 +225,16 @@ AU10002 - Operating System Installation Type
 .DESCRIPTION   
 VALIDATION: Verifies that the OS installation type is server core for the 
 reduced surface area.<br/>
-COMPLIANCE: Installation Type should be Server Core. Different SKUs are
-available at the link below:<br/>
-<a href="http://msdn.microsoft.com/en-us/library/ms724358.aspx">http://msdn.microsoft.com/en-us/library/ms724358.aspx</a><br/>  
+COMPLIANCE: The operating system installation type should be Server Core. 
+This check is rated as a critical severity because as an application, PI 
+can only be as secure as the platform it runs on. Server core provides a 
+dramatically reduced software footprint compared to the standard server 
+installation with all graphic components. Fewer application running and 
+fewer services communicating over the network amount to a reduced attack 
+surface area overall. The critical severity rating is intended to reflect 
+our stance that if an administrator were to only implement one change, 
+switching to server core would have the greatest impact.
+</br>
 For more on the advantages of Windows Server Core, please see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx </a>
 #>
@@ -267,12 +265,16 @@ PROCESS
 	try
 	{				
 		$InstallationType = $global:MachineConfiguration.InstallationType
-		if($InstallationType -eq "Server Core") { $result =  $true } else { $result = $false }
-
-		# Set a message to return with the audit object.
-		$msgTemplate = "The following installation type is used: {0}"
-		$msg = [string]::Format($msgTemplate, $InstallationType)
-
+		if($InstallationType -eq "Server Core") 
+		{ 
+			$result =  $true 
+			$msg = "Server Core installation detected."
+		} 
+		else 
+		{ 
+			$result = $false 
+			$msg = "Installation is not Server Core. The following installation type is used: " + $InstallationType + ". Leveraging a Core installation offers dramatically reduced attack surface over other installation types."
+		}
 	}
 	catch
 	{
@@ -348,7 +350,8 @@ PROCESS
 		
 		foreach($profile in $firewallState) 
 		{ 
-			If($profile.Enabled)
+			# Explicitly check if [bool]$true because GPOboolean "False" will give misleading result in PS4
+			If($profile.Enabled -eq $true)
 			{ $validationCounter++ } 
 			Else
 			{ $disabledProfiles += " " + $profile.Name + ";" }
@@ -772,17 +775,17 @@ PROCESS
 			# Attribute is 0 or 1 for enabled/disabled
 			$adminIsEnabled = Get-PISysAudit_RegistryKeyValue -rkp $adminKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
 			$userIsEnabled  = Get-PISysAudit_RegistryKeyValue -rkp $userKeyPath -a "IsInstalled" -lc $LocalComputer -rcn $RemoteComputerName
-			if($adminIsEnabled -and $userIsEnabled)
+			if($adminIsEnabled -eq 1 -and $userIsEnabled -eq 1)
 			{
 				$result = $true
 				$msg = "IE Enhanced Security is enabled for Users and Admins."
 			}
-			elseif($adminIsEnabled)
+			elseif($adminIsEnabled -eq 1)
 			{
 				$result = $false
 				$msg = "IE Enhanced Security is disabled for Users."
 			}
-			elseif($userIsEnabled)
+			elseif($userIsEnabled -eq 1)
 			{
 				$result = $false
 				$msg = "IE Enhanced Security is disabled for Admins."

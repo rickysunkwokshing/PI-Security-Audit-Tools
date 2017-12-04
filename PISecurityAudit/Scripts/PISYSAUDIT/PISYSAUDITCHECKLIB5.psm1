@@ -34,15 +34,6 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
-function NewAuditFunction
-{
-    Param($name, $level)
-    $obj = New-Object pscustomobject
-    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
-    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
-    return $obj
-}
-
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -62,10 +53,10 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the machine compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionVersion"  1 # AU50001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionAppPools" 1 # AU50002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSSL"      1 # AU50003
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSPN"      1 # AU50004
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionVersion"  1 "AU50001"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionAppPools" 1 "AU50002"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSSL"      1 "AU50003"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSPN"      1 "AU50004"
 	
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -193,10 +184,15 @@ function Get-PISysAudit_CheckPIVisionVersion
 .SYNOPSIS
 AU50001 - PI Vision Version
 .DESCRIPTION
-VALIDATION: verifies PI Vision version.<br/>
-COMPLIANCE: upgrade to the latest version of PI Vision.  For more information, 
-see "Upgrade a PI Vision installation" in the PI Live Library.<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a>
+VALIDATION: Verifies PI Vision version.<br/>
+COMPLIANCE: Upgrade to the latest version of PI Vision. See the PI 
+Vision product page for the latest version and associated documentation:<br/>
+<a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ </a><br/>
+For more information on the upgrade procedure, see "Upgrade a PI Vision 
+installation" in the PI Live Library.<br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a><br/>
+Associated security bulletins:<br/>
+<a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -234,12 +230,13 @@ PROCESS
 		if($installVersionInt64 -ge 3200)
 		{
 			$result = $true
-			$msg = "Version is compliant."
+			$msg = "Version $installVersion is compliant."
 		}	
 		else 
 		{
 			$result = $false
-			$msg = "Version is not compliant."
+			$msg = "Noncompliant version ($installVersion) detected. Upgrading to the latest PI Vision version is recommended. "
+			$msg += "See https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ for the latest version and associated documentation."
 		}
 	}
 	catch

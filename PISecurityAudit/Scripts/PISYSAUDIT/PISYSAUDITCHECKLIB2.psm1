@@ -35,15 +35,6 @@
 function GetFunctionName
 { return (Get-Variable MyInvocation -Scope 1).Value.MyCommand.Name }
 
-function NewAuditFunction
-{
-    Param($name, $level)
-    $obj = New-Object pscustomobject
-    $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
-    $obj | Add-Member -MemberType NoteProperty -Name 'Level' -Value $level
-    return $obj
-}
-
 # ........................................................................
 # Public Functions
 # ........................................................................
@@ -63,20 +54,20 @@ param(
 	# Form a list of all functions that need to be called to test
 	# the PI Data Archive compliance.
 	$listOfFunctions = @()
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 # AU20001
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 # AU20002
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerVersion"                      1 # AU20003
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 # AU20004
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 # AU20005
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 # AU20006
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 # AU20007
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 # AU20008
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 # AU20009
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 # AU20010
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 # AU20011
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 # AU20012
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 # AU20013
-	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 # AU20014
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess" 1 "AU20001"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIAdminUsage"                         1 "AU20002"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIServerVersion"                      1 "AU20003"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckEditDays"                             1 "AU20004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAutoTrustConfig"                      1 "AU20005"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExpensiveQueryProtection"             1 "AU20006"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckExplicitLoginDisabled"                1 "AU20007"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPISPN"                                1 "AU20008"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPICollective"                         1 "AU20009"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInstalledClientSoftware"              1 "AU20010"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIFirewall"                           1 "AU20011"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 "AU20012"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 "AU20013"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 "AU20014"
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -511,10 +502,15 @@ function Get-PISysAudit_CheckPIServerVersion
 AU20003 - PI Data Archive Version
 .DESCRIPTION
 VALIDATION: Verifies that the PI Data Archive is using the most recent release. <br/>  
-COMPLIANCE: Upgrade the PI Data Archive to the latest version, PI Data Archive 
-2016 R2 (3.4.405.1198).  For more information, see the "Upgrade a PI Data Archive Server" 
-section of the PI Data Archive Installation and Upgrade Guide, Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a>
+COMPLIANCE: Upgrade the PI Data Archive to the latest version. See the PI Data 
+Archive product page for the latest version and associated documentation:<br/>
+<a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive </a><br/>
+For more information on the upgrade procedure, see the "Upgrade a PI Data Archive 
+Server" section of the PI Data Archive Installation and Upgrade Guide, in Live 
+Library: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
+Associated security bulletins:<br/>
+<a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -543,10 +539,9 @@ PROCESS
 	$Severity = "Unknown"
 	try
 	{
-		# Update these for subsequent releases
-		$latestVersion = '3.4.410.1256'
-		$readable = '2017 SP1'
-
+		$latestVersion = '3.4.405.1198'
+		$readable = '2016 R2'
+		
 		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
 		$versionInt = [int]($installationVersion -replace '\.', '')
 		$latestInt = [int]($latestVersion -replace '\.', '')
@@ -555,7 +550,8 @@ PROCESS
 		{
 			$result = $false
 			$Severity = 'High'
-			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
+			$msg = "Noncompliant version (" + $installationVersion + ") detected. Upgrading to the latest PI Data Archive version is recommended. "
+			$msg += "See https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive for the latest version and associated documentation."
 		}
 		else
 		{
@@ -1107,18 +1103,43 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{	
-		$serviceType = $global:PIDataArchiveConfiguration.Connection.Service.Type.ToString()
-		if ($serviceType.ToLower() -eq 'collective')
+	{
+		$connection = $global:PIDataArchiveConfiguration.Connection
+
+		if($connection.GetType().ToString() -eq "OSIsoft.PI.Net.Connection") # PS Tools pre-2017
 		{
-			$result = $true
-			$msg = "PI Data Archive is a member of PI Collective '{0}'"
-			$msg = [string]::Format($msg, $global:PIDataArchiveConfiguration.Connection.Service.Name)
+			$serviceType = $connection.Service.Type.ToString()
+			if ($serviceType.ToLower() -eq 'collective')
+			{
+				$result = $true
+				$collectiveName = $connection.Service.Name
+				$msg = "PI Data Archive is a member of PI Collective '$collectiveName'"
+			}
+			else
+			{
+				$msg = "PI Data Archive is not a member of a PI Collective"
+				$result = $false
+			}
+		}
+		elseif($connection.GetType().ToString() -eq "OSIsoft.PI.Net.ClientChannel") # PS Tools 2017
+		{
+			$serviceType = $connection.CurrentRole.Type.ToString().ToLower()
+			if ($serviceType -eq 'primary' -or $serviceType -eq 'secondary')
+			{
+				$result = $true
+				$collectiveName = Get-PICollective $connection | Select-Object -ExpandProperty Name
+				$msg = "PI Data Archive is a member of PI Collective '$collectiveName'"
+			}
+			else
+			{
+				$msg = "PI Data Archive is not a member of a PI Collective"
+				$result = $false
+			}
 		}
 		else
 		{
-			$msg = "PI Data Archive is not a member of a PI Collective"
-			$result = $false
+			$result = "N/A"
+			$msg = "Unable to detect collective status from PI Data Archive connection."
 		}
 	}
 	catch
