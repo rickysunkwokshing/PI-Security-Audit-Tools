@@ -142,12 +142,13 @@ function Get-PISysAudit_CheckDomainMemberShip
 .SYNOPSIS
 AU10001 - Domain Membership
 .DESCRIPTION
-VALIDATION: Verifies that the machine is a member of an Active Directory Domain.<br/>  
-COMPLIANCE: Join the machine to an Active Directory Domain.  Use of a domain is 
-encouraged as AD provides Kerberos authentication and is our best available technology 
-for securing a PI System.  Furthermore, the implementation of transport security in the 
-PI System relies on Windows Integrated Security and AD to automatically enable higher 
-strength ciphers.
+VALIDATION: Verifies that the machine is a member of an Active Directory 
+Domain.<br/>  
+COMPLIANCE: Join the machine to an Active Directory Domain. Use of a domain is 
+encouraged as AD provides Kerberos authentication and is our best available 
+technology for securing a PI System. Furthermore, the implementation of 
+transport security in the PI System relies on Windows Integrated Security and 
+AD to automatically enable higher strength ciphers.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -225,16 +226,15 @@ AU10002 - Operating System Installation Type
 .DESCRIPTION   
 VALIDATION: Verifies that the OS installation type is server core for the 
 reduced surface area.<br/>
-COMPLIANCE: The operating system installation type should be Server Core. 
-This check is rated as a critical severity because as an application, PI 
-can only be as secure as the platform it runs on. Server core provides a 
-dramatically reduced software footprint compared to the standard server 
-installation with all graphic components. Fewer application running and 
-fewer services communicating over the network amount to a reduced attack 
-surface area overall. The critical severity rating is intended to reflect 
-our stance that if an administrator were to only implement one change, 
-switching to server core would have the greatest impact.
-</br>
+COMPLIANCE: The operating system installation type should be Server Core. This 
+check is rated as a critical severity because as an application, PI can only be 
+as secure as the platform it runs on. Server core provides a dramatically 
+reduced software footprint compared to the standard server installation with 
+all graphic components. Fewer application running and fewer services 
+communicating over the network amount to a reduced attack surface area overall. 
+The critical severity rating is intended to reflect our stance that if an 
+administrator were to only implement one change, switching to server core would 
+have the greatest impact.
 For more on the advantages of Windows Server Core, please see:<br/>
 <a href="https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx">https://msdn.microsoft.com/en-us/library/hh846314(v=vs.85).aspx </a>
 #>
@@ -308,11 +308,11 @@ AU10003 - Windows Firewall Enabled
 .DESCRIPTION
 VALIDATION: Verifies that the Windows host based firewall is enabled.<br/> 
 COMPLIANCE: Enable the Windows firewall for Domain, Private and Public Scope.  
-A firewall's effectiveness is heavily dependent on the configuration.  
-For PI specific port requirements, please see:<br/> 
-<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01162"> https://techsupport.osisoft.com/Troubleshooting/KB/KB01162 </a> <br/>
-For more general information on the Windows firewall, see "Windows Firewall with 
-Advanced Security Overview" on TechNet: <br/>
+A firewall's effectiveness is heavily dependent on the configuration. For PI-
+specific port requirements, please see:<br/> 
+<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01162">https://techsupport.osisoft.com/Troubleshooting/KB/KB01162 </a> <br/>
+For more general information on the Windows firewall, see "Windows Firewall 
+with Advanced Security Overview" on TechNet: <br/>
 <a href="https://technet.microsoft.com/en-us/library/hh831365(v=ws.11).aspx">https://technet.microsoft.com/en-us/library/hh831365(v=ws.11).aspx </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -401,8 +401,9 @@ function Get-PISysAudit_CheckAppLockerEnabled
 AU10004 - AppLocker Enabled
 .DESCRIPTION
 VALIDATION: Verifies that AppLocker is enabled. <br/>  
-COMPLIANCE: Set AppLocker to Enforce mode after establishing a policy and ensure that the Application Identity service is not disabled.  For a 
-primer on running AppLocker on a PI Data Archive, see: <br/>
+COMPLIANCE: Set AppLocker to Enforce mode after establishing a policy and ensure
+that the Application Identity service is not disabled.  For a primer on running 
+AppLocker on a PI Data Archive, see: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00994">https://techsupport.osisoft.com/Troubleshooting/KB/KB00994</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -515,8 +516,8 @@ following default features: EnableLUA, ConsentPromptBehaviorAdmin,
 EnableInstallerDetection, PromptOnSecureDesktop and EnableSecureUIAPaths.
 Additionally, a check is performed for the feature ValidateAdminCodeSignatures.  
 Lower severity is assigned if this is the only feature disabled.<br/>
-COMPLIANCE: Enable the flagged UAC features through Local Security Policy.  
-For more information on specific UAC features, see: <br/>
+COMPLIANCE: Enable the flagged UAC features through Local Security Policy. For 
+more information on specific UAC features, see: <br/>
 <a href="https://technet.microsoft.com/en-us/library/dd835564(v=ws.10).aspx">https://technet.microsoft.com/en-us/library/dd835564(v=ws.10).aspx </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -621,11 +622,11 @@ AU10006 - Health Monitoring (OSIsoft NOC)
 VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled, 
 indicating that the machine is monitored in the OSIsoft NOC. <br/>
 COMPLIANCE: The goal of this check is to ensure that the PI System component
-has monitoring for notification and response, of which mPI is one example.  
-If an equivalent independent solution is in place for monitoring, this check 
-can be safely ignored.  To ensure compliance with this check PI Agent and PI 
-Diagnostics need to be installed and running on the machine so that the 
-OSIsoft NOC will detect issues. <br/>
+has monitoring for notification and response, of which mPI is one example. If 
+an equivalent independent solution is in place for monitoring, this check can
+be safely ignored.  To ensure compliance with this check PI Agent and PI 
+Diagnostics need to be installed and running on the machine so that the OSIsoft 
+NOC will detect issues. <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -733,9 +734,9 @@ function Get-PISysAudit_CheckIEEnhancedSecurity
 AU10007 - Internet Explorer Enhanced Security
 .DESCRIPTION
 VERIFICATION: Validates that IE Enhanced Security is enabled <br/>
-COMPLIANCE: Ensure that Internet Explorer Enhanced Security is enabled
-for both Administrators and Users. More information is available at: 
-<a href="https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx"> https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx </a> <br/>
+COMPLIANCE: Ensure that Internet Explorer Enhanced Security is enabled for both
+Administrators and Users. More information is available at:<br/>
+<a href="https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx">https://technet.microsoft.com/en-us/library/dd883248(v=ws.10).aspx </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -957,7 +958,7 @@ function Get-PISysAudit_CheckInternetAccess
 .SYNOPSIS
 AU10009 - No Internet Access
 .DESCRIPTION
-VERIFICATION: Checks that this server is not able to access the internet. <br/>
+VERIFICATION: Checks that this server is not able to access the internet.<br/>
 COMPLIANCE: Implement firewall restrictions to prevent access to the internet 
 from the server. 
 #>
