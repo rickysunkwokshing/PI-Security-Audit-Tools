@@ -1098,7 +1098,7 @@ PROCESS
 	$msg = ""
 	try
 	{		
-		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		if($global:ArePowerShellToolsAvailable -and (Test-AFServerConnectionAvailable))
 		{
 			$con = $global:AFServerConnection
 			$version = [int]($con.ServerVersion -replace '\.', '')
@@ -1222,7 +1222,7 @@ PROCESS
 	$msg = ""
 	try
 	{		
-		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		if($global:ArePowerShellToolsAvailable -and (Test-AFServerConnectionAvailable))
 		{
 			$con = $global:AFServerConnection
 
