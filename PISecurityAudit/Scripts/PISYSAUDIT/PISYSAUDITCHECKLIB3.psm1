@@ -684,7 +684,9 @@ PROCESS
 		{
 			# OSIsoft.Powershell not available
 			$result = "N/A"
-			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			$msg = "PowerShell Tools for the PI System (OSIsoft.Powershell module) not found. " 
+			$msg += "Cannot continue processing the validation check. " 
+			$msg += "Check if PI System Management Tools are installed on the machine running the audit tools."
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
 	}
@@ -935,7 +937,9 @@ PROCESS
 		{
 			# OSIsoft.Powershell not available
 			$result = "N/A"
-			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			$msg = "PowerShell Tools for the PI System (OSIsoft.Powershell module) not found. " 
+			$msg += "Cannot continue processing the validation check. " 
+			$msg += "Check if PI System Management Tools are installed on the machine running the audit tools."
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
 	}
@@ -1324,7 +1328,9 @@ PROCESS
 		else
 		{
 			$result = "N/A"
-			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			$msg = "PowerShell Tools for the PI System (OSIsoft.Powershell module) not found. " 
+			$msg += "Cannot continue processing the validation check. " 
+			$msg += "Check if PI System Management Tools are installed on the machine running the audit tools."
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}			
 	}
