@@ -139,7 +139,6 @@ END {}
 
 }
 
-
 function Get-PISysAudit_CheckPIWebApiVersion
 {
 <#  
@@ -147,11 +146,11 @@ function Get-PISysAudit_CheckPIWebApiVersion
 AU60001 - PI Web API Version
 .DESCRIPTION
 VALIDATION: Verifies PI Web API version.<br/>
-COMPLIANCE: Upgrade to the latest version of PI Web API. See the PI 
-Web API product page for the latest version and associated documentation:<br/>
+COMPLIANCE: Upgrade to the latest version of PI Web API. See the PI Web API 
+product page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/">https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/ </a><br/>
 For more information on the upgrade procedure, see "PI Web API Installation" 
-in the PI Live Library.<br/>
+in the PI Live Library:<br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B</a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts">https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts</a>
@@ -231,9 +230,9 @@ function Get-PISysAudit_CheckPIWebApiCSRF
 AU60002 - PI Web API CSRF
 .DESCRIPTION
 VALIDATION: Checks for enabled CSRF Defense in the PI Web API.<br/>
-COMPLIANCE: Verify that Cross-Site Request Forgery defense is enabled. 
-This is configured by setting "EnableCSRFDefense" to True on the 
-PI Web API configuration element. for more information, see AL00316.<br/>
+COMPLIANCE: Verify that Cross-Site Request Forgery defense is enabled. This is 
+configured by setting "EnableCSRFDefense" to True on the PI Web API 
+configuration element. for more information, see AL00316:<br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/Alerts/AL00316">https://techsupport.osisoft.com/Troubleshooting/Alerts/AL00316</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
