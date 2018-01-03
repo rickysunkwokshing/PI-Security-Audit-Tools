@@ -185,12 +185,12 @@ function Get-PISysAudit_CheckPIServerDBSecurity_PIWorldReadAccess
 .SYNOPSIS
 AU20001 - PI Data Archive Table Security
 .DESCRIPTION
-VALIDATION: Examines the database security of the PI Data Archive and flags any 
-ACLs that contain access for PIWorld as weak. <br/>
-COMPLIANCE: Remove PIWorld access from all database security ACLs.  Note that prior
-removing PIWorld access, you need to evaluate which applications are relying on that 
-access so that you can grant those applications access explicitly.  This check will
-also pass if PIWorld is disabled globally.
+VALIDATION: Examines the database security of the PI Data Archive and flags 
+any ACLs that contain access for PIWorld as weak. <br/>
+COMPLIANCE: Remove PIWorld access from all database security ACLs.  Note that 
+prior to removing PIWorld access, you need to evaluate which applications are 
+relying on that access so that you can grant those applications access 
+explicitly.  This check will also pass if PIWorld is disabled globally.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -344,14 +344,15 @@ function Get-PISysAudit_CheckPIAdminUsage
 AU20002 - PI Admin Usage
 .DESCRIPTION
 VALIDATION: Verifies that the piadmin PI User is not used in mappings or trusts.<br/>
-COMPLIANCE: Replace any trusts or mappings that use piadmin with a mapping or trust to a
-PI Identity with appropriate privilege for the applications that will use it.  Will also
-check if trusts and mappings to piadmin have been disabled globally.  This can be done by  
-checking "User cannot be used in a Trust" and "User cannot be used in a Mapping" in the 
-Properties menu for the piadmin PI User.  To access this menu open use the Identities, 
-Users, & Groups plugin in PI SMT, navigate to the PI User tab, right click the piadmin 
-entry and select Properties in the context menu.  
-For more information, see "Security Best Practice" #4 in KB00833: <br/>
+COMPLIANCE: Replace any trusts or mappings that use piadmin with a mapping or 
+trust to a PI Identity with appropriate privilege for the applications that will
+use it.  Will also check if trusts and mappings to piadmin have been disabled 
+globally.  This can be done by checking "User cannot be used in a Trust" and 
+"User cannot be used in a Mapping" in the Properties menu for the piadmin PI 
+User.  To access this menu open use the Identities, Users, & Groups plugin in 
+PI SMT, navigate to the PI User tab, right click the piadmin entry and select 
+Properties in the context menu. For more information, see "Security Best 
+Practice" #4 in KB00833: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 ">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -501,13 +502,13 @@ function Get-PISysAudit_CheckPIServerVersion
 .SYNOPSIS
 AU20003 - PI Data Archive Version
 .DESCRIPTION
-VALIDATION: Verifies that the PI Data Archive is using the most recent release. <br/>  
+VALIDATION: Verifies that the PI Data Archive is using the most recent release.<br/>  
 COMPLIANCE: Upgrade the PI Data Archive to the latest version. See the PI Data 
 Archive product page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive </a><br/>
-For more information on the upgrade procedure, see the "Upgrade a PI Data Archive 
-Server" section of the PI Data Archive Installation and Upgrade Guide, in Live 
-Library: <br/>
+For more information on the upgrade procedure, see the "Upgrade a PI Data 
+Archive Server" section of the PI Data Archive Installation and Upgrade Guide, 
+in Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts</a>
@@ -591,10 +592,11 @@ function Get-PISysAudit_CheckEditDays
 AU20004 - Edit Days Specified
 .DESCRIPTION
 VALIDATION: verified that the Edit Days tuning parameter is set. <br/>
-COMPLIANCE: set to a value greater than zero.  EditDays defines the number of past 
-days where events can be modified in the Snapshot or Archive databases. A zero value means 
-no time check is done.  For instructions to set EditDays, see "Modify the EditDays tuning 
-parameter" section in the PI Data Archive System Management Guide:<br/>
+COMPLIANCE: set to a value greater than zero.  EditDays defines the number of 
+past days where events can be modified in the Snapshot or Archive databases. A 
+zero value means no time check is done.  For instructions to set EditDays, see 
+"Modify the EditDays tuning parameter" section in the PI Data Archive System 
+Management Guide:<br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -680,8 +682,8 @@ AU20005 - Auto Trust Configuration
 VALIDATION: Verifies that the autotrustconfig tuning parameter is set to create 
 either no trusts or a trust for the loopback automatically (127.0.0.1). <br/>
 COMPLIANCE: Set the autotrustconfig tuning parameter to a value of 0 (do not 
-automatically create any PI Trust entries) or 1 (create the trust entry for the loopback 
-IP address 127.0.0.1 only). 
+automatically create any PI Trust entries) or 1 (create the trust entry for the 
+loopback IP address 127.0.0.1 only). 
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -784,10 +786,11 @@ function Get-PISysAudit_CheckExpensiveQueryProtection
 .SYNOPSIS
 AU20006 - Expensive Query Protection
 .DESCRIPTION
-VALIDATION: Verify that the PI Data Archive has protection against expensive queries. <br/>
-COMPLIANCE: Set the archive_maxqueryexecutionsec tuning parameter to a value between 60 
-and 300.  For more information on this parameter and other that can protect against expensive 
-queries, see the knowledgebase article 3224OSI8 <br/>
+VALIDATION: Verify that the PI Data Archive has protection against expensive 
+queries. <br/>
+COMPLIANCE: Set the archive_maxqueryexecutionsec tuning parameter to a value 
+between 60 and 300.  For more information on this parameter and other that can 
+protect against expensive queries, see the knowledgebase article 3224OSI8: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/3224OSI8">https://techsupport.osisoft.com/Troubleshooting/KB/3224OSI8  </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -894,11 +897,12 @@ function Get-PISysAudit_CheckExplicitLoginDisabled
 .SYNOPSIS
 AU20007 - Explicit Login Disabled
 .DESCRIPTION
-VALIDATION: Verifies that explicit login is disabled as an authentication protocol. <br/>  
-COMPLIANCE: Set the tuning parameter Server_AuthenticationPolicy to a value greater than 3.  
-This is equivalent to the third notch, "Disable explicit login", or higher on the Security 
-Settings plugin in PI SMT.  For more information, see "Security Best Practice #2" and "Security 
-Best Practice #3" in KB00833. <br/>
+VALIDATION: Verifies that explicit login is disabled as an authentication
+protocol. <br/>  
+COMPLIANCE: Set the tuning parameter Server_AuthenticationPolicy to a value 
+greater than 3. This is equivalent to the third notch, "Disable explicit login", 
+or higher on the Security Settings plugin in PI SMT.  For more information, see 
+"Security Best Practice #2" and "Security Best Practice #3" in KB00833. <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB00833">https://techsupport.osisoft.com/Troubleshooting/KB/KB00833 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -998,10 +1002,10 @@ function Get-PISysAudit_CheckPISPN
 AU20008 - PI Server SPN
 .DESCRIPTION
 VALIDATION: Checks PI Data Archive SPN assignment.<br/>
-COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running pinetmgr. 
-Presently only local system is supported.  Correct SPN assignment makes Kerberos 
-Authentication possible.  For more information, see "PI and Kerberos authentication" in 
-the PI Live Library. <br/>
+COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running 
+pinetmgr. Presently only local system is supported.  Correct SPN assignment 
+makes Kerberos Authentication possible.  For more information, see "PI and 
+Kerberos authentication" in the PI Live Library. <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -1074,9 +1078,11 @@ function Get-PISysAudit_CheckPICollective
 .SYNOPSIS
 AU20009 - PI Collective
 .DESCRIPTION
-VALIDATION: Checks if the PI Data Archive is a member of a High Availability Collective. <br/>
-COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to allow for 
-High Availability which avoids a single point of failure and allows for less disruptive servicing.<br/>
+VALIDATION: Checks if the PI Data Archive is a member of a High Availability 
+Collective. <br/>
+COMPLIANCE: Ensure that the PI Data Archive is a member of a PI Collective to 
+allow for High Availability which avoids a single point of failure and allows 
+for less disruptive servicing.<br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1172,13 +1178,15 @@ function Get-PISysAudit_CheckInstalledClientSoftware
 .SYNOPSIS
 AU20010 - No Client Software
 .DESCRIPTION
-VALIDATION: Checks if common client software is installed on the PI Data Archive machine. <br/>
-COMPLIANCE: Local logon access to the PI Data Archive server should be limited to administrators
-and only performed for maintenance tasks which require local logon.  Client tools should not be 
-necessary locally, and following the principle of least functionality, should be removed to reduce
-the available attack surface and required patch maintenance.  As a minimum measure, ensure common
-client tools such as PI Processbookt and Microsoft Office are not installedon the PI Data Archive 
-machines only. <br/>
+VALIDATION: Checks if common client software is installed on the PI Data Archive
+machine. <br/>
+COMPLIANCE: Local logon access to the PI Data Archive server should be limited to
+administrators and only performed for maintenance tasks which require local 
+logon. Client tools should not be necessary locally, and following the principle 
+of least functionality, should be removed to reduce the available attack surface
+and required patch maintenance. As a minimum measure, ensure common client tools 
+such as PI ProcessBook and Microsoft Office are not installed on the PI Data
+Archive machines. <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1270,10 +1278,10 @@ function Get-PISysAudit_CheckPIFirewall
 AU20011 - PI Firewall Used
 .DESCRIPTION
 VALIDATION: Checks that PI Firewall is used. <br/>
-COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should 
-be removed and replaced with specific IPs or subnets that may 
-connect to the PI Data Archive. For more information on PI Firewall,
-see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
+COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should be removed 
+and replaced with specific IPs or subnets that may connect to the PI Data 
+Archive. For more information on PI Firewall, see: 
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1357,14 +1365,15 @@ function Get-PISysAudit_CheckTransportSecurity
 AU20012 - Transport Security Used
 .DESCRIPTION
 VALIDATION: All connections are using transport security.
-COMPLIANCE: All connections should have transport security enabled. To
-accomplish this, the application must connect with WIS, the PI Data 
-Archive must be at PI Data Archive 2015 or later and the client 
-application must be of a supported version:
+COMPLIANCE: All connections should have transport security enabled. To 
+accomplish this, the application must connect with WIS, the PI Data Archive must 
+be at PI Data Archive 2015 or later and the client application must be of a 
+supported version:
 	+ PI API 2016 for Windows Integrated Security
 	+ PI SDK 1.3.6 or higher
 	+ PI AF SDK (all versions)
-For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+For more information, see: 
+<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1482,10 +1491,11 @@ function Get-PISysAudit_CheckPIBackup
 AU20013 - PI Backup Configured
 .DESCRIPTION
 VALIDATION: Ensures that PI Backups are configured and current. <br/>
-COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration
-and data daily. It is best practice to back up to a local disk on the 
-PI Data Archive machine, then copy the backup to an off-machine location. 
-For more information, see <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
+COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and 
+data daily. It is best practice to back up to a local disk on the PI Data
+Archive machine, then copy the backup to an off-machine location. For more 
+information, see:
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1618,15 +1628,16 @@ AU20014 - No Invalid Connections
 .DESCRIPTION
 VALIDATION: All connections use an existing, enabled identity and protocol.
 COMPLIANCE: To comply with this check, connections should only be using the
-currently configured identity and mechanism.  A connection can only be in 
+currently configured identity and mechanism. A connection can only be in 
 this state if it is long lived and the trust or mapping it was using was edited 
-after the connection was established.  When a mapping or trust is changed, 
+after the connection was established. When a mapping or trust is changed, 
 the PI Data Archive requires a reconnect in order to update the credentials 
 of a connecting client application. This can lead to unintentional prolonged 
 access or delayed identification of access revocation having a greater impact 
 than expected. Note that access control, for example revoking access to a PI 
-point from a specific identity, is effective immediately. 
-For more information, see <a href="https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8">https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8</a> <br/>
+point from a specific identity, is effective immediately. For more information, 
+see: 
+<a href="https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8">https://techsupport.osisoft.com/Troubleshooting/Known-Issues/16624OSI8</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							

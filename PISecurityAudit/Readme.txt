@@ -11,9 +11,9 @@ The following role audit checks have specific module requirements below.
 PI Vision: 
 +WebAdministration (IIS Management) - must be installed on the target web server to read IIS configuration data when performing a PI Vision role audit.
 PI AF Server: 
-+OSIsoft.PowerShell (PowerShell Tools for the PI System) - must be installed on machine running the PI Security Audit Tools script
++OSIsoft.PowerShell module (PowerShell Tools for the PI System, included with the PI System Management Tools) - must be installed on machine running the PI Security Audit Tools script
 PI Data Archive: 
-+OSIsoft.PowerShell (PowerShell Tools for the PI System) - must be installed on machine running the PI Security Audit Tools script
++OSIsoft.PowerShell module (PowerShell Tools for the PI System, included with the PI System Management Tools) - must be installed on machine running the PI Security Audit Tools script
 SQL Server: 
 +SQLPS - must be installed on machine running the PI Security Audit Tools script.  To install the SQLPS module with minimal other components on Windows 8/Server 2012 or later, go to https://www.microsoft.com/en-us/download/details.aspx?id=52676 and select ENU\x64\PowerShellTools.msi, ENU\x64\SharedManagementObjects.msi and ENU\x64\SQLSysClrTypes.msi.
 

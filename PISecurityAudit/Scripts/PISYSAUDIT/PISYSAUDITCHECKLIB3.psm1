@@ -76,13 +76,14 @@ function Get-PISysAudit_CheckPIAFServiceConfiguredAccount
 .SYNOPSIS
 AU30001 - PI AF Server Service Account
 .DESCRIPTION
-VALIDATION: Verifies that the AF Server application service is not running as the account 
-Local System. <br/>
-COMPLIANCE: Run the AF Server Application service as a user other than Local System.  In 
-order to change the user that the service is running as, open control panel, go to Programs, 
-Programs and Features, select the entry for the PI AF Server and click Change.  This will 
-launch the installer where you will be given the option to change configuration settings, 
-including the service account.
+VALIDATION: Verifies that the AF Server application service is not running as 
+the account Local System. <br/>
+COMPLIANCE: Run the AF Server Application service as a user other than Local 
+System.  In order to change the user that the service is running as, open 
+control panel, go to Programs, Programs and Features, select the entry for the 
+PI AF Server and click Change.  This will launch the installer where you will 
+be given the option to change configuration settings, including the service 
+account.
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -156,10 +157,12 @@ function Get-PISysAudit_CheckPImpersonationModeForAFDataSets
 AU30002 - Impersonation mode for AF Data Sets
 .DESCRIPTION
 VALIDATION: Verifies the impersonation mode for external data tables. <br/>
-COMPLIANCE: Set the Configuration Setting ExternalDataTablesAllowNonImpersonatedUsers to 
-false, thereby requiring impersonation for access to external tables.  This setting can be 
-changed by running the AFDiag utility with the /ExternalDataTablesAllowNonImpersonatedUsers- 
-flag.  For more information, see "AFDiag utility parameters" in the PI Live Library. <br/>
+COMPLIANCE: Set the Configuration Setting 
+ExternalDataTablesAllowNonImpersonatedUsers to false, thereby requiring 
+impersonation for access to external tables.  This setting can be changed by 
+running the AFDiag utility with the 
+/ExternalDataTablesAllowNonImpersonatedUsers- flag.  For more information, see 
+"AFDiag utility parameters" in the PI Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -268,11 +271,11 @@ function Get-PISysAudit_CheckPIAFServicePrivileges
 .SYNOPSIS
 AU30003 - PI AF Server Service Access
 .DESCRIPTION
-VALIDATION: Verifies that the PI AF application server service does not have excessive 
-rights. <br/>
+VALIDATION: Verifies that the PI AF application server service does not have 
+excessive rights. <br/>
 COMPLIANCE: Ensure that the account does not have the following privileges: 
-SeDebugPrivilege, SeTakeOwnershipPrivilege and SeTcbPrivilege.  For information on these 
-rights and how to set them, see "User Rights" on TechNet: <br/>
+SeDebugPrivilege, SeTakeOwnershipPrivilege and SeTcbPrivilege.  For information
+on these rights and how to set them, see "User Rights" on TechNet: <br/>
 <a href="https://technet.microsoft.com/en-us/library/dd349804(v=ws.10).aspx">https://technet.microsoft.com/en-us/library/dd349804(v=ws.10).aspx</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -405,9 +408,10 @@ function Get-PISysAudit_CheckPlugInVerifyLevel
 AU30004 - PI AF Server Plugin Verify Level
 .DESCRIPTION
 VALIDATION: Verifies that PI AF requires plugins to be validated. <br/>
-COMPLIANCE: Set the Configuration Setting PlugInVerifyLevel to RequireSigned or 
-RequireSignedTrustedProvider.  This can be done with AFDiag /PluginVerifyLevel:<Level>.
-For more information, see "AFDiag utility parameters" in the PI Live Library. <br/>
+COMPLIANCE: Set the Configuration Setting PlugInVerifyLevel to RequireSigned 
+or RequireSignedTrustedProvider. This can be done with AFDiag 
+/PluginVerifyLevel:<Level>. For more information, see "AFDiag utility 
+parameters" in the PI Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -494,10 +498,10 @@ function Get-PISysAudit_CheckFileExtensionWhitelist
 AU30005 - PI AF Server File Extension Whitelist
 .DESCRIPTION
 VALIDATION: Verifies file extension whitelist for PI AF. <br/>
-COMPLIANCE: Set the Configuration Setting FileExtensions to only include the file 
-extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a subset thereof.
-This can be done with AFDiag /FileExtensions:<ExtensionList>.  For more information, 
-see "AFDiag utility parameters" in the PI Live Library. <br/>
+COMPLIANCE: Set the Configuration Setting FileExtensions to only include the 
+file extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a 
+subset thereof. This can be done with AFDiag /FileExtensions:<ExtensionList>. 
+For more information, see "AFDiag utility parameters" in the PI Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -613,11 +617,11 @@ function Get-PISysAudit_CheckAFServerVersion
 AU30006 - PI AF Server Version
 .DESCRIPTION
 VALIDATION: Verifies PI AF Server version. <br/>
-COMPLIANCE: Upgrade to the latest version of PI AF Server. See the PI AF 
-product page for the latest version and associated documentation:<br/>
+COMPLIANCE: Upgrade to the latest version of PI AF Server. See the PI AF product
+page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF">https://techsupport.osisoft.com/Products/PI-Server/PI-AF </a><br/>
-For more information on the upgrade procedure, see "PI AF Server 
-upgrades" in the PI Live Library. <br/>
+For more information on the upgrade procedure, see "PI AF Server upgrades" in 
+the PI Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts</a>
@@ -684,7 +688,9 @@ PROCESS
 		{
 			# OSIsoft.Powershell not available
 			$result = "N/A"
-			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			$msg = "PowerShell Tools for the PI System (OSIsoft.Powershell module) not found. " 
+			$msg += "Cannot continue processing the validation check. " 
+			$msg += "Check if PI System Management Tools are installed on the machine running the audit tools."
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
 	}
@@ -720,8 +726,9 @@ function Get-PISysAudit_CheckAFSPN
 AU30007 - AF Server SPN
 .DESCRIPTION
 VALIDATION: Checks PI AF Server SPN assignment.<br/>
-COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. This makes Kerberos Authentication possible.
-For more information, see "PI AF and Kerberos authentication" in the PI Live Library. <br/>
+COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. 
+This makes Kerberos Authentication possible. For more information, see "PI AF 
+and Kerberos authentication" in the PI Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D</a>
 #>
 
@@ -795,11 +802,13 @@ function Get-PISysAudit_CheckAFServerAdminRight
 .SYNOPSIS
 AU30008 - PI AF Server Admin Right
 .DESCRIPTION
-VALIDATION: Verifies PI AF Server Admin right on the server object is not set improperly. <br/>
-COMPLIANCE: Ensure there is a single identity with the Admin right at the server level.
-That identity should have a single custom account or group mapped to it.  Admin rights 
-at the server level should not be necessary for ordinary administration tasks.
-For more information, see "PI AF Access rights" in the PI Live Library. <br/>
+VALIDATION: Verifies PI AF Server Admin right on the server object is not set 
+improperly. <br/>
+COMPLIANCE: Ensure there is a single identity with the Admin right at the 
+server level. That identity should have a single custom account or group mapped
+to it. Admin rights at the server level should not be necessary for ordinary 
+administration tasks. For more information, see "PI AF Access rights" in the PI
+Live Library: <br/>
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -935,7 +944,9 @@ PROCESS
 		{
 			# OSIsoft.Powershell not available
 			$result = "N/A"
-			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			$msg = "PowerShell Tools for the PI System (OSIsoft.Powershell module) not found. " 
+			$msg += "Cannot continue processing the validation check. " 
+			$msg += "Check if PI System Management Tools are installed on the machine running the audit tools."
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}
 	}
@@ -970,9 +981,11 @@ function Get-PISysAudit_CheckAFConnectionString
 .SYNOPSIS
 AU30009 - AF Connection to SQL
 .DESCRIPTION
-VERIFICATION: AF Service connects to the SQL Server with Windows authentication. <br/>
-COMPLIANCE: Ensure that the AF Application service connects to the SQL Server with
-Windows Authentication. Windows Authentication is the preferred method, see:
+VERIFICATION: AF Service connects to the SQL Server with Windows 
+authentication. <br/>
+COMPLIANCE: Ensure that the AF Application service connects to the SQL Server
+with Windows Authentication. Windows Authentication is the preferred method, 
+see:
 <a href="https://msdn.microsoft.com/en-us/library/ms144284.aspx">https://msdn.microsoft.com/en-us/library/ms144284.aspx</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -1065,12 +1078,12 @@ function Get-PISysAudit_CheckAFWorldIdentity
 .SYNOPSIS
 AU30010 - Restrict AF World Identity
 .DESCRIPTION
-VERIFICATION: Verifies the World Identity has been disabled or restricted <br/>
+VERIFICATION: Verifies the World Identity has been disabled or restricted.<br/>
 COMPLIANCE: Ensure that the World Identity is disabled on the AF Server. 
-Alternatively, remove the mapping to the \Everyone group and re-map it to 
-an appropriate group with only users who need access to PI AF.  For more 
+Alternatively, remove the mapping to the \Everyone group and re-map it to an 
+appropriate group with only users who need access to PI AF.  For more 
 information on default PI AF Identities, see:
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0" >https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1098,7 +1111,7 @@ PROCESS
 	$msg = ""
 	try
 	{		
-		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		if($global:ArePowerShellToolsAvailable -and (Test-AFServerConnectionAvailable))
 		{
 			$con = $global:AFServerConnection
 			$version = [int]($con.ServerVersion -replace '\.', '')
@@ -1194,7 +1207,8 @@ VERIFICATION: Write access to objects should be limited to power users. <br/>
 COMPLIANCE: Database level write access should not be granted to any well-known, 
 end user groups, such as \Everyone or Domain Users. Similarly, write access to 
 analyses should be limited. For more information on PI AF access writes, please 
-see: <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399<br/>" >https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
+see: 
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399<br/>">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1222,7 +1236,7 @@ PROCESS
 	$msg = ""
 	try
 	{		
-		if($global:ArePowerShellToolsAvailable -and $global:AFServerConnection.ConnectionInfo.IsConnected)
+		if($global:ArePowerShellToolsAvailable -and (Test-AFServerConnectionAvailable))
 		{
 			$con = $global:AFServerConnection
 
@@ -1324,7 +1338,9 @@ PROCESS
 		else
 		{
 			$result = "N/A"
-			$msg = "OSIsoft.Powershell module not found. Cannot continue processing the validation check."
+			$msg = "PowerShell Tools for the PI System (OSIsoft.Powershell module) not found. " 
+			$msg += "Cannot continue processing the validation check. " 
+			$msg += "Check if PI System Management Tools are installed on the machine running the audit tools."
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 		}			
 	}

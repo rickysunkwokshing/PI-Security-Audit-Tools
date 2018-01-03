@@ -64,11 +64,11 @@ foreach ($line in $helpFile)
 					# Properly space the description and sanitize if of the html tags.
 					if($PSVersion2){$fnHelpDescription = $fnHelp.Description[0].Text}
 					else {$fnHelpDescription = $fnHelp.Description.Text}
- 					$newHelp += "`r`n`t`t" + $fnHelp.Synopsis + "`r`n`t`t" + $($($($($fnHelpDescription `
-						-replace "`n","`r`n`t`t") -replace "<br/>","") -replace "</a>","") -replace '<a href=".*?">','') + "`r`n"
+ 					$newHelp += "`r`n" + $fnHelp.Synopsis + "`r`n" + $($($($($fnHelpDescription `
+						-replace "`n","`r`n") -replace "<br/>","") -replace "</a>","") -replace '<a href=".*?">','') + "`r`n"
                 }
             }
-            $newHelp += "`r`n`t`t//ENDSECTION - VALIDATIONS//`r`n"
+            $newHelp += "`r`n//ENDSECTION - VALIDATIONS//`r`n"
     }
 	# Resume echoing in order to fill in the rest of the file.
     if($line.ToUpper().Contains("//ENDSECTION - VALIDATIONS//")){$write = $true}
