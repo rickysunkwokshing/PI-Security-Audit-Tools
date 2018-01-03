@@ -884,9 +884,9 @@ Function Get-PIWebAPIProperties
 {
 <#
 .SYNOPSIS
-Query PI Vision (PI Coresight) machine for information about the application.
+Query PI WebAPI machine for information about the application.
 .DESCRIPTION
-Query PI Vision (PI Coresight) machine for information about the application.  
+Query  PI WebAPI machine for information about the application.  
 This function reduces the number of PSSessions compared with calling separately to the core module.
 #>
 	param(
@@ -1345,7 +1345,9 @@ If ($AppToCheck -eq "pivision") {
 ElseIf ($AppToCheck -eq "piwebapi") { 
         $global:ProductName = "PI WebAPI"
         Get-PIWebAPIProperties -lc $LocalComputer -rcn $RemoteComputerName -DBGLevel $DBGLevel
-
+        # CHECK CUSTOM HOST HEADER
+	    $blnCustomHeader = $false
+	    $HostA = $False 
         # Get hostname and FQDN for later use
         $global:WebServerName =  $global:PIWebAPIProperties.MachineName
         $global:WebServerDomain =  $global:PIWebAPIProperties.MachineDomain
@@ -1355,7 +1357,7 @@ ElseIf ($AppToCheck -eq "piwebapi") {
         $WebAPIURL =  ($global:PIWebAPIProperties.CrawlerSubmitUrl -split '/*/')[1]
         
         # Check if WebAPI URL matches the Web Server name
-        If ($WebAPIURL -ne $global:WebServerName -and $WebAPIURL -ne $global:WebServerFQDN) { 
+        If ($WebAPIURL -ne $global:WebServerName -and $WebAPIURL -ne $global:WebServerFQDN -and $WebAPIURL -ne "localhost") { 
         $blnCustomHeader = $True 
         $CScustomHeader = $WebAPIURL
         }
