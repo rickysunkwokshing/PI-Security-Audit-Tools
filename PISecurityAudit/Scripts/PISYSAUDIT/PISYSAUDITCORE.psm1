@@ -2352,7 +2352,7 @@ PROCESS
 					"local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
 					"nt authority\local system", "nt authority\network service", "nt authority\local service",
-					 "applicationpoolidentity", "nt service\afservice", "nt service\pinetmgr", "nt service\piwebapi", "nt service\picrawler" ))
+					 "applicationpoolidentity", "nt service\afservice", "nt service\pinetmgr", "nt service\piwebapi", "nt service\picrawler", "nt service\pisqldas" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
 			$parsingPosDL = $UserString.IndexOf('\')
