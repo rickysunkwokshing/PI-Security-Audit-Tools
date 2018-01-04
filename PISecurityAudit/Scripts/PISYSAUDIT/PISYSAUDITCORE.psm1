@@ -1012,6 +1012,24 @@ function Test-PowerShellToolsForPISystemAvailable
 	}
 }
 
+function Test-AFServerConnectionAvailable
+{
+<#
+.SYNOPSIS
+(Core functionality) Checks if AF Server is connected.
+.DESCRIPTION
+Validate AF Server is connected.
+#>
+    if($null -ne $global:AFServerConnection.IsConnected)
+	{
+		$global:AFServerConnection.IsConnected
+	}
+	else
+	{
+		$global:AFServerConnection.ConnectionInfo.IsConnected
+	}
+}
+
 function PathConcat {
 param(							
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
@@ -1361,7 +1379,7 @@ param(
 			try
 			{
 				$global:AFServerConnection = Connect-AFServer -AFServer $(Get-AFServer -Name $ComputerParams.ComputerName)
-				if($global:AFServerConnection.ConnectionInfo.IsConnected)
+				if(Test-AFServerConnectionAvailable)
 				{
 					$msgTemplate = "Successfully connected to the PI AF Server {0} with PowerShell."
 					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
@@ -2334,7 +2352,7 @@ PROCESS
 					"local system", "network service", "local service",
 					"nt authority\localsystem", "nt authority\networkservice", "nt authority\localservice",
 					"nt authority\local system", "nt authority\network service", "nt authority\local service",
-					 "applicationpoolidentity", "nt service\afservice", "nt service\pinetmgr", "nt service\piwebapi", "nt service\picrawler", "nt service\pisqldas" ))
+					 "applicationpoolidentity", "nt service\afservice", "nt service\pinetmgr", "nt service\piwebapi", "nt service\picrawler" ))
 		{ 
 			$ServiceAccountDomain = 'MACHINEACCOUNT'
 			$parsingPosDL = $UserString.IndexOf('\')
@@ -5675,6 +5693,7 @@ Export-ModuleMember -Alias piauditparams
 Export-ModuleMember -Alias pisysauditparams
 Export-ModuleMember -Alias piaudit
 Export-ModuleMember -Alias pwdondisk
+Export-ModuleMember Test-AFServerConnectionAvailable
 Export-ModuleMember Test-PowerShellToolsForPISystemAvailable
 Export-ModuleMember Test-WebAdministrationModuleAvailable
 # </Do not remove>
