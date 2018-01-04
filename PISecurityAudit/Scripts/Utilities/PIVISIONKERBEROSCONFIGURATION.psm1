@@ -849,7 +849,9 @@ $IISscriptBlock = {
 	{ $ProductName = 'PIVision' }
 	elseif(Test-Path -Path $($pisystemKey + "Coresight"))
 	{ $ProductName = 'Coresight' }
-
+    else { Write-Warning "PI Vision/PI Coresight not found. Aborting." 
+    exit 
+    }
 
     $IISWebSite = Get-ItemProperty -Path $($pisystemKey + $ProductName) | Select-Object -ExpandProperty "WebSite"
 	$InstallDir = Get-ItemProperty -Path $($pisystemKey + $ProductName) | Select-Object -ExpandProperty "InstallationDirectory"
@@ -930,6 +932,11 @@ This function reduces the number of PSSessions compared with calling separately 
 
 $WebAPIscriptBlock = {
 
+    If (!(Test-Path ($env:PIHOME64 + "WebAPI\InstallationConfig.json"))) { 
+    Write-Warning "PI WebAPI not found. Aborting."
+    exit
+    }
+
 	$WebServerName = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
 	$WebServerDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
     
@@ -984,6 +991,11 @@ $SQLDASscriptBlock = {
 	$WebServerName = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
 	$WebServerDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
     
+    If (!(Test-Path ($env:PIHOME64 + "SQLDAS\OLE DB\PISqlDas.exe.config"))) { 
+    Write-Warning "PI SQL DAS for OLEDB not found. Aborting."
+    exit
+    }
+
     # SQL DAS will automatically register SPNs in the future. 
     # It will also use different SPN class based on product (SQL DAS for OLEDB, for Integrator ..) and based on binding (HTTPS vs NET.TCP).
     # For now, let's grab the binding information from SQL DAS for OLEDB config file for future use (future SQLDAS will use ports in SPNs, among other things).
@@ -1460,8 +1472,11 @@ If ($AppToCheck -eq "pivision") {
 #### PI WebAPI specific Section
 }
 ElseIf ($AppToCheck -eq "piwebapi") { 
+
         $global:ProductName = "PI WebAPI"
+
         Get-PIWebAPIProperties -lc $LocalComputer -rcn $RemoteComputerName -DBGLevel $DBGLevel
+
         # CHECK CUSTOM HOST HEADER
 	    $blnCustomHeader = $false
 	    $HostA = $False 
