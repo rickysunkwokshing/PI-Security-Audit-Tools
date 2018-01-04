@@ -293,7 +293,7 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 	Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2 
 
 	# Template for correct rbcd config.   
-	$msgCanDelegateTo = "<p><good>$global:AppPoolAccountFriendlyName can delegate to $ResourceType $ComputerName running under $ServiceAccount</good></p>"
+	$msgCanDelegateTo = "<p><good>$global:SvcAccountFriendlyName can delegate to $ResourceType $ComputerName running under $ServiceAccount</good></p>"
 
 
     # Check the Principals for a match (based on name or SID)
@@ -303,7 +303,7 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 	} 
 
     ElseIf ($ComputerName -eq $global:WebServerName -or $ComputerName -eq $global:WebServerFQDN) { 
-    $global:RBCDstring += "<p><good>$global:AppPoolAccountFriendlyName doesn't need to delegate to $ResourceType $ComputerName because they're on the same machine.</good></p>"    
+    $global:RBCDstring += "<p><good>$global:SvcAccountFriendlyName doesn't need to delegate to $ResourceType $ComputerName because they're on the same machine.</good></p>"    
     }
 
 	# Resource-Based Kerberos Delegation is not configured properly - compiling a set of PS commands to fix the rbcd config.
@@ -377,7 +377,7 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 					# Principal and Back End are not in the same domain. Request the user to construct PrincipalsToAllowedToDelegate manually.
 					Else {
 						$name = $RBCDfixline[0]
-						$global:RBCDstring = "<p><bad>$global:AppPoolAccountFriendlyName CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount</bad><br>
+						$global:RBCDstring = "<p><bad>$global:SvcAccountFriendlyName CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount</bad><br>
 						An account from another domain (SID: $name) has been identified on PrincipalsToAllowedToDelegate list.<br>
 						Manual PrincipalsToAllowedToDelegate construction required. <br>
 						See OSIsoft <a href=`"http://techsupport.osisoft.com/Troubleshooting/KB/KB01222`" target=`"_blank`" >KB01222 - Types of Kerberos Delegation</a><br></p>"
@@ -389,7 +389,7 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 			    $RBCDfixFinished = "$($ADObjType_RBCD) -Identity $($ServiceAccount) -PrincipalsAllowedToDelegateToAccount `$Principal1$($RBCDfixPrincipalList) -Server $ServiceAccountDomain"
 
 			    # Cannot delegate + fix
-			    $global:RBCDstring += "<p><bad>$global:AppPoolAccountFriendlyName CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount</bad><br>
+			    $global:RBCDstring += "<p><bad>$global:SvcAccountFriendlyName CAN'T delegate to $ResourceType $ComputerName running under $ServiceAccount</bad><br>
 			    <details>
 			    <summary><a href=`"http://techsupport.osisoft.com/Troubleshooting/KB/KB01222`" target=`"_blank`" >Documentation</a> | PowerShell commands to fix the issue:</summary><br>
 			    <code>
@@ -500,10 +500,10 @@ Function Check-ClassicDelegation
             # Host (A) DNS Record is used - only one SPN needed!
 		    If ($DNSAtype) {
 			    If ($ClassicSPNs -match $CSShortSPN) { 
-				    $global:strSPNs = "<p><good>$global:ProductName Service Principal Name $CSShortSPN exists and is assigned to the service identity: $global:AppPoolAccountFriendlyName.</good></p>" 			
+				    $global:strSPNs = "<p><good>$global:ProductName Service Principal Name $CSShortSPN exists and is assigned to the service identity: $global:SvcAccountFriendlyName.</good></p>" 			
 			    }
 			    Else { 
-				    $global:strSPNs = "<p><bad>Kerberos authentication will fail. Please make sure $CSShortSPN Service Principal Name is assigned to the correct service identity: $global:AppPoolAccountFriendlyName.</bad><br>
+				    $global:strSPNs = "<p><bad>Kerberos authentication will fail. Please make sure $CSShortSPN Service Principal Name is assigned to the correct service identity: $global:SvcAccountFriendlyName.</bad><br>
 				    <details>
 					<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 `" target=`"_blank`" >Documentation</a> | Command to create the missing SPN:</summary><br>
                     <code>
@@ -516,10 +516,10 @@ Function Check-ClassicDelegation
             # CNAME or FQDN/hostname is used.
 		    Else {
 			    If ($ClassicSPNs -match $CSShortSPN -and $ClassicSPNs -match $CSLongSPN) { 
-				    $global:strSPNs = "<p><good>Service Principal Names $CSShortSPN and $CSLongSPN exist and are assigned to the service identity: $global:AppPoolAccountFriendlyName.</good></p>"   
+				    $global:strSPNs = "<p><good>Service Principal Names $CSShortSPN and $CSLongSPN exist and are assigned to the service identity: $global:SvcAccountFriendlyName.</good></p>"   
 			    }
 			    Else { 
-				    $global:strSPNs = "<p><bad>Kerberos authentication will fail. Please make sure $CSShortSPN and $CSLongSPN Service Principal Names are assigned to the correct service identity: $global:AppPoolAccountFriendlyName.</bad><br>
+				    $global:strSPNs = "<p><bad>Kerberos authentication will fail. Please make sure $CSShortSPN and $CSLongSPN Service Principal Names are assigned to the correct service identity: $global:SvcAccountFriendlyName.</bad><br>
 				    <details>
 					<summary><a href=`"https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46 `" target=`"_blank`" >Documentation</a> | Commands to create the missing SPNs</summary><br>
 					<code>
@@ -534,7 +534,7 @@ Function Check-ClassicDelegation
 
 	        # Unconstrained Kerberos Delegation is not supported (and rather insecure)
 	        If ($ClassicUnconstrainedKerberos -eq $true) { 
-	        $global:strClassicDelegation = "<p><bad>$global:AppPoolAccountFriendlyName is trusted for Unconstrained Kerberos Delegation!<br> 
+	        $global:strClassicDelegation = "<p><bad>$global:SvcAccountFriendlyName is trusted for Unconstrained Kerberos Delegation!<br> 
 	        This is neither supported nor secure!</bad><br>
 			Enable Constrained Kerberos Delegation as per <a href=`"http://techsupport.osisoft.com/Troubleshooting/KB/KB01222`" target=`"_blank`" >OSIsoft KB01222 - Types of Kerberos Delegation</a><br>  
 	        </p>"
@@ -564,15 +564,15 @@ Function Check-ClassicDelegation
     If ($ClassicServer -ne $Global:WebServerName -and $ClassicServer -ne $Global:WebServerFQDN) {
 
 	# All good.
-	$msgCanDelegateToClassic = "<p><good>$global:AppPoolAccountFriendlyName  can delegate to $ClassicResourceType $ClassicServer.</good></p>"
+	$msgCanDelegateToClassic = "<p><good>$global:SvcAccountFriendlyName  can delegate to $ClassicResourceType $ClassicServer.</good></p>"
 	
 	# Issue found - include fix.
-	$msgCanNotDelegateToClassic = "<p><bad>$global:AppPoolAccountFriendlyName  CAN'T delegate to $ClassicResourceType $ClassicServer.</bad></p>
+	$msgCanNotDelegateToClassic = "<p><bad>$global:SvcAccountFriendlyName  CAN'T delegate to $ClassicResourceType $ClassicServer.</bad></p>
     $DelegationFix"
 	}
 
     Else { 
-    $global:strClassicDelegation +=  "<p><good>$global:AppPoolAccountFriendlyName doesn't need to delegate to $ClassicResourceType $ClassicServer because it's all in one machine.</good></p>" }
+    $global:strClassicDelegation +=  "<p><good>$global:SvcAccountFriendlyName doesn't need to delegate to $ClassicResourceType $ClassicServer because it's all in one machine.</good></p>" }
 
 
 	# Look through the list of SPNs PI Vision (Coresight) can delegate to for a match.
@@ -667,13 +667,13 @@ Function Get-AppNetworkIdentityName
 {
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("AppPoolIDType")]
+		[alias("IDType")]
 		[string]
-		$AppPoolIdentityType,
+		$IdentityType,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
-		[alias("AppPoolUserString")]
+		[alias("UserString")]
 		[string]
-		$AppPoolUsernameValue,
+		$UsernameValue,
 		[alias("ServerName")]
 		[string]
 		$IISserverName,
@@ -683,32 +683,32 @@ Function Get-AppNetworkIdentityName
 		$DBGLevel = 0	
 	)	
 
-	$CSUserGMSA = $AppPoolUsernameValue | Out-String
+	$CSUserGMSA = $UsernameValue | Out-String
 
-    If ($AppPoolIdentityType -ne "NetworkService" -and $AppPoolIdentityType -ne "ApplicationPoolIdentity" -and $AppPoolIdentityType -ne "LocalSystem" -and $AppPoolIdentityType -ne "Local System" -and $AppPoolIdentityType -ne "Network Service" -and $AppPoolIdentityType -ne "piwebapi")
+    If ($IdentityType -ne "NetworkService" -and $IdentityType -ne "ApplicationPoolIdentity" -and $IdentityType -ne "LocalSystem" -and $IdentityType -ne "Local System" -and $IdentityType -ne "Network Service" -and $IdentityType -ne "piwebapi"-and $IdentityType -ne "pisqldas")
     { 
         $global:blnCustomAccount = $true
 
-		$global:CSAppPoolIdentity = $AppPoolUsernameValue
+		# $global:CSAppPoolIdentity = $UsernameValue
         
 		#MSA or gMSA
         If ($CSUserGMSA.contains('$')) { 
 			$global:blngMSA = $True 
 			$global:ADAccType = 3
-			$global:gMSA = "<p><good>$global:ProductName is run by Group Managed Service Account $AppPoolUsernameValue.</good></p>"
+			$global:gMSA = "<p><good>$global:ProductName is run by Group Managed Service Account $UsernameValue.</good></p>"
 		} 
 		Else {  # Standard User 
 			$global:blngMSA = $false 
-            $global:gMSA = "<p><bad>$global:ProductName is by Domain User $AppPoolUsernameValue. <a href=`"https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts`" target=`"_blank`" >Use Group Managed Service Account instead.</a></bad></p>"
+            $global:gMSA = "<p><bad>$global:ProductName is by Domain User $UsernameValue. <a href=`"https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts`" target=`"_blank`" >Use Group Managed Service Account instead.</a></bad></p>"
 			$global:ADAccType = 1
 		}
 
-		$CSAppPoolPosition = $AppPoolUsernameValue.IndexOf("\")
-		$global:ServiceAccount = $AppPoolUsernameValue.Substring($CSAppPoolPosition+1)
+		$CSAppPoolPosition = $UsernameValue.IndexOf("\")
+		$global:ServiceAccount = $UsernameValue.Substring($CSAppPoolPosition+1)
 		$global:ServiceAccount = $global:ServiceAccount.TrimEnd('$')
 		$global:ServiceAccount = $global:ServiceAccount.ToLower()
 		
-		$global:AppPoolAccountFriendlyName = $AppPoolUsernameValue
+		$global:SvcAccountFriendlyName = $UsernameValue
     }
 
     Else
@@ -717,12 +717,12 @@ Function Get-AppNetworkIdentityName
             $global:blnCustomAccount = $false
             $global:blngMSA = $false
 			$global:ADAccType = 2
-            $global:gMSA = "<p><bad>$global:ProductName is run by Default Account $AppPoolIdentityType. <a href=`"https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts`" target=`"_blank`" >Use Group Managed Service Account instead.</a></bad></p>"
+            $global:gMSA = "<p><bad>$global:ProductName is run by Default Account $IdentityType. <a href=`"https://blogs.technet.microsoft.com/askpfeplat/2012/12/16/windows-server-2012-group-managed-service-accounts`" target=`"_blank`" >Use Group Managed Service Account instead.</a></bad></p>"
 						
-			$global:CSAppPoolIdentity = $AppPoolIdentityType
+			# $global:CSAppPoolIdentity = $IdentityType
 			$global:ServiceAccount = $IISserverName.ToLower()
 			
-			$global:AppPoolAccountFriendlyName = $AppPoolIdentityType
+			$global:SvcAccountFriendlyName = $IdentityType
     }
 }
 
@@ -760,7 +760,7 @@ Function Check-ServicePrincipalName
         If ($HostA) {
 
 			If ($SPNCheck -match $SPNstring1) { 
-				$global:strSPNs = "<p><good>Service Principal Name $SPNstring1 exists and is assigned to $global:AppPoolAccountFriendlyName.</good></p>" 			
+				$global:strSPNs = "<p><good>Service Principal Name $SPNstring1 exists and is assigned to $global:SvcAccountFriendlyName.</good></p>" 			
 			}
 			Else { 
 				$global:strSPNs = "<p><bad>Kerberos authentication to $global:ProductName will fail.<br></bad>
@@ -776,7 +776,7 @@ Function Check-ServicePrincipalName
 
 		Else {
 			If ($SPNCheck -match $SPNstring1 -and $SPNCheck -match $SPNstring2) { 
-				$global:strSPNs = "<p><good>Service Principal Names $SPNstring1 and $SPNstring2 exist and are assigned to $global:AppPoolAccountFriendlyName.</good></p>"   
+				$global:strSPNs = "<p><good>Service Principal Names $SPNstring1 and $SPNstring2 exist and are assigned to $global:SvcAccountFriendlyName.</good></p>"   
 			}
 			Else { 
 				$global:strSPNs = "<p><bad>Kerberos authentication to $global:ProductName will fail.<br></bad>
@@ -931,6 +931,61 @@ $WebAPIscriptBlock = {
 
 }
 
+Function Get-PISQLDASProperties
+{
+<#
+.SYNOPSIS
+Query PI WebAPI machine for information about the application.
+.DESCRIPTION
+Query  PI WebAPI machine for information about the application.  
+This function reduces the number of PSSessions compared with calling separately to the core module.
+#>
+	param(
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean] $LocalComputer,
+		[parameter(Mandatory=$true, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string] $RemoteComputerName,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int] $DBGLevel = 0	
+	)	
+	
+	$fn = GetFunctionName
+    $global:SQLDASProperties = $null
+
+$SQLDASscriptBlock = {
+
+	$WebServerName = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\ComputerName\ActiveComputerName" -Name "ComputerName" | Select-Object -ExpandProperty "ComputerName"
+	$WebServerDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
+    
+    # SQL DAS will automatically register SPNs in the future. 
+    # It will also use different SPN class based on product (SQL DAS for OLEDB, for Integrator ..) and based on binding (HTTPS vs NET.TCP).
+    # For now, let's grab the binding information from SQL DAS for OLEDB config file for future use.
+    # Assume HTTP SPN class for the time being.
+
+    #$SQLDASconfig.Load($env:PIHOME64 + "\SQLDAS\OLE DB\PISqlDas.exe.config")
+    #$SQLDASnetTCP = $SQLDASconfig.SelectSingleNode("//configuration/system.serviceModel/services/service/host/baseAddresses/add[starts-with(@baseAddress, 'net.tcp')]")
+    #$SQLDAShttps = $SQLDASconfig.SelectSingleNode("//configuration/system.serviceModel/services/service/host/baseAddresses/add[starts-with(@baseAddress, 'https')]")
+
+	$SQLDASConfiguration = New-Object PSCustomObject
+	$SQLDASConfiguration | Add-Member -MemberType NoteProperty -Name "MachineName" -Value $WebServerName
+	$SQLDASConfiguration | Add-Member -MemberType NoteProperty -Name "MachineDomain" -Value $WebServerDomain
+    #$SQLDASConfiguration | Add-Member -MemberType NoteProperty -Name "SQLDAShttps" -Value $SQLDAShttps.baseAddress
+    #$SQLDASConfiguration | Add-Member -MemberType NoteProperty -Name "SQLDASnettcp" -Value $SQLDASnetTCP.baseAddress
+
+	return $SQLDASConfiguration
+}
+
+		if($LocalComputer)
+		{ $global:PISQLDASProperties = & $SQLDASscriptBlock }
+		else
+		{ $global:PISQLDASProperties = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $SQLDASscriptBlock }
+
+}
+
+
 Function Initialize-KerberosConfigurationTest
 {
 	param(
@@ -942,7 +997,7 @@ Function Initialize-KerberosConfigurationTest
 		[boolean] $LocalComputer,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("app")]
-		[ValidateSet('pivision','piwebapi','Menu')]
+		[ValidateSet('pivision','piwebapi', 'pisqldas', 'Menu')]
 		[string] $Product,
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("kc")]
@@ -1010,8 +1065,9 @@ Function Initialize-KerberosConfigurationTest
 
 		$AppPIVision = New-Object System.Management.Automation.Host.ChoiceDescription "&PI Vision"
 		$AppPIVWebAPI = New-Object System.Management.Automation.Host.ChoiceDescription "&PI WebAPI"
+        $AppSQLDAS = New-Object System.Management.Automation.Host.ChoiceDescription "&PI SQL DAS"
 
-		$options = [System.Management.Automation.Host.ChoiceDescription[]]($AppPIVision,$AppPIVWebAPI)
+		$options = [System.Management.Automation.Host.ChoiceDescription[]]($AppPIVision,$AppPIVWebAPI, $AppSQLDAS)
 
 		$ProductResult = $host.ui.PromptForChoice($title, $message, $options, 0) 
 	}
@@ -1022,6 +1078,7 @@ Function Initialize-KerberosConfigurationTest
 		{
 			'pivision' {$ProductResult = 0}
 			'piwebapi' {$ProductResult = 1}
+            'pisqldas' {$ProductResult = 2}
 		}
 	}
 
@@ -1052,8 +1109,9 @@ Function Initialize-KerberosConfigurationTest
 
     $result = $ProductResult.ToString() + $KerberosResult.ToString()
 
+# Test for WebAdministration module only if PI Vision is selected.
 If ( $result -in "00", "01", "02"  ) {
-    # Test for WebAdministration module
+    
 	if(Test-WebAdministrationModuleAvailable -lc $LocalComputer -rcn $ComputerName -dbgl $DBGLevel)
 	{
 		$msg = 'WebAdministration module loaded successfully.'
@@ -1083,12 +1141,12 @@ If ( $result -in "00", "01", "02"  ) {
 Function Test-KerberosConfiguration {
 <#  
 .SYNOPSIS
-Designed to check PI Vision (formerly PI Coresight) configuration to ensure Kerberos authentication and delegation
+Designed to check PI Vision or PI WebAPI configuration to ensure Kerberos authentication and delegation
 are configured correctly.  
 
 .DESCRIPTION
 Dubbed 'PI Dog' after Kerberos, the three-headed guardian of Hades. This utility is designed to
-examine the configuration of a PI Vision web application related to Kerberos delegation and 
+examine the configuration of a PI Vision web application, PI WebAPI application, or PI SQL DAS for OLEDB service related to Kerberos delegation and 
 provide actionable information if any issues or deviation from best practices are detected.
 	
 PI Dog has best support when run locally due to complications with WS-Man, SPN resolution or 
@@ -1097,17 +1155,21 @@ assigned to a custom account, the scripts may need to be run locally.  For more 
 see - https://github.com/osisoft/PI-Security-Audit-Tools/wiki/Tutorial2:-Running-the-scripts-remotely-(USERS).
 
 The syntax is...				 
-Test-KerberosConfiguration [[-ComputerName | -cn] <string>]
+Test-KerberosConfiguration [[-ComputerName | -cn] <string> [-Product | -app] <string> [-KerberosCheck | -kc] <string>]
 
 Import the PISYSAUDIT module to make this function available.
 
 .PARAMETER cn
-The computer hosting the target PI Vision (formerly PI Coresight) web application.
+The computer hosting the target application.
 .PARAMETER kc
 The type of kerberos delegation configuration check to perform.  Supported values
 are None, Classic, ResourceBased and Menu (select interactively).
+.PARAMETER app
+The product you'd like to check configuration for. Supported values
+are piwebapi, pivision, pisqldas, and Menu (select interactively).
 .EXAMPLE
-Test-KerberosConfiguration -ComputerName piomnibox -KerberosCheck ResourceBased
+Test-KerberosConfiguration -ComputerName piomnibox -Product pivision -KerberosCheck ResourceBased
+Test-KerberosConfiguration -Product piwebapi -KerberosCheck None
 .LINK
 https://pisquare.osisoft.com
 #>
@@ -1118,7 +1180,7 @@ param(
 		[string] $ComputerName = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("app")]
-		[ValidateSet('pivision','piwebapi','Menu')]
+		[ValidateSet('pivision','piwebapi','pisqldas','Menu')]
 		[string] $Product = "Menu",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("kc")]
@@ -1224,6 +1286,29 @@ switch ($result)
 			$rbcd = $true
         }
 
+        "20" {"PI SQL DAS + No Kerberos"
+            $AppToCheck = "pisqldas"
+			$blnDelegationCheckConfirmed = $false
+			$rbcd = $false
+			$RSATcheck = $false
+        }
+
+
+        "21" {"PI SQL DAS + Kerberos"
+            $AppToCheck = "pisqldas"
+			$RSATcheck = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -ne 'Installed'
+			$blnDelegationCheckConfirmed = $true
+			$rbcd = $false
+        }
+
+
+        "22" {"PI SQL DAS + RBCD"
+            $AppToCheck = "pisqldas"
+			$RSATcheck = $(Get-WindowsFeature -Name RSAT-AD-PowerShell | Select-Object –ExpandProperty 'InstallState') -ne 'Installed'
+			$blnDelegationCheckConfirmed = $true
+			$rbcd = $true
+        }
+
  		# Initialization failed
 		998 {
 			Write-Warning "Initialization failed due to an issue loading the IIS module."
@@ -1313,7 +1398,7 @@ If ($AppToCheck -eq "pivision") {
     $global:WebServerFQDN = $WebServerName + "." + $WebServerDomain 
 
 	# GET APPPOOL IDENTITY
-	Get-AppNetworkIdentityName -AppPoolIDType $CSAppPoolSvcType -AppPoolUserString $PIVisionUserSvc -ServerName $WebServerName
+	Get-AppNetworkIdentityName -IDType $CSAppPoolSvcType -UserString $PIVisionUserSvc -ServerName $WebServerName
 
     # KERNEL-MODE AUTHENTICATION CHECK
 	Check-KernelModeAuth -CustomAppPool $global:blnCustomAccount -UseAppPoolCreds $blnUseAppPoolCredentials -UseKernelModeAuth $blnKernelMode -DBGLevel $DBGLevel      
@@ -1370,48 +1455,73 @@ ElseIf ($AppToCheck -eq "piwebapi") {
         Else { $global:ServiceAccount = $ProductUserSvcObject.UserName }
 
 
-        Get-AppNetworkIdentityName -AppPoolIDType $ProductUserSvcObject.UserName -AppPoolUserString $WebAPIServiceAccountName -ServerName $global:WebServerName
+        Get-AppNetworkIdentityName -IDType $ProductUserSvcObject.UserName -UserString $WebAPIServiceAccountName -ServerName $global:WebServerName
 
+
+}
+ElseIf ($AppToCheck -eq "pisqldas") { 
+        $global:ProductName = "PI SQL DAS"
+        Get-PISQLDASProperties -lc $LocalComputer -rcn $RemoteComputerName -DBGLevel $DBGLevel
+
+        # CHECK CUSTOM HOST HEADER - assuming computer/FQDN is used with PI SQL DAS.
+	    $blnCustomHeader = $false
+	    $HostA = $False 
+
+        # Get hostname and FQDN for later use
+        $global:WebServerName =  $global:PISQLDASProperties.MachineName
+        $global:WebServerDomain =  $global:PISQLDASProperties.MachineDomain
+        $global:WebServerFQDN = $WebServerName + "." + $WebServerDomain 
+
+        $SQLDASServiceAccountName = Get-PISysAudit_ServiceProperty -sn 'pisqldas' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -ErrorAction SilentlyContinue
+
+        $ProductUserSvcObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $SQLDASServiceAccountName -DBGLevel $DBGLevel
+        
+        If ( $ProductUserSvcObject.domain -eq "MACHINEACCOUNT" ) { $global:ServiceAccount = $global:WebServerName }
+        Else { $global:ServiceAccount = $ProductUserSvcObject.UserName }
+
+
+        Get-AppNetworkIdentityName -IDType $ProductUserSvcObject.UserName -UserString $SQLDASServiceAccountName -ServerName $global:WebServerName
+        
 
 }
 
 
-    	# Check Custom Host Header type - CNAME vs HOST (A)	
-	If ($blnCustomHeader -eq $True) {								
-	    $AliasTypeCheck = Resolve-DnsName $CScustomHeader | Select -ExpandProperty Type
-		If ($AliasTypeCheck -match "CNAME") { 
-			$HostA = $False 
-			}
-		Else {
-			$HostA = $True
-		}
+        # Check Custom Host Header type - CNAME vs HOST (A)	
+	    If ($blnCustomHeader -eq $True) {								
+	        $AliasTypeCheck = Resolve-DnsName $CScustomHeader | Select -ExpandProperty Type
+		        If ($AliasTypeCheck -match "CNAME") { 
+			        $HostA = $False 
+			        }
+		        Else {
+			        $HostA = $True
+		        }
 
-        # HOST (A) DNS record is preferred	
-	    If ($HostA -ne $true) {
-	    $global:CustomHostHeader = "<p><bad>Custom Host Header $($CScustomHeader) is used (CNAME DNS Alias)).
-		Using CNAME DNS Alias can potentially cause issues with Kerberos Authentication.</bad>
-		<details>
-		<summary>Documentation Download links</summary>
-		<a href=`"http://aka.ms/kcdpaper`" target=`"_blank`" >Microsoft Understanding Kerberos Constrained Delegation Whitepaper</a><br>
-		<a href=`"https://benchmarks.cisecurity.org/tools2/iis/CIS_Microsoft_IIS_8_Benchmark_v1.0.0.pdf`" target=`"_blank`" >CIS Microsoft IIS 8 Benchmark</a>
-		</details></p>"
+                # HOST (A) DNS record is preferred	
+	            If ($HostA -ne $true) {
+	            $global:CustomHostHeader = "<p><bad>Custom Host Header $($CScustomHeader) is used (CNAME DNS Alias)).
+		        Using CNAME DNS Alias can potentially cause issues with Kerberos Authentication.</bad>
+		        <details>
+		        <summary>Documentation Download links</summary>
+		        <a href=`"http://aka.ms/kcdpaper`" target=`"_blank`" >Microsoft Understanding Kerberos Constrained Delegation Whitepaper</a><br>
+		        <a href=`"https://benchmarks.cisecurity.org/tools2/iis/CIS_Microsoft_IIS_8_Benchmark_v1.0.0.pdf`" target=`"_blank`" >CIS Microsoft IIS 8 Benchmark</a>
+		        </details></p>"
+	            }
+		        Else {
+		        # All good
+		        $global:CustomHostHeader = "<p><good>Custom Host Header $($CScustomHeader) is used (type: $($CScustomHeaderType)).</good></p>"
+
+		        }
 	    }
-		Else {
-		# All good
-		$global:CustomHostHeader = "<p><good>Custom Host Header $($CScustomHeader) is used (type: $($CScustomHeaderType)).</good></p>"
-
-		}
-	}
     
-    # Custom Host Header is not used.
-	Else {
-	    $global:CustomHostHeader = "<p><bad>Custom Host Header is not configured for $global:ProductName. Using Custom Host Header is recommended.</bad><br> 
-		<details>
-		<summary>Documentation Download links</summary>	    
-		<a href=`"http://aka.ms/kcdpaper`" target=`"_blank`" >Microsoft Understanding Kerberos Constrained Delegation Whitepaper</a><br>
-		<a href=`"https://benchmarks.cisecurity.org/tools2/iis/CIS_Microsoft_IIS_8_Benchmark_v1.0.0.pdf`" target=`"_blank`" >CIS Microsoft IIS 8 Benchmark</a><br>
-		</details></p>"
-	}
+        # Custom Host Header is not used.
+	    Else {
+	        $global:CustomHostHeader = "<p><bad>Custom Host Header is not configured for $global:ProductName. Using Custom Host Header is recommended.</bad><br> 
+		    <details>
+		    <summary>Documentation Download links</summary>	    
+		    <a href=`"http://aka.ms/kcdpaper`" target=`"_blank`" >Microsoft Understanding Kerberos Constrained Delegation Whitepaper</a><br>
+		    <a href=`"https://benchmarks.cisecurity.org/tools2/iis/CIS_Microsoft_IIS_8_Benchmark_v1.0.0.pdf`" target=`"_blank`" >CIS Microsoft IIS 8 Benchmark</a><br>
+		    </details></p>"
+	    }
 
 	# FRONT-END SERVICE PRINCIPAL NAMES CHECK	
 	# Only need one SPN for HOST (A) DNS record
@@ -1450,8 +1560,10 @@ ElseIf ($AppToCheck -eq "piwebapi") {
 	    # RESOURCE BASED KERBEROS DELEGATION
 	    If ($rbcd) {
 	    $ServiceAccountString = $global:ServiceAccount.ToString()         
-        $ServiceAccountSID = Get-ADObject -Filter { Name -like $ServiceAccountString } -Properties objectSID | Select objectSID -ExpandProperty objectSID | Select -Expand Value
-        If (!$IISAppPoolAccountSID) { $ServiceAccountSID = "dummySID" }
+        $ServiceAccountSID = Get-ADObject -Filter { sAMAccountName -like $ServiceAccountString } -Properties objectSID | Select objectSID -ExpandProperty objectSID | Select -Expand Value
+        
+        # Fail-safe in case resolution of the SID isn't successful. SID is only needed in cross-domain RBCD checks, but this part of RBCD check must be improved in the future.
+        If (!$ServiceAccountSID) { $ServiceAccountSID = "dummySID" }
 
             # Check AF Servers (back-ends) for rbcd (PrincipalsAllowedToDelegateToAccount)					
             foreach ($AFServerTemp in $AFServers) { 
@@ -1615,6 +1727,7 @@ If($blnWindowsAuth)
 # ClaimsAuth!
 ElseIf ($blnClaimsAuth -eq $true) { 
     $strIISAuthenticationSection="<p><good>Claims Authentication is enabled.</good></p>"
+    $global:Kernel = "<p><good>Windows Authentication not checked as it's superseded by Claims Authentication.</good></p>"
 }
 
 # Windows/Claims Auth is N/A
@@ -1708,7 +1821,8 @@ Else
 			
 				</head>
 "@
-				
+			
+#PI Vision body	
 If ($AppToCheck -eq "pivision") {
                     $body = @"
                     <body>
@@ -1734,16 +1848,42 @@ If ($AppToCheck -eq "pivision") {
                 </html>
 "@
 }
+
+# PI WebAPI body
+ElseIf ($AppToCheck -eq "piwebapi") {
+        $body = @"
+                    <body>
+                    <header>PI Dog Report for server $WebServerFQDN on $dogtime</header>
+                    <div style="margin-right: auto; margin-left: auto;width: 90%;">                    
+                    <header2>PI SQL DAS Configuration</header2>
+                    <article>
+					<ul>
+					<li>$global:gMSA</li>
+					</ul>
+					</article>
+					<article>
+    				<table class="summarytable table">
+                    <thead><header2>$secondArticle</header2></thead>
+					$strKerberosDelegationsSection
+					</table>                    
+					</article>
+					</div>			
+				</body>
+                </html>
+                </html>
+"@
+}
+
+# SQL DAS for OLEDB body
 Else {
         $body = @"
                     <body>
                     <header>PI Dog Report for server $WebServerFQDN on $dogtime</header>
                     <div style="margin-right: auto; margin-left: auto;width: 90%;">                    
-                    <header2>PI WebAPI Configuration</header2>
+                    <header2>PI SQL DAS Configuration</header2>
                     <article>
 					<ul>
 					<li>$global:gMSA</li>
-	                <li>$global:CustomHostHeader</li> 
 					</ul>
 					</article>
 					<article>
