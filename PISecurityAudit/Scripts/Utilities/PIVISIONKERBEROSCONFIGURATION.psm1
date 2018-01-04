@@ -1560,10 +1560,23 @@ ElseIf ($AppToCheck -eq "pisqldas") {
 	    # RESOURCE BASED KERBEROS DELEGATION
 	    If ($rbcd) {
 	    $ServiceAccountString = $global:ServiceAccount.ToString()         
-        $ServiceAccountSID = Get-ADObject -Filter { sAMAccountName -like $ServiceAccountString } -Properties objectSID | Select objectSID -ExpandProperty objectSID | Select -Expand Value
         
-        # Fail-safe in case resolution of the SID isn't successful. SID is only needed in cross-domain RBCD checks, but this part of RBCD check must be improved in the future.
-        If (!$ServiceAccountSID) { $ServiceAccountSID = "dummySID" }
+            # Get SID of the middle-tier app to check in cross-domain RBCD config.
+
+                # Standard User 
+                If ($global:ADAccType -eq 1) { 
+                $ServiceAccountSID = (Get-ADUser -Identity $ServiceAccountString -Properties SID).SID.Value
+                }
+
+                # Computer 
+                ElseIf ($global:ADAccType -eq 2) { 
+                $ServiceAccountSID = (Get-ADComputer -Identity $ServiceAccountString -Properties SID).SID.Value
+                }
+
+                # gMSA
+                Else { 
+                $ServiceAccountSID = (Get-ADServiceAccount -Identity $ServiceAccountString -Properties SID).SID.Value
+                }
 
             # Check AF Servers (back-ends) for rbcd (PrincipalsAllowedToDelegateToAccount)					
             foreach ($AFServerTemp in $AFServers) { 
