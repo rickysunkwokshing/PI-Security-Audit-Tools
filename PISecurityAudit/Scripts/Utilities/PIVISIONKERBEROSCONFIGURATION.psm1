@@ -195,6 +195,12 @@ Verify PI and AF Server SPN configuration. This function uses setspn.exe tool.
 
 Function Check-ResourceBasedConstrainedDelegationPrincipals 
 {
+<#
+.SYNOPSIS
+Verify RBCD configuration.
+.DESCRIPTION
+Verify RBCD configuration. This function uses RSAT-AD-PowerShell Module.
+#>
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("sa")]
@@ -403,6 +409,12 @@ Function Check-ResourceBasedConstrainedDelegationPrincipals
 
 Function Check-ClassicDelegation
 {
+<#
+.SYNOPSIS
+Verify Classic Kerberos Delegation configuration.
+.DESCRIPTION
+Verify Classic Kerberos Delegation configuration. This function uses RSAT-AD-PowerShell Module.
+#>
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("sspn")]
@@ -586,6 +598,12 @@ Function Check-ClassicDelegation
 
 Function Check-KernelModeAuth
 {
+<#
+.SYNOPSIS
+Verify Kernel-mode Authentication configuration.
+.DESCRIPTION
+Verify Kernel-mode Authentication configuration based on combination of AppPool identity and Windows Authentication settings.
+#>
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("CustomAppPool")]
@@ -665,6 +683,12 @@ Set-WebConfigurationProperty -Filter '/system.webServer/security/authentication/
 
 Function Get-AppNetworkIdentityName
 {
+<#
+.SYNOPSIS
+Parse Service Account Name and type.
+.DESCRIPTION
+Parse Service Account Name and type.
+#>
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("IDType")]
@@ -722,7 +746,7 @@ Function Get-AppNetworkIdentityName
 			# $global:CSAppPoolIdentity = $IdentityType
 			$global:ServiceAccount = $IISserverName.ToLower()
 			
-			$global:SvcAccountFriendlyName = $IdentityType
+			$global:SvcAccountFriendlyName = $global:ServiceAccount.ToUpper()
     }
 }
 
@@ -935,9 +959,9 @@ Function Get-PISQLDASProperties
 {
 <#
 .SYNOPSIS
-Query PI WebAPI machine for information about the application.
+Query PI SQL DAS for OLEDB machine for information about the application.
 .DESCRIPTION
-Query  PI WebAPI machine for information about the application.  
+Query PI SQL DAS for OLEDB machine for information about the application.  
 This function reduces the number of PSSessions compared with calling separately to the core module.
 #>
 	param(
@@ -962,7 +986,7 @@ $SQLDASscriptBlock = {
     
     # SQL DAS will automatically register SPNs in the future. 
     # It will also use different SPN class based on product (SQL DAS for OLEDB, for Integrator ..) and based on binding (HTTPS vs NET.TCP).
-    # For now, let's grab the binding information from SQL DAS for OLEDB config file for future use.
+    # For now, let's grab the binding information from SQL DAS for OLEDB config file for future use (future SQLDAS will use ports in SPNs, among other things).
     # Assume HTTP SPN class for the time being.
 
     #$SQLDASconfig.Load($env:PIHOME64 + "\SQLDAS\OLE DB\PISqlDas.exe.config")
@@ -988,6 +1012,12 @@ $SQLDASscriptBlock = {
 
 Function Initialize-KerberosConfigurationTest
 {
+<#
+.SYNOPSIS
+Break down user input.
+.DESCRIPTION
+Break down user input.
+#>
 	param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]
 		[alias("cn")]
@@ -1141,7 +1171,7 @@ If ( $result -in "00", "01", "02"  ) {
 Function Test-KerberosConfiguration {
 <#  
 .SYNOPSIS
-Designed to check PI Vision or PI WebAPI configuration to ensure Kerberos authentication and delegation
+Designed to check PI Vision, PI WebAPI, or PI SQL DAS for OLEDB configuration to ensure Kerberos authentication and delegation
 are configured correctly.  
 
 .DESCRIPTION
@@ -1170,6 +1200,7 @@ are piwebapi, pivision, pisqldas, and Menu (select interactively).
 .EXAMPLE
 Test-KerberosConfiguration -ComputerName piomnibox -Product pivision -KerberosCheck ResourceBased
 Test-KerberosConfiguration -Product piwebapi -KerberosCheck None
+Unleash-PI_Dog -app pisqldas -cn hal9000 -kc Classic
 .LINK
 https://pisquare.osisoft.com
 #>
@@ -1238,6 +1269,7 @@ param(
 		
 	}
 
+# Break down user selection into usable bits.
 switch ($result)
     {
         "00" {"PI Vision + No Kerberos"
@@ -1361,7 +1393,7 @@ If ($RSATcheck) {
 	}
 }	
 
-####
+#### PI Vision specific Section
 If ($AppToCheck -eq "pivision") {	
 	$global:ProductName = "PI Vision"
 
@@ -1425,7 +1457,7 @@ If ($AppToCheck -eq "pivision") {
 	$ProductUserSvcObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $PIVisionUserSvc -DBGLevel $DBGLevel
 
 
-####
+#### PI WebAPI specific Section
 }
 ElseIf ($AppToCheck -eq "piwebapi") { 
         $global:ProductName = "PI WebAPI"
@@ -1459,8 +1491,11 @@ ElseIf ($AppToCheck -eq "piwebapi") {
 
 
 }
+#### PI SQL DAS specific Section
 ElseIf ($AppToCheck -eq "pisqldas") { 
-        $global:ProductName = "PI SQL DAS"
+        
+        $global:ProductName = "PI SQL DAS for OLEDB"
+
         Get-PISQLDASProperties -lc $LocalComputer -rcn $RemoteComputerName -DBGLevel $DBGLevel
 
         # CHECK CUSTOM HOST HEADER - assuming computer/FQDN is used with PI SQL DAS.
@@ -1485,8 +1520,10 @@ ElseIf ($AppToCheck -eq "pisqldas") {
 
 }
 
+### Commencing general section common for all apps.
+###
 
-        # Check Custom Host Header type - CNAME vs HOST (A)	
+        # Check Custom Host Header type - CNAME vs HOST (A)	- currently relevant only for Vision and WebAPI
 	    If ($blnCustomHeader -eq $True) {								
 	        $AliasTypeCheck = Resolve-DnsName $CScustomHeader | Select -ExpandProperty Type
 		        If ($AliasTypeCheck -match "CNAME") { 
@@ -1543,11 +1580,12 @@ ElseIf ($AppToCheck -eq "pisqldas") {
 		$SPNtwo = ("host/" + $global:WebServerFQDN).ToLower()
 	}
 
-	# If Classic Kerberos Delegation is to be checked, SPNs can ge obtained in the same AD call. Othertwise, SETSPN tool is used.
+	# If Classic Kerberos Delegation is to be checked, SPNs can ge obtained in one AD call to improve performance. Othertwise, SETSPN tool is used.
 	If ($blnDelegationCheckConfirmed -eq $false -or $rbcd -eq $true) {
     
 	Check-ServicePrincipalName -chh $HostA -spn1 $SPNone -spn2 $SPNtwo -TargetAccountName $global:ServiceAccount -TargetDomain $ProductUserSvcObject.Domain
 	}
+
 
 	# KERBEROS DELEGATION CHECK CONFIRMED
 	If ($blnDelegationCheckConfirmed) {
@@ -1559,7 +1597,9 @@ ElseIf ($AppToCheck -eq "pisqldas") {
 			
 	    # RESOURCE BASED KERBEROS DELEGATION
 	    If ($rbcd) {
-	    $ServiceAccountString = $global:ServiceAccount.ToString()         
+        
+        # Help variable
+	    $ServiceAccountString = $global:ServiceAccount.ToString()      
         
             # Get SID of the middle-tier app to check in cross-domain RBCD config.
 
@@ -1893,7 +1933,7 @@ Else {
                     <body>
                     <header>PI Dog Report for server $WebServerFQDN on $dogtime</header>
                     <div style="margin-right: auto; margin-left: auto;width: 90%;">                    
-                    <header2>PI SQL DAS Configuration</header2>
+                    <header2>PI SQL DAS for OLEDB Configuration</header2>
                     <article>
 					<ul>
 					<li>$global:gMSA</li>
