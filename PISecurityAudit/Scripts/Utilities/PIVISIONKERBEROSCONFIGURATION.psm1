@@ -992,7 +992,7 @@ $SQLDASscriptBlock = {
 	$WebServerDomain = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" -Name "Domain" | Select-Object -ExpandProperty "Domain"
     
     If (!(Test-Path ($env:PIHOME64 + "SQLDAS\OLE DB\PISqlDas.exe.config"))) { 
-    Write-Warning "PI WebAPI not found. Aborting."
+    Write-Warning "PI SQL DAS for OLEDB not found. Aborting."
     exit
     }
 
