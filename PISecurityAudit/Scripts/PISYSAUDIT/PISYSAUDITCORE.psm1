@@ -5059,7 +5059,7 @@ PROCESS
 				{
 					$suppressedCheckIDs += $suppressedCheckID + "; "
 				}
-				$suppressedCheckIDs = $suppressedCheckIDs.Trim(';')
+				$suppressedCheckIDs = $suppressedCheckIDs.Trim('; ')
 			}
 
 			# Construct HTML table for errors
