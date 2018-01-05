@@ -2002,9 +2002,12 @@ PROCESS
 		$msgTemplate5 = "Information, {0}."
 		$msgTemplate6 = "Function: {0}, Debug: {1}."
 		
+		if($Message.EndsWith("."))
+		{ $Message = $Message.Trim(".") }
+
 		# Message.
 		$msg = ""
-				
+		
 		if($MessageType.ToLower() -eq "error")
 		{
 			# This type of message is always shown whatever the debug level.
