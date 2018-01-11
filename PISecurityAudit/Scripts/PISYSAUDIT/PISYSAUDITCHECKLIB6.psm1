@@ -276,30 +276,41 @@ PROCESS
 
 				# Drill into Configuration DB to get Web API config element
 				$configDB = Get-AFDatabase -AFServer $configAF -Name 'Configuration'
-				$osisoft = Get-AFElement -AFDatabase $configDB -Name 'OSIsoft'
-				$webAPI = Get-AFElement -AFElement $osisoft -Name 'PI Web API'
-				$configElem = Get-AFElement -AFElement $webAPI -Name $global:PIWebApiConfiguration.AFElement
-				$systemConfig = Get-AFElement -AFElement $configElem -Name 'System Configuration'
-				$CsrfDefense = Get-AFAttribute -AFElement $systemConfig -Name 'EnableCSRFDefense'
+				if($null -ne $configDB) { $osisoft = Get-AFElement -AFDatabase $configDB -Name 'OSIsoft' }
+				if($null -ne $osisoft) { $webAPI = Get-AFElement -AFElement $osisoft -Name 'PI Web API' }
+				if($null -ne $webAPI) { $configElem = Get-AFElement -AFElement $webAPI -Name $global:PIWebApiConfiguration.AFElement }
+				if($null -ne $configElem) { $systemConfig = Get-AFElement -AFElement $configElem -Name 'System Configuration' }
+				if($null -ne $systemConfig) { $CsrfDefense = Get-AFAttribute -AFElement $systemConfig -Name 'EnableCSRFDefense' }
 
-				if($null -ne $CsrfDefense)
+				if($null -ne $systemConfig)
 				{
-					$CsrfEnabled = $CsrfDefense.GetValue()
-					if($CsrfEnabled.Value -eq $true)
+					if($null -ne $CsrfDefense)
 					{
-						$result = $true
-						$msg = "CSRF Defense is enabled on the PI Web API."
+						$CsrfEnabled = $CsrfDefense.GetValue()
+						if($CsrfEnabled.Value -eq $true)
+						{
+							$result = $true
+							$msg = "CSRF Defense is enabled on the PI Web API."
+						}
+						else
+						{
+							$result = $false
+							$msg = "CSRF Defense is disabled on the PI Web API."
+						}
 					}
 					else
 					{
 						$result = $false
-						$msg = "CSRF Defense is disabled on the PI Web API."
+						$msg = "Unable to locate EnableCSRFDefense setting for the PI Web API."
 					}
 				}
 				else
 				{
-					$result = $false
-					$msg = "Unable to locate EnableCSRFDefense setting for the PI Web API."
+					# problem finding config element
+					$result = "N/A"
+					$msg = "Unable to locate PI Web API configuration element '$($global:PIWebApiConfiguration.AFElement)'"
+					$msg += " on $($global:PIWebApiConfiguration.AFServer)"
+					Write-PISysAudit_LogMessage $msg "Error" $fn
 				}
 			}
 			else
