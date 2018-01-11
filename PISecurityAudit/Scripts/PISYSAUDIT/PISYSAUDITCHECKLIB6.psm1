@@ -56,6 +56,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebAPIVersion"   1 "AU60001"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiCSRF"      1 "AU60002"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebAPIDebugMode" 1 "AU60003"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiHeaders"   1 "AU60004"
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -481,6 +482,214 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPIWebApiHeaders
+{
+<#
+.SYNOPSIS
+AU60004 - PI Web API HTTP Headers
+.DESCRIPTION
+VALIDATION: Verifies that best practices for HTTP headers are implemented
+in the PI Web API. <br/>
+COMPLIANCE: Ensure that the X-Frame-Options header is set to enforce framing
+restrictions. Ensure that the Strict-Transport-Security header is set to enforce
+HTTP strict transport security (HSTS). For configuration steps, see Live Library: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8">
+	https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8 </a> <br/>
+For additional recommendations, see KB01631: <br/>
+<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/">https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{
+	# Get and store the function Name.
+	$fn = GetFunctionName
+
+	try
+	{
+		$installVersion = $global:PIWebApiConfiguration.Version
+		$installVersionInt64 = [int64]($installVersion.Split('.') -join '')
+
+		# X-Frame-Options support added in PI Web API 2017
+		if($installVersionInt64 -ge 190000)
+		{
+			# Define X-Frame-Options values that will pass the check
+			$xfoValuesAllowed = @(
+				'DENY',
+				'SAMEORIGIN',
+				'ALLOW-FROM*'
+			)
+
+			# Attempt connection to configuration AF Server
+			$configAF = Get-AFServer $global:PIWebApiConfiguration.AFServer
+			if($configAF)
+			{
+				$configAF = Connect-AFServer -AFServer $configAF
+
+				# Drill into Configuration DB to get Web API config element
+				$configDB = Get-AFDatabase -AFServer $configAF -Name 'Configuration'
+				if($null -ne $configDB) { $osisoft = Get-AFElement -AFDatabase $configDB -Name 'OSIsoft' }
+				if($null -ne $osisoft) { $webAPI = Get-AFElement -AFElement $osisoft -Name 'PI Web API' }
+				if($null -ne $webAPI) { $configElem = Get-AFElement -AFElement $webAPI -Name $global:PIWebApiConfiguration.AFElement }
+				if($null -ne $configElem) { $systemConfig = Get-AFElement -AFElement $configElem -Name 'System Configuration' }
+				if($null -ne $systemConfig) { $xFrameOptions = Get-AFAttribute -AFElement $systemConfig -Name 'XFrameOptions' }
+				if($installVersionInt64 -ge 1100000)
+				{
+					if($null -ne $systemConfig) { $customHeaders = Get-AFAttribute -AFElement $systemConfig -Name 'CustomHeaders' }
+					if($null -ne $systemConfig) { $customHeadersEnabled = Get-AFAttribute -AFElement $systemConfig -Name 'CustomHeadersEnabled' }
+				}
+
+				if($null -ne $systemConfig)
+				{
+					if($null -ne $xFrameOptions)
+					{
+						$xfoValue = $xFrameOptions.GetValue()
+						$xFramePassed = $false
+						foreach($allowed in $xfoValuesAllowed)
+						{
+							if($xfoValue.Value -like $allowed)
+							{
+								$xFramePassed = $true
+							}
+						}
+					}
+					else
+					{
+						# no XFrameOptions attribute
+						$xFramePassed = $false
+					}
+
+					if($installVersionInt64 -ge 1100000)
+					{
+						$customHeadersEnabledValue = $customHeadersEnabled.GetValue()
+						if (($null -ne $customHeadersEnabled) -and
+							($customHeadersEnabledValue.Value -eq $true) -and
+							($null -ne $customHeaders))
+						{
+							$hstsPassed = $false
+							$customHeadersValue = $customHeaders.GetValue()
+							foreach($header in $customHeadersValue.Value)
+							{
+								# check for HSTS header
+								if($header -like 'strict-transport-security:*') { $hstsPassed = $true }
+								# check for X-Frame-Options again
+								foreach($allowed in $xfoValuesAllowed)
+								{
+									if($header -like ("x-frame-options: $allowed"))
+									{
+										$xFramePassed = $true
+									}
+								}
+							}
+						}
+						else
+						{
+							# CustomHeaders are missing or not enabled.
+							# Fail all checks for headers that are only in this attribute
+							$hstsPassed = $false
+						}
+
+						# Evaluate results for PI Web API 2017 R2
+						if($xFramePassed -and $hstsPassed)
+						{
+							$result = $true
+							$msg = "Recommended HTTP headers are enabled in the PI Web API."
+						}
+						elseif($xFramePassed)
+						{
+							$result = $false
+							$msg = "X-Frame-Options is enabled, but HSTS is not enabled in the PI Web API."
+						}
+						elseif($hstsPassed)
+						{
+							$result = $false
+							$msg = "HSTS is enabled, but X-Frame-Options is not enabled in the PI Web API."
+						}
+						else
+						{
+							$result = $false
+							$msg = "No recommended HTTP headers are enabled in the PI Web API."
+						}
+					}
+					else
+					{
+						# version is not 2017 R2 or later, can't pass check fully
+						$result = $false
+						if($xFramePassed)
+						{
+							$msg = "X-Frame-Option is enabled, but other custom headers require PI Web API 2017 or later."
+						}
+						else
+						{
+							$msg = "X-Frame-Option is not enabled, and other custom headers require PI Web API 2017 or later."
+						}
+					}
+				}
+				else
+				{
+					# problem finding config element
+					$result = "N/A"
+					$msg = "Unable to locate PI Web API configuration element '$($global:PIWebApiConfiguration.AFElement)'"
+					$msg += " on $($global:PIWebApiConfiguration.AFServer)"
+					Write-PISysAudit_LogMessage $msg "Error" $fn
+				}
+			}
+			else
+			{
+				# no connection to AF
+				$result = "N/A"
+				$msg = "Unable to connect to PI Web API configuration AF Server '$($global:PIWebApiConfiguration.AFServer)'"
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
+		}
+		else
+		{
+			# version is earlier than 2017
+			$result = $false
+			$msg = "Custom HTTP headers are supported in PI Web API 2017 R2 or later."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		$result = "N/A"
+	}	
+
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU60004" `
+									-ain "PI Web API HTTP Headers" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "PI System" -Group2 "PI Web API" `
+									-Severity "Low"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -527,8 +736,8 @@ PROCESS
 	catch
 	{
 		# Return the error message.
-		$msg = "A problem occurred during the processing of the validation check"					
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		$result = "N/A"
 	}	
 	
@@ -539,7 +748,7 @@ PROCESS
 									-aif $fn -msg $msg `
 									-Group1 "<Category 1>" -Group2 "<Category 2>" `
 									-Group3 "<Category 3>" -Group4 "<Category 4>" `
-									-Severity "<Severity>"																																																
+									-Severity "<Severity>"
 }
 
 END {}
@@ -558,6 +767,7 @@ Export-ModuleMember Get-PISysAudit_FunctionsFromLibrary6
 Export-ModuleMember Get-PISysAudit_CheckPIWebApiVersion
 Export-ModuleMember Get-PISysAudit_CheckPIWebApiCSRF
 Export-ModuleMember Get-PISysAudit_CheckPIWebAPIDebugMode
+Export-ModuleMember Get-PISysAudit_CheckPIWebApiHeaders
 # </Do not remove>
 
 # ........................................................................
