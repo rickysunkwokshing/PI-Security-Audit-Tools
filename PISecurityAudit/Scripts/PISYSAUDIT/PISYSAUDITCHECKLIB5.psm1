@@ -57,6 +57,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionAppPools" 1 "AU50002"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSSL"      1 "AU50003"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSPN"      1 "AU50004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionHeaders"  1 "AU50005"
 	
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -132,7 +133,8 @@ PROCESS
 			$UsingHTTPS = $Bindings.protocol -contains "https"
 			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
 			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/' + $ProductName) -Filter system.webServer/security/access -Name "sslFlags"
-			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site.ToString() + '/' + $ProductName) | select-object Value	
+			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site.ToString() + '/' + $ProductName) | select-object Value
+			$customHeaders = Get-WebConfigurationProperty -Location $($Site.ToString() + '/' + $ProductName) -Filter /system.webServer/httpProtocol -Name "customHeaders" | Select-Object -ExpandProperty Collection
 			
 			# App Pool Info 
 			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.identitytype
@@ -156,6 +158,7 @@ PROCESS
 			$Configuration | Add-Member -MemberType NoteProperty -Name UsingHTTPS -Value $UsingHTTPS
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsSite
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsApp -Value $sslFlagsApp
+			$Configuration | Add-Member -MemberType NoteProperty -Name customHeaders -Value $customHeaders
 			
 			return $Configuration
 		}
@@ -660,22 +663,23 @@ END {}
 #***************************
 }
 
-
-# ........................................................................
-# Add your cmdlet after this section. Don't forget to add an intruction
-# to export them at the bottom of this script.
-# ........................................................................
-function Get-PISysAudit_TemplateAU1xxxx
+function Get-PISysAudit_CheckPIVisionHeaders
 {
-<#  
+<#
 .SYNOPSIS
-AU5xxxx - <Name>
+AU50005 - PI Vision HTTP Headers
 .DESCRIPTION
-VALIDATION: <Enter what the verification checks>
-COMPLIANCE: <Enter what it needs to be compliant>
+VALIDATION: Checks for recommended PI Vision HTTP response headers. <br/>
+COMPLIANCE: Ensure that the default HTTP headers in PI Vision 2017 R2 are configured: <br/>
+- X-Frame-Options: SAMEORIGIN <br/>
+- X-Content-Type-Options: nosniff <br/>
+- Referrer-Policy: no-referrer <br/>
+- X-XSS-Protection: 1; mode=block <br/>
+For more information on these headers, see KB01631: <br/>
+<a href="http://techsupport.osisoft.com/Troubleshooting/KB/KB01631/">http://techsupport.osisoft.com/Troubleshooting/KB/KB01631/</a>
 #>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(							
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
 		[alias("at")]
 		[System.Collections.HashTable]
@@ -691,35 +695,173 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
-		$DBGLevel = 0)		
+		$DBGLevel = 0)
 BEGIN {}
 PROCESS
-{		
+{
 	# Get and store the function Name.
 	$fn = GetFunctionName
-	
+	$msg = ''
+
 	try
-	{		
-		# Enter routine.
-		# Use information from $global:PIVisionConfiguration whenever possible to 
-		# focus on validation simplify logic. 		
+	{
+		# PI Vision 2017 R2 default headers:
+		#   X-Frame-Options: SAMEORIGIN
+		#   X-Content-Type-Options: nosniff
+		#   Referrer-Policy: no-referrer
+		#   X-XSS-Protection: 1; mode=block
+		# Some headers have alternate values that are equally or more restrictive,
+		# should pass checks in this case.
+		$defaultHeaders = @{
+			"X-Frame-Options" = @( "SAMEORIGIN", "DENY", "ALLOW-FROM *" );
+			"X-Content-Type-Options" = "nosniff";
+			"Referrer-Policy" = @( "no-referrer", "same-origin" );
+			"X-XSS-Protection" = "1; mode=block"
+		}
+
+		$customHeaders = $global:PIVisionConfiguration.customHeaders
+
+		if($null -ne $customHeaders)
+		{
+			$failedHeaders = [System.Collections.ArrayList]@()
+			$missingHeaders = [System.Collections.ArrayList]@()
+			foreach($defaultHeader in $defaultHeaders.GetEnumerator())
+			{
+				if($defaultHeader.Key -in $customHeaders.name)
+				{
+					$header = $customHeaders | Where-Object name -EQ $defaultHeader.Key
+					$headerPassed = $false
+					foreach($allowed in $defaultHeader.Value)
+					{
+						if($header.value -like $allowed) { $headerPassed = $true }
+					}
+					if(-not $headerPassed)
+					{
+						$failedHeaders.Add($header.name) | Out-Null
+					}
+				}
+				else
+				{
+					$missingHeaders.Add($defaultHeader.Key) | Out-Null
+				}
+			}
+
+			if($failedHeaders.Count -gt 0)
+			{
+				$result = $false
+				$msg += "Headers with insecure settings: "
+				for($i=0;$i -lt $failedHeaders.Count;$i++)
+				{
+					if($i -gt 0) { $msg += ', ' }
+					$msg += $failedHeaders[$i]
+				}
+				$msg += '. '
+			}
+			if($missingHeaders.Count -gt 0)
+			{
+				$result = $false
+				$msg += "Missing headers: "
+				for($i=0;$i -lt $missingHeaders.Count;$i++)
+				{
+					if($i -gt 0) { $msg += ', ' }
+					$msg += $missingHeaders[$i]
+				}
+			}
+			if(($failedHeaders.Count -eq 0) -and ($missingHeaders.Count -eq 0))
+			{
+				$result = $true
+				$msg = "Recommended HTTP headers are configured in PI Vision."
+			}
+		}
+		else
+		{
+			$result = $false
+			$msg = "No HTTP response headers configured for PI Vision."
+		}
 	}
 	catch
 	{
 		# Return the error message.
-		$msg = "A problem occurred during the processing of the validation check"					
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		$result = "N/A"
-	}	
-	
-	# Define the results in the audit table	
+	}
+
+	# Define the results in the audit table
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU50005" `
+									-ain "PI Vision HTTP Headers" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "PI System" -Group2 "PI Vision" `
+									-Severity "Low"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+# ........................................................................
+# Add your cmdlet after this section. Don't forget to add an intruction
+# to export them at the bottom of this script.
+# ........................................................................
+function Get-PISysAudit_TemplateAU1xxxx
+{
+<#  
+.SYNOPSIS
+AU5xxxx - <Name>
+.DESCRIPTION
+VALIDATION: <Enter what the verification checks>
+COMPLIANCE: <Enter what it needs to be compliant>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{
+	# Get and store the function Name.
+	$fn = GetFunctionName
+
+	try
+	{		
+		# Enter routine.
+		# Use information from $global:PIVisionConfiguration whenever possible to 
+		# focus on validation simplify logic.	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		$result = "N/A"
+	}
+
+	# Define the results in the audit table
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU1xxxx" `
 									-ain "<Name>" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "<Category 1>" -Group2 "<Category 2>" `
 									-Group3 "<Category 3>" -Group4 "<Category 4>" `
-									-Severity "<Severity>"																																																
+									-Severity "<Severity>"
 }
 
 END {}
@@ -739,6 +881,7 @@ Export-ModuleMember Get-PISysAudit_CheckPIVisionVersion
 Export-ModuleMember Get-PISysAudit_CheckPIVisionAppPools
 Export-ModuleMember Get-PISysAudit_CheckPIVisionSSL
 Export-ModuleMember Get-PISysAudit_CheckPIVisionSPN
+Export-ModuleMember Get-PISysAudit_CheckPIVisionHeaders
 # </Do not remove>
 
 # ........................................................................
