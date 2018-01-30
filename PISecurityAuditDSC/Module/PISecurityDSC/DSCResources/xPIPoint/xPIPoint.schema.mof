@@ -1,4 +1,4 @@
-
+﻿
 [ClassVersion("0.1.0.0"), FriendlyName("PIPoint")]
 class xPIPoint : OMI_BaseResource
 {
