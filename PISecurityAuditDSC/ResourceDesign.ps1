@@ -63,3 +63,28 @@ $Properties += @{
 $Properties += $CommonProperties
 
 New-xDscResource -Name 'xPIPoint' -ModuleName 'PISecurityDSC' -FriendlyName 'PIPoint' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
+
+$writeProperties = @(
+                        'Identity',
+                        'Description',
+                        'NetworkPath', 
+                        'IPAddress',
+                        'NetMask',
+                        'WindowsDomain',
+                        'WindowsAccount', 
+                        'ApplicationName'
+                    )
+$Properties = @{}
+$Properties += @{ 
+    'Name' = (New-xDscResourceProperty -Name 'Name' -Type String -Attribute Key );
+    'Enabled' = (New-xDscResourceProperty -Name 'Enabled' -Type Boolean -Attribute Write );
+}
+foreach($Property in $writeProperties)
+{
+    $Properties += @{
+        $Property = (New-xDscResourceProperty -Name $Property -Type String -Attribute Write );
+    }
+}
+$Properties += $CommonProperties
+
+New-xDscResource -Name 'xPITrust' -ModuleName 'PISecurityDSC' -FriendlyName 'PITrust' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
