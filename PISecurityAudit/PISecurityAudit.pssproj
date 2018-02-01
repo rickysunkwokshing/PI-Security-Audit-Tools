@@ -28,34 +28,33 @@
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="en-US\" />
+    <Folder Include="Testing\" />
     <Folder Include="Scripts\" />
-    <Folder Include="Scripts\piconfig\" />
+    <Folder Include="Scripts\Utilities\" />
     <Folder Include="Scripts\PISYSAUDIT\" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Readme.txt" />
     <Compile Include="Scripts\DebugScript.ps1" />
-    <Compile Include="Scripts\piconfig\CheckPIAdminUsageInMappings.dif" />
-    <Compile Include="Scripts\piconfig\CheckPIAdminUsageInTrusts.dif" />
     <Compile Include="PISYSAUDIT.psd1" />
-    <Compile Include="Scripts\CheckProcessPrivilege.ps1" />
-    <Compile Include="Scripts\Examples.ps1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB1.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB2.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB3.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB4.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB5.psm1" />
+    <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB6.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCORE.psm1" />
     <Compile Include="Scripts\UpdateValidationsInHelp.ps1" />
+    <Compile Include="Scripts\Utilities\PIVISIONKERBEROSCONFIGURATION.psm1" />
+    <Compile Include="Scripts\Utilities\PISECCONFIGEXPORT.psm1" />
+    <Compile Include="Testing\ExecutePester.ps1" />
+    <Compile Include="Testing\ExecutePSScriptAnalyzer.ps1" />
+    <Compile Include="Testing\ImportPester.ps1" />
+    <Compile Include="Testing\InstallTestingModules.ps1" />
+    <Compile Include="Testing\PISYSAUDITCORE.tests.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="en-US\about_PISYSAUDIT.help.txt" />
-    <Content Include="Scripts\piconfig\CheckAutoTrustConfig.dif" />
-    <Content Include="Scripts\piconfig\CheckEditDays.dif" />
-    <Content Include="Scripts\piconfig\CheckExpensiveQuery.dif" />
-    <Content Include="Scripts\piconfig\CheckPIAdminTrustsDisabled.dif" />
-    <Content Include="Scripts\piconfig\CheckPIServerAuthPolicy.dif" />
-    <Content Include="Scripts\piconfig\CheckPIServerAvailability.dif" />
-    <Content Include="Scripts\piconfig\CheckPIWorldReadAccess.dif" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Target Name="Build" />
