@@ -1823,8 +1823,8 @@ PROCESS
 	try
 	{
 		# Update these for subsequent releases
-		$latestVersion = '3.4.410.1256'
-		$readable = '2017 SP1'
+		$latestVersion = '3.4.415.1188'
+		$readable = '2017 R2A'
 
 		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
 		$versionInt = [int]($installationVersion -replace '\.', '')
