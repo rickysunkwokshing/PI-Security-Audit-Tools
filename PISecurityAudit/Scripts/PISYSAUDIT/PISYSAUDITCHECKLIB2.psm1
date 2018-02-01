@@ -68,6 +68,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 "AU20012"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 "AU20013"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 "AU20014"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPINetworkManagerConfiguredAccount"	1 "AU20015"
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -1781,6 +1782,112 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPINetworkManagerConfiguredAccount
+{
+<#  
+.SYNOPSIS
+AU20015 -  - PI Network Manager Service Account
+.DESCRIPTION
+VALIDATION: Verifies that PI Data Archive version is greater than 2017 R2
+and the PI Network Manager application service is running as the account NT Service\PINetMgr.
+If PI Data Archive version is less than 2017 R2, PI Network Manager Application Service 
+will run as Local System by default.
+COMPLIANCE: Run the PI Network Manager Application service as default account
+NT Service\PINetMgr with PI Data Archive version greater than 2017 R2.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = "Unknown"
+	try
+	{
+		# Update these for subsequent releases
+		$latestVersion = '3.4.410.1256'
+		$readable = '2017 SP1'
+
+		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
+		$versionInt = [int]($installationVersion -replace '\.', '')
+		$latestInt = [int]($latestVersion -replace '\.', '')
+		
+		if($versionInt -lt $latestInt)
+		{
+			$result = $false
+			$Severity = "High"
+			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
+		}
+		else
+		{
+			try
+			{		
+				# Get the service account.
+				$value = Get-PISysAudit_ServiceProperty -sn 'pinetmgr' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		
+				# Check if the value is == NT Service\PINetMgr		
+				if($value.ToLower() -eq "nt service\pinetmgr") 
+				{
+					$result =  $true 
+					$msg = "PINetMgr is running as NT Service\PINetMgr"
+				} 
+				else 
+				{ 
+					$result = $false
+					$Severity = "High"
+					$msg = "PINetMgr is not running as NT Service\PINetMgr"
+				}			
+			}
+			catch
+			{
+				# Return the error message.
+				$msg = "A problem occurred during the processing of the validation check."					
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+				$result = "N/A"
+			}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+
+	# Define the results in the audit table		
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20015" `
+										-aif $fn -msg $msg `
+										-ain "Configured Account" -aiv $result `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity "High"					
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
 
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
@@ -1867,6 +1974,7 @@ Export-ModuleMember Get-PISysAudit_CheckPIFirewall
 Export-ModuleMember Get-PISysAudit_CheckTransportSecurity
 Export-ModuleMember Get-PISysAudit_CheckPIBackup
 Export-ModuleMember Get-PISysAudit_CheckInvalidConnections
+Export-ModuleMember Get-PISysAudit_CheckPINetworkManagerConfiguredAccount
 # </Do not remove>
 
 # ........................................................................
