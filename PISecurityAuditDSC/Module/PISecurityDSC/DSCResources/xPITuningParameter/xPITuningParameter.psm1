@@ -54,7 +54,7 @@ function Set-TargetResource
     
     if($Ensure -eq 'Absent')
     { 
-        Set-PITuningParameter -Connection $Connection -Name $Name -Value $null 
+        Reset-PITuningParameter -Connection $Connection -Name $Name 
     }
     else
     { 
