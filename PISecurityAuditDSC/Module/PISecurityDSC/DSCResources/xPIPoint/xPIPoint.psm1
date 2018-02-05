@@ -1,4 +1,4 @@
-Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
+﻿Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
                                -ChildPath 'CommonResourceHelper.psm1')
 
 function Get-TargetResource

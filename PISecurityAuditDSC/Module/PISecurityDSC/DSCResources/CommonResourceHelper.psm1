@@ -27,6 +27,8 @@
         }
     }
 
+    Write-Verbose "Ensure: $($Ensure)"
+
     return $Ensure
 }
 
@@ -88,6 +90,44 @@ function Compare-PIResourceGenericProperties
     }
 }
 
+function Set-PIResourceParametersPreserved
+{
+    param(
+        [parameter(Mandatory=$true)]
+        [alias('pt')]
+        [System.Collections.Hashtable]
+        $ParameterTable,
+        
+        [parameter(Mandatory=$true)]
+        [alias('sp')]
+        [System.String[]]
+        $SpecifiedParameters,
+
+        [parameter(Mandatory=$true)]
+        [alias('cp')]
+        [System.Collections.Hashtable]
+        $CurrentParameters
+    )
+
+    $CommonParameters = @('Ensure', 'PIDataArchive')
+    $ParametersToPreserve = $CurrentParameters
+    # Explicitly specified parameters and common parameters should not be preserved.
+    $ParametersToDefer = $SpecifiedParameters + $CommonParameters 
+    Foreach($Parameter in $ParametersToDefer)
+    { 
+       Write-Verbose "NotPreserving: $($Parameter)"
+       $null = $ParametersToPreserve.Remove($Parameter)
+    }
+    # Set the parameter values we want to keep to the current resource values.
+    Foreach($Parameter in $ParametersToPreserve.GetEnumerator())
+    {
+        Write-Verbose "Preserving: $($Parameter.Key): $($Parameter.Value)"
+        $ParameterTable[$Parameter.Key] = $Parameter.Value
+    }
+
+    return $ParameterTable
+}
+
 function IsNullOrEmpty
 {
 param(
@@ -98,4 +138,4 @@ param(
     return $($null -eq $Value -or "" -eq $Value)
 }
 
-Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL', 'Compare-PIResourceGenericProperties', 'IsNullOrEmpty' )
+Export-ModuleMember -Function @( 'Get-PIResource_Ensure', 'Compare-PIDataArchiveACL', 'Compare-PIResourceGenericProperties', 'Set-PIResourceParametersPreserved', 'IsNullOrEmpty' )

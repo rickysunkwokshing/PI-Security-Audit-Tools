@@ -1,0 +1,18 @@
+﻿
+[ClassVersion("0.1.0.0"), FriendlyName("PITrust")]
+class xPITrust : OMI_BaseResource
+{
+    [Write] String WindowsDomain;
+    [Write] String Description;
+    [Write] Boolean Enabled;
+    [Required, Description("PI Data Archive name for connection")] String PIDataArchive;
+    [Write] String NetworkPath;
+    [Write] String WindowsAccount;
+    [Key] String Name;
+    [Write] String Identity;
+    [Write] String ApplicationName;
+    [Write] String NetMask;
+    [Write] String IPAddress;
+    [Write, ValueMap{"Present","Absent"}, Values{"Present","Absent"}] String Ensure;
+};
+
