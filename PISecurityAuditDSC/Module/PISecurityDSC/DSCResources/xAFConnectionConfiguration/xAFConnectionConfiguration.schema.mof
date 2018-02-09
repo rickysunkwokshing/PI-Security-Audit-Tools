@@ -1,0 +1,12 @@
+﻿
+[ClassVersion("0.1.0.0"), FriendlyName("AFConnectionConfiguration")]
+class xAFConnectionConfiguration : OMI_BaseResource
+{
+    [Write, ValueMap{"Present","Absent"}, Values{"Present","Absent"}] String Ensure;
+    [Key] String Name;
+    [Write] String Timeout;
+    [Write] String Path;
+    [Write] String Account;
+    [Write] Sint32 Port;
+};
+
