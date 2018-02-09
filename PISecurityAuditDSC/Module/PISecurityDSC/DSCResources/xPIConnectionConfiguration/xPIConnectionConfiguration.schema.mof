@@ -1,0 +1,15 @@
+﻿
+[ClassVersion("0.1.0.0"), FriendlyName("PIConnectionConfiguration")]
+class xPIConnectionConfiguration : OMI_BaseResource
+{
+    [Key] String Name;
+    [Write] String Path;
+	[Write] String OpenTimeout;
+    [Write] String OperationTImeout;
+	[Write] Sint32 Priority;
+    [Write] Sint32 Port;
+    [Write, ValueMap{"Present","Absent"}, Values{"Present","Absent"}] String Ensure;
+	[Read] Boolean Default;
+	[Read] Boolean Collective;
+};
+
