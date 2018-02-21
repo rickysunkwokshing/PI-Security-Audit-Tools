@@ -88,3 +88,18 @@ foreach($Property in $writeProperties)
 $Properties += $CommonProperties
 
 New-xDscResource -Name 'xPITrust' -ModuleName 'PISecurityDSC' -FriendlyName 'PITrust' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
+
+$Properties = @{}
+$Properties += @{ 
+    'Name' = (New-xDscResourceProperty -Name 'Name' -Type String -Attribute Key );
+    'Path' = (New-xDscResourceProperty -Name 'Path' -Type String -Attribute Write );
+    'Port' = (New-xDscResourceProperty -Name 'Port' -Type Sint32 -Attribute Write );
+    'Priority' = (New-xDscResourceProperty -Name 'Priority' -Type Sint32 -Attribute Write );
+    'OpenTimeout' = (New-xDscResourceProperty -Name 'OpenTimeout' -Type String -Attribute Write );
+    'OperationTImeout' = (New-xDscResourceProperty -Name 'OperationTImeout' -Type String -Attribute Write );
+    'Default' = (New-xDscResourceProperty -Name 'Default' -Type Boolean -Attribute Read );
+    'Collective' = (New-xDscResourceProperty -Name 'Collective' -Type Boolean -Attribute Read );
+    'Ensure' = (New-xDscResourceProperty -Name 'Ensure' -Type String -Attribute Write -ValidateSet 'Present', 'Absent');
+}
+
+New-xDscResource -Name 'xPIConnectionConfiguration' -ModuleName 'PISecurityDSC' -FriendlyName 'PIConnectionConfiguration' -ClassVersion 0.1.0.0 -Property $Properties.Values -Path $Path
