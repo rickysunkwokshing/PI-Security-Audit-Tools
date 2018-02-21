@@ -41,6 +41,23 @@
     }
 }
 
+function ConvertTo-FullPath
+{
+param(
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$AFServer,
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ElementPath
+)
+
+$FullPath = "\\" + $AFServer.Trim("\") + "\" + $ElementPath.Trim("\")
+
+return $FullPath
+}
+
 function Get-TargetResource
 {
     [cmdletbinding()]
@@ -49,6 +66,10 @@ function Get-TargetResource
         [ValidateSet("Present", "Absent")]
         [string]$Ensure = "Present",
 
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$AFServer,
+        
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$ElementPath,
@@ -72,7 +93,7 @@ function Get-TargetResource
     $attributeType = $null
     $attributeIsArray = $null
 
-    
+    $ElementPath = ConvertTo-FullPath -AFServer $AFServer -ElementPath $ElementPath
     # Load AF SDK. Calling this while it's already loaded shouldn't be harmful
     $loaded = [System.Reflection.Assembly]::LoadWithPartialName("OSIsoft.AFSDK")
     if ($null -eq $loaded) {
@@ -132,6 +153,10 @@ function Set-TargetResource
     (
         [ValidateSet("Present", "Absent")]
         [string]$Ensure = "Present",
+        
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
+        [string]$AFServer,
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
@@ -149,7 +174,8 @@ function Set-TargetResource
         [boolean]$IsArray = $false
     )
 
-    # Load AF SDK. Calling this while it's already loaded shouldn't be harmful
+    $ElementPath = ConvertTo-FullPath -AFServer $AFServer -ElementPath $ElementPath
+    # Load AF SDK. Calling this while it's already loaded by PowerShell tools shouldn't be harmful
     $loaded = [System.Reflection.Assembly]::LoadWithPartialName("OSIsoft.AFSDK")
     if ($null -eq $loaded) {
         $ErrorActionPreference = 'Stop'
@@ -261,6 +287,10 @@ function Test-TargetResource
 
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
+        [string]$AFServer,
+
+        [Parameter(Mandatory)]
+        [ValidateNotNullOrEmpty()]
         [string]$ElementPath,
 
         [Parameter(Mandatory)]
@@ -275,7 +305,7 @@ function Test-TargetResource
         [boolean]$IsArray = $false
     )
 
-    $result = Get-TargetResource -Ensure Present -ElementPath $ElementPath -Name $Name
+    $result = Get-TargetResource -Ensure Present -ElementPath $ElementPath -Name $Name -AFServer $AFServer
     $ensureMatch = $result.Ensure -eq $Ensure
     $typeMatch = $result.Type -eq $Type
     $arrayMatch = $result.IsArray -eq $IsArray

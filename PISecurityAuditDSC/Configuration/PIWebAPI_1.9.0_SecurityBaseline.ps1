@@ -27,24 +27,9 @@ to the PI Web API.
 
 .EXAMPLE
 
-.\PIWebAPI_1.9.0_SecurityBaseline -NodeName "myPIWebAPI" -PIWebAPIConfigElementPath "\\myAF\Configuration\OSIsoft\PI Web API\myPIWebAPI\System Configuration" -CorsOrigins "https://myPIWebAPI,https://myPIWebAPI.domain.int"
+.\PIWebAPI_1.9.0_SecurityBaseline -PIWebAPINodeName "myPIWebAPI" -AFServer "myAF" -PIWebAPIConfigElementPath "Configuration\OSIsoft\PI Web API\myPIWebAPI\System Configuration" -CorsOrigins "https://myPIWebAPI,https://myPIWebAPI.domain.int"
 
 #>
-param
-(
-    [parameter(Mandatory=$true)]
-    [string]
-    $NodeName,
-
-    [parameter(Mandatory=$true)]
-    [string]
-    $PIWebAPIConfigElementPath,
-
-    [parameter(Mandatory=$true)]
-    [string]
-    $CorsOrigins
-)
-
 
 Configuration PIWebAPI_1.9.0_SecurityBaseline
 {
@@ -52,7 +37,11 @@ Configuration PIWebAPI_1.9.0_SecurityBaseline
     (
         [parameter(Mandatory=$true)]
         [string]
-        $NodeName,
+        $PIWebAPINodeName,
+
+        [parameter(Mandatory=$true)]
+        [string]
+        $AFServer,
 
         [parameter(Mandatory=$true)]
         [string]
@@ -122,7 +111,7 @@ Configuration PIWebAPI_1.9.0_SecurityBaseline
         }
     )
 
-    Node $NodeName
+    Node $PIWebAPINodeName
     {
         foreach($attribute in $configAttributes.GetEnumerator())
         {
@@ -130,6 +119,7 @@ Configuration PIWebAPI_1.9.0_SecurityBaseline
             {
                 AFAttribute $attribute.Name
                 {
+                    AFServer = $AFServer
                     ElementPath = $PIWebAPIConfigElementPath
                     Name = $attribute.Name
                     Type = $attribute.Type
@@ -142,6 +132,7 @@ Configuration PIWebAPI_1.9.0_SecurityBaseline
     }
 }
 
-PIWebAPI_1.9.0_SecurityBaseline -NodeName $NodeName `
+PIWebAPI_1.9.0_SecurityBaseline -PIWebAPINodeName $PIWebAPINodeName `
+    -AFServer $AFServer `
     -PIWebAPIConfigElementPath $PIWebAPIConfigElementPath `
     -CorsOrigins $CorsOrigins
