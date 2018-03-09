@@ -578,26 +578,31 @@ PROCESS
 
 					if($installVersionInt64 -ge 1100000)
 					{
-						$customHeadersEnabledValue = $customHeadersEnabled.GetValue()
-						if (($null -ne $customHeadersEnabled) -and
-							($customHeadersEnabledValue.Value -eq $true) -and
-							($null -ne $customHeaders))
+						if (($null -ne $customHeadersEnabled) -and ($null -ne $customHeaders))
 						{
 							$hstsPassed = $false
+                            $customHeadersEnabledValue = $customHeadersEnabled.GetValue()
 							$customHeadersValue = $customHeaders.GetValue()
-							foreach($header in $customHeadersValue.Value)
-							{
-								# check for HSTS header
-								if($header -like 'strict-transport-security:*') { $hstsPassed = $true }
-								# check for X-Frame-Options again
-								foreach($allowed in $xfoValuesAllowed)
-								{
-									if($header -like ("x-frame-options: $allowed"))
-									{
-										$xFramePassed = $true
-									}
-								}
-							}
+                            if($customHeadersEnabledValue.Value -eq $true)
+                            {
+							    foreach($header in $customHeadersValue.Value)
+							    {
+								    # check for HSTS header
+								    if($header -like 'strict-transport-security:*') { $hstsPassed = $true }
+								    # check for X-Frame-Options again
+								    foreach($allowed in $xfoValuesAllowed)
+								    {
+									    if($header -like ("x-frame-options: $allowed"))
+									    {
+										    $xFramePassed = $true
+									    }
+								    }
+							    }
+                            }
+                            else
+                            {
+                                $hstsPassed = $false
+                            }
 						}
 						else
 						{
