@@ -1,9 +1,4 @@
-# ***********************************************************************
-# Validation library
-# ***********************************************************************
-# * Modulename:   PISYSAUDIT
-# * Filename:     PISYSAUDITCHECKLIB5.psm1
-# * Description:  Validation rules for PI Vision.
+# ************************************************************************
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,14 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) 2016 Harry Paul, OSIsoft, LLC
-# * Created validation rule module based off of template used for the
-# * previous modules.
-# *
-# ************************************************************************
-# Version History:
-# ------------------------------------------------------------------------
-#
 # ************************************************************************
 
 # ........................................................................
