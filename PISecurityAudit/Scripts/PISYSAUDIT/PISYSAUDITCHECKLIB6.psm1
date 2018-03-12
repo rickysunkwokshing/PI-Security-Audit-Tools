@@ -44,6 +44,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiCSRF"      1 "AU60002"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebAPIDebugMode" 1 "AU60003"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiHeaders"   1 "AU60004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIWebApiCORS"      1 "AU60005"
 
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -682,6 +683,124 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPIWebApiCORS
+{
+<#
+.SYNOPSIS
+AU60005 - PI Web API CORS
+.DESCRIPTION
+VALIDATION: Verifies that CORS origins are restricted to a whitelist of domains, if CORS is enabled. <br/>
+COMPLIANCE: Ensure that the CORSOrigins attribute in the PI Web API configuration element
+is either empty (CORS disabled) or contains a list of allowed domains. Do not use CORSOrigins = *,
+as this allows cross-origin requests from any origin. For more information, see Live Library: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C">
+	https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C</a>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{
+	# Get and store the function Name.
+	$fn = GetFunctionName
+
+	try
+	{
+		# Attempt connection to configuration AF Server
+		$configAF = Get-AFServer $global:PIWebApiConfiguration.AFServer
+		if($configAF)
+		{
+			$configAF = Connect-AFServer -AFServer $configAF
+
+			# Drill into Configuration DB to get Web API config element
+			$configDB = Get-AFDatabase -AFServer $configAF -Name 'Configuration'
+			if($null -ne $configDB) { $osisoft = Get-AFElement -AFDatabase $configDB -Name 'OSIsoft' }
+			if($null -ne $osisoft) { $webAPI = Get-AFElement -AFElement $osisoft -Name 'PI Web API' }
+			if($null -ne $webAPI) { $configElem = Get-AFElement -AFElement $webAPI -Name $global:PIWebApiConfiguration.AFElement }
+			if($null -ne $configElem) { $systemConfig = Get-AFElement -AFElement $configElem -Name 'System Configuration' }
+			if($null -ne $systemConfig) { $corsOrigins = Get-AFAttribute -AFElement $systemConfig -Name 'CORSOrigins' }
+
+			if($null -ne $systemConfig)
+			{
+				if($null -ne $corsOrigins)
+				{
+					$corsOriginsStr = $corsOrigins.GetValue().Value
+					$corsOriginsStr = $corsOriginsStr.Trim()
+					if($corsOriginsStr -eq '*')
+					{
+						$result = $false
+						$msg = "CORS origins are unrestricted on the PI Web API."
+					}
+					else
+					{
+						$result = $true
+						$msg = "CORS origins are restricted on the PI Web API."
+					}
+				}
+				else
+				{
+					# No CORSOrigins attribute means CORS access is disabled
+					$result = $true
+					$msg = "CORS is disabled on the PI Web API."
+				}
+			}
+			else
+			{
+				# problem finding config element
+				$result = "N/A"
+				$msg = "Unable to locate PI Web API configuration element '$($global:PIWebApiConfiguration.AFElement)'"
+				$msg += " on $($global:PIWebApiConfiguration.AFServer)"
+				Write-PISysAudit_LogMessage $msg "Error" $fn
+			}
+		}
+		else
+		{
+			# no connection to AF
+			$result = "N/A"
+			$msg = "Unable to connect to PI Web API configuration AF Server '$($global:PIWebApiConfiguration.AFServer)'"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		$result = "N/A"
+	}
+
+	# Define the results in the audit table
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU60005" `
+									-ain "PI Web API CORS" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "PI System" -Group2 "PI Web API" `
+									-Severity "Low"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -760,6 +879,7 @@ Export-ModuleMember Get-PISysAudit_CheckPIWebApiVersion
 Export-ModuleMember Get-PISysAudit_CheckPIWebApiCSRF
 Export-ModuleMember Get-PISysAudit_CheckPIWebAPIDebugMode
 Export-ModuleMember Get-PISysAudit_CheckPIWebApiHeaders
+Export-ModuleMember Get-PISysAudit_CheckPIWebApiCORS
 # </Do not remove>
 
 # ........................................................................
