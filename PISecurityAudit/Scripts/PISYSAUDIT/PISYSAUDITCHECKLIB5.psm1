@@ -180,7 +180,7 @@ product page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ </a><br/>
 For more information on the upgrade procedure, see "Upgrade a PI Vision 
 installation" in the PI Live Library:<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts</a>
 #>
@@ -264,7 +264,7 @@ VALIDATION: checks PI Vision AppPool identity.<br/>
 COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not
 ideal. For more information, see "Create a service account for PI Vision" in 
 the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -383,7 +383,7 @@ COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL
 are allowed. The SSL certificate is issued by a Certificate Authority. For more 
 information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live 
 Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -537,7 +537,7 @@ VALIDATION: Checks PI Vision SPN assignment. <br/>
 COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool 
 account. This makes Kerberos Authentication possible. For more information, 
 see the PI Live Library link below. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							

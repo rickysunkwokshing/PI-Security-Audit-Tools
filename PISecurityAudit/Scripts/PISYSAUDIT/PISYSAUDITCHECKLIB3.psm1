@@ -149,7 +149,7 @@ impersonation for access to external tables.  This setting can be changed by
 running the AFDiag utility with the 
 /ExternalDataTablesAllowNonImpersonatedUsers- flag.  For more information, see 
 "AFDiag utility parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -398,7 +398,7 @@ COMPLIANCE: Set the Configuration Setting PlugInVerifyLevel to RequireSigned
 or RequireSignedTrustedProvider. This can be done with AFDiag 
 /PluginVerifyLevel:<Level>. For more information, see "AFDiag utility 
 parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -488,7 +488,7 @@ COMPLIANCE: Set the Configuration Setting FileExtensions to only include the
 file extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a 
 subset thereof. This can be done with AFDiag /FileExtensions:<ExtensionList>. 
 For more information, see "AFDiag utility parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -608,7 +608,7 @@ page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF">https://techsupport.osisoft.com/Products/PI-Server/PI-AF </a><br/>
 For more information on the upgrade procedure, see "PI AF Server upgrades" in 
 the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts</a>
 #>
@@ -715,7 +715,7 @@ VALIDATION: Checks PI AF Server SPN assignment.<br/>
 COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. 
 This makes Kerberos Authentication possible. For more information, see "PI AF 
 and Kerberos authentication" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D</a>
 #>
 
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -795,7 +795,7 @@ server level. That identity should have a single custom account or group mapped
 to it. Admin rights at the server level should not be necessary for ordinary 
 administration tasks. For more information, see "PI AF Access rights" in the PI
 Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1072,7 +1072,7 @@ COMPLIANCE: Ensure that the World Identity is disabled on the AF Server.
 Alternatively, remove the mapping to the \Everyone group and re-map it to an 
 appropriate group with only users who need access to PI AF.  For more 
 information on default PI AF Identities, see:
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1197,7 +1197,7 @@ COMPLIANCE: Database level write access should not be granted to any well-known,
 end user groups, such as \Everyone or Domain Users. Similarly, write access to 
 analyses should be limited. For more information on PI AF access writes, please 
 see: 
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399<br/>">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							

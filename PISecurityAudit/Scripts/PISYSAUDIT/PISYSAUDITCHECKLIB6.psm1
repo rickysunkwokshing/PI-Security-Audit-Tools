@@ -141,7 +141,7 @@ product page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/">https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/ </a><br/>
 For more information on the upgrade procedure, see "PI Web API Installation" 
 in the PI Live Library:<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v8/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B</a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B</a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts">https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts</a>
 #>
@@ -351,8 +351,7 @@ DebugMode attribute to False in the PI Web API configuration element, if this
 attribute exists. If the DebugMode attribute is not present, debug mode is 
 disabled by default. Debug mode should only be enabled for troubleshooting 
 purposes. For more information, see Live Library:<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-E8BF02E2-77C1-40B1-9F1F-0637F94BB8B9">
-	https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-E8BF02E2-77C1-40B1-9F1F-0637F94BB8B9</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-E8BF02E2-77C1-40B1-9F1F-0637F94BB8B9">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-E8BF02E2-77C1-40B1-9F1F-0637F94BB8B9</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -481,8 +480,7 @@ in the PI Web API. <br/>
 COMPLIANCE: Ensure that the X-Frame-Options header is set to enforce framing
 restrictions. Ensure that the Strict-Transport-Security header is set to enforce
 HTTP strict transport security (HSTS). For configuration steps, see Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8">
-	https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8 </a> <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8 </a> <br/>
 For additional recommendations, see KB01631: <br/>
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/">https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/</a>
 #>
@@ -693,8 +691,7 @@ VALIDATION: Verifies that CORS origins are restricted to a whitelist of domains,
 COMPLIANCE: Ensure that the CORSOrigins attribute in the PI Web API configuration element
 is either empty (CORS disabled) or contains a list of allowed domains. Do not use CORSOrigins = *,
 as this allows cross-origin requests from any origin. For more information, see Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C">
-	https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(
