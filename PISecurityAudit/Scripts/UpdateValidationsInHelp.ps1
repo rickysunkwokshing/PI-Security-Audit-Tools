@@ -47,7 +47,8 @@ foreach ($line in $helpFile)
             $libs += Get-PISysAudit_FunctionsFromLibrary2 
             $libs += Get-PISysAudit_FunctionsFromLibrary3 
             $libs += Get-PISysAudit_FunctionsFromLibrary4 
-            $libs += Get-PISysAudit_FunctionsFromLibrary5 
+            $libs += Get-PISysAudit_FunctionsFromLibrary5
+            $libs += Get-PISysAudit_FunctionsFromLibrary6
 
             foreach ($lib in $libs)
             {

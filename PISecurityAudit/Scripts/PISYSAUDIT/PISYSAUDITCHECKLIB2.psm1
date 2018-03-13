@@ -496,7 +496,7 @@ Archive product page for the latest version and associated documentation:<br/>
 For more information on the upgrade procedure, see the "Upgrade a PI Data 
 Archive Server" section of the PI Data Archive Installation and Upgrade Guide, 
 in Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts</a>
 #>
@@ -584,7 +584,7 @@ past days where events can be modified in the Snapshot or Archive databases. A
 zero value means no time check is done.  For instructions to set EditDays, see 
 "Modify the EditDays tuning parameter" section in the PI Data Archive System 
 Management Guide:<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0865CC31-BF8C-4347-B717-15071ED51399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0865CC31-BF8C-4347-B717-15071ED51399 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -993,7 +993,7 @@ COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running
 pinetmgr. Presently only local system is supported.  Correct SPN assignment 
 makes Kerberos Authentication possible.  For more information, see "PI and 
 Kerberos authentication" in the PI Live Library. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1268,7 +1268,7 @@ VALIDATION: Checks that PI Firewall is used. <br/>
 COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should be removed 
 and replaced with specific IPs or subnets that may connect to the PI Data 
 Archive. For more information on PI Firewall, see: 
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1482,7 +1482,7 @@ COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and
 data daily. It is best practice to back up to a local disk on the PI Data
 Archive machine, then copy the backup to an off-machine location. For more 
 information, see:
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
