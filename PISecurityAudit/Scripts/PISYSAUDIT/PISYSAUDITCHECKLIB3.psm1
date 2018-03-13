@@ -484,11 +484,16 @@ function Get-PISysAudit_CheckFileExtensionWhitelist
 AU30005 - PI AF Server File Extension Whitelist
 .DESCRIPTION
 VALIDATION: Verifies file extension whitelist for PI AF. <br/>
-COMPLIANCE: Set the Configuration Setting FileExtensions to only include the 
+COMPLIANCE: Set the FileExtensions configuration setting to only include the 
 file extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a 
 subset thereof. This can be done with AFDiag /FileExtensions:<ExtensionList>. 
 For more information, see "AFDiag utility parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a><br/>
+By default, the only noncompliant extension included is PDI, which corresponds
+to PI ProcessBook displays. Caution is recommended with PDI files as they can
+contain VBA Macros. Clients are encouraged to leverage Macro Protection with
+PI ProcessBook. For more information, see "Macro protection" in the Live Library: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/processbook-v4/GUID-312C3C85-B06D-4271-AE9D-4FE08E093137">https://livelibrary.osisoft.com/LiveLibrary/content/en/processbook-v4/GUID-312C3C85-B06D-4271-AE9D-4FE08E093137</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -559,7 +564,7 @@ PROCESS
 							# If we detect any rogue extension, the validation check fails, no need to look further
 							if($result -eq $false) 
 							{
-								$msg = "Setting contains non-compliant extenions."
+								$msg = "Setting contains non-compliant extensions."
 								break
 							}
 						} 
