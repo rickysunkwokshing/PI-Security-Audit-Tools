@@ -5140,7 +5140,7 @@ PROCESS
 					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
 					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
 					$recommendations +=@"
-					<b id="$($_.ID)">$($recommendationInfo.Synopsis)</b>
+					<b id="$($_.ID)">$($_.ID + " - " + $_.AuditItemName)</b>
 					<br/>
 					<p>$recommendationInfoDescription</p>
 					<br/>
@@ -5248,7 +5248,7 @@ PROCESS
 			
 					<br/>
 
-					$Recommendations
+					$recommendations
 					
 				</body>
 			</html>
