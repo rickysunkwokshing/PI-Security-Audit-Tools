@@ -28,7 +28,7 @@
 # RootModule = ''
 
 # Version number of this module.
-ModuleVersion = '1.0'
+ModuleVersion = '2.2.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -37,19 +37,19 @@ ModuleVersion = '1.0'
 GUID = '94961d11-6fe6-4bb6-af3f-d5a3d4591e12'
 
 # Author of this module
-Author = 'hpaul'
+Author = 'Customer Support'
 
 # Company or vendor of this module
-CompanyName = 'Unknown'
+CompanyName = 'OSIsoft'
 
 # Copyright statement for this module
-Copyright = '(c) 2017 hpaul. All rights reserved.'
+Copyright = '(c) 2017 OSIsoft. All rights reserved.'
 
 # Description of the functionality provided by this module
-# Description = ''
+Description = 'Collection of DSC resources for PI security.'
 
 # Minimum version of the Windows PowerShell engine required by this module
-# PowerShellVersion = ''
+PowerShellVersion = '3.0.0.0'
 
 # Name of the Windows PowerShell host required by this module
 # PowerShellHostName = ''
