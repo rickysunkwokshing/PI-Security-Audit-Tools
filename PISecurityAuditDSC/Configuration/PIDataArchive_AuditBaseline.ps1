@@ -27,28 +27,31 @@ Data Archive.
 While some validation checks are more involved, there are many which can be 
 corrected with a simple there are many checks which cover
 
+.EXAMPLE 
+.\PIDataArchive_AuditBaseline -NodeName "myPI" -DaysToAllowEdit 60 -MaxQueryExecutionSeconds 300 -AutoTrustConfig 0 -PIFirewallHostmasks @('10.10.*.*','10.1.*.*') -AuthenticationPolicy 51
+
 .PARAMETER DaysToAllowEdits
 
 Defines the number of days to allow edits to archive and snapshot data.  Any 
 non-zero value is accepted, though the value should be chosen to reflect the 
-practical reality of your environment.
+practical reality of your environment.  Defaults to 365 days.
 
 .PARAMETER MaxQueryExecutionSeconds
 
-Defines the maximum time that a query will be allowed to run.  Accepted values
-are between 60 and 300 seconds.
+Defines the maximum time a query will be allowed to run in seconds.  Accepted
+values between 60 and 300 seconds.  Defaults to 260.
 
 .PARAMETER AutoTrustConfig
 
 Defines trusts that are automatically created by the PI Data Archive.  Accepted
-values include:
- 0 - No trusts created
- 1 - Loopback trust created for 127.0.0.1
+values include: 0 (No trusts created) or 1 (Loopback trust created for 127.0.0.1).
+Defaults to 0.
 
 .PARAMETER PIFirewallHostmasks
 
 The PI Firewall provides an additional layer of protection by only allowing 
-connections to the PI Data Archive from approved sources. 
+connections to the PI Data Archive from approved sources.  Defaults to non-
+routable ranges of 10.*.*.* and 192.168.*.*.
 
 .PARAMETER AuthenticationPolicy
 
@@ -57,9 +60,7 @@ protocols available to PI Data Archive clients.  Accepted values:
  3  -  block explicit login (DEFAULT)
  19 -  block PI SDK applications from using trusts
  51 -  block all applications from using trusts
-
-.EXAMPLE 
-.\PIDataArchive_AuditBaseline -NodeName "myPI" -DaysToAllowEdit 60 -MaxQueryExecutionSeconds 300 -AutoTrustConfig 0 -PIFirewallHostmasks @('10.10.*.*','10.1.*.*') -AuthenticationPolicy 51
+Defaults to 3.
 
 #>
 Configuration PIDataArchive_AuditBaseline
@@ -171,5 +172,3 @@ Configuration PIDataArchive_AuditBaseline
         }
     }
 }
-
-PIDataArchive_AuditBaseline

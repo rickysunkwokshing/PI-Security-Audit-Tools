@@ -24,7 +24,12 @@ Security for the PI Data Archive.
 .DESCRIPTION
    
 This configuration is meant to configure a new install of a PI Data Archive to 
-use the standard WIS implementation.
+use the standard WIS implementation as documented in the Field Service Technical
+Standard in KB01702.
+
+.EXAMPLE 
+
+.\PIDataArchive_BasicWindowsImplementation -NodeName "myPI" -PIAdministratorsADGroup 'mydomain\PI Admins' -PIUsersADGroup 'mydomain\PI Users'
 
 .PARAMETER NodeName
 
@@ -58,9 +63,6 @@ create PI Points.  Ideally, this should be a group.
 
 Windows identity to associate with PI Web Applications such as PI Vision.  Ideally, 
 this should be a group.
-
-.EXAMPLE 
-.\PIDataArchive_BasicWindowsImplementation -NodeName "myPI" -PIAdministratorsADGroup 'mydomain\PI Admins' -PIUsersADGroup 'mydomain\PI Users'
 
 #>
 Configuration PIDataArchive_BasicWindowsImplementation
@@ -238,5 +240,3 @@ Configuration PIDataArchive_BasicWindowsImplementation
         }
     }
 }
-
-PIDataArchive_BasicWindowsImplementation
