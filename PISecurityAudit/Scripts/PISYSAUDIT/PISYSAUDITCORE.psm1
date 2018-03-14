@@ -3376,7 +3376,7 @@ PROCESS
 			return $null
 		}
 		$scriptBlock = {
-					param([string]$SID) 
+					param([string]$AccountSID) 
 					if(Test-Path $($env:ProgramData + "\OSIsoft")) 
 					{ 
 						$FilePathRoot = $($env:ProgramData + "\OSIsoft")
@@ -3387,18 +3387,26 @@ PROCESS
 					}
 					else
 					{
-						return $null
+                        return $null
 					}
-					$FilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege.CFG'
-					$UtilityExecutable = $env:Windir + '\system32\secedit.exe'
+					
+                    # Specify temp files for command output and standard output, if any.
+                    $FilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege.CFG'
+                    $StandardOutputFilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege_StandardOutput.txt'
+					
+                    # Invoke the commandline utility
+                    $UtilityExecutable = $env:Windir + '\system32\secedit.exe'
 					$ArgumentList = @('/export', '/areas USER_RIGHTS', $('/cfg "' + $FilePath + '"'))
-					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -Wait -NoNewWindow
-					$FileContent = Get-Content -Path $FilePath
-					if(Test-Path $FilePath) { Remove-Item $FilePath }
-					$Privs = @()
+					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -Wait -NoNewWindow -RedirectStandardOutput $StandardOutputFilePath
+					
+                    # Check command output for the account SID associated with specific rights.
+                    $FileContent = Get-Content -Path $FilePath
+                    if(Test-Path $FilePath) { Remove-Item $FilePath }
+                    if(Test-Path $StandardOutputFilePath) { Remove-Item $StandardOutputFilePath }
+                    $Privs = @()
 					Foreach($Priv in $FileContent)
 					{
-						if($Priv -like "Se*=*" -and $Priv -like $('*' + $SID + '*'))
+						if($Priv -like "Se*=*" -and $Priv -like $('*' + $AccountSID + '*'))
 						{
 							$Privs += $Priv.Split('=').Trim()[0]
 						}
@@ -3407,7 +3415,7 @@ PROCESS
 		}
 
 		if($LocalComputer)
-		{ $AccountPrivileges = & $scriptBlock -UserSID $AccountSID }
+		{ $AccountPrivileges = & $scriptBlock -AccountSID $AccountSID }
 		else
 		{ 
 			$AccountPrivileges = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $AccountSID
@@ -3416,7 +3424,6 @@ PROCESS
 	}
 	catch
 	{
-		# Return the error message.
 		$msg = "Reading privileges from the process failed"
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		return $null

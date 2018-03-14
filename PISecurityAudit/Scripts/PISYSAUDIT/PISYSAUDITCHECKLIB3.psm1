@@ -326,7 +326,8 @@ PROCESS
 				
 				if($null -ne $listOfPrivileges)
 				{
-					# Read each line to find granted privileges.		
+					$result = $true
+                    # Read each line to find granted privileges.		
 					foreach($line in $listOfPrivileges)
 					{											
 						# Reset.					
@@ -350,8 +351,8 @@ PROCESS
 						$msg = "The account has the following privileges: " + $msg + "." 
 					}
 					else 
-					{ 
-						$msg = "No weaknesses were detected."
+					{
+                        $msg = "No weaknesses were detected."
 					}
 				}
 				else
