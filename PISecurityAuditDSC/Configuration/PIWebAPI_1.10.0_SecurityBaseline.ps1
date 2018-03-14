@@ -26,7 +26,11 @@ This example configuration covers a baseline configuration for the PI Web API
 This configuration sets the security-related attributes on the PI Web API 
 configuration element.
 
-.PARAMETER NodeName
+.EXAMPLE
+
+.\PIWebAPI_1.10.0_SecurityBaseline -PIWebAPINodeName "myPIWebAPI" -AFServer "myAFServer" -PIWebAPIConfigElementPath "Configuration\OSIsoft\PI Web API\myPIWebAPI\System Configuration" -CorsOrigins "https://myPIWebAPI,https://myPIWebAPI.domain.int"
+
+.PARAMETER PIWebAPINodeName
 
 Name of the PI Web API server.
 
@@ -41,9 +45,6 @@ Allowable origins from which CORS requests will be allowed, separated by commas.
 This should include the domain names of any other sites which will make requests
 to the PI Web API.
 
-.EXAMPLE
-
-.\PIWebAPI_1.10.0_SecurityBaseline -PIWebAPINodeName "myPIWebAPI" -AFServer "myAFServer" -PIWebAPIConfigElementPath "Configuration\OSIsoft\PI Web API\myPIWebAPI\System Configuration" -CorsOrigins "https://myPIWebAPI,https://myPIWebAPI.domain.int"
 
 #>
 
@@ -165,8 +166,3 @@ Configuration PIWebAPI_1.10.0_SecurityBaseline
         }
     }
 }
-
-PIWebAPI_1.10.0_SecurityBaseline -PIWebAPINodeName $PIWebAPINodeName `
-    -AFServer $AFServer `
-    -PIWebAPIConfigElementPath $PIWebAPIConfigElementPath `
-    -CorsOrigins $CorsOrigins
