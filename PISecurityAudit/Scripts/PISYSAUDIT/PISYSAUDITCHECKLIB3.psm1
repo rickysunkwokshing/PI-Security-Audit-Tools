@@ -1256,7 +1256,15 @@ PROCESS
 				$databases = $con.Databases
 				foreach($db in $databases)
 				{
-					$dbAccess = Get-AFSecurity -AFObject $db
+					if($db.Name -eq "Configuration")
+                    {
+                        # Configuration database ACL should be evaluated at the OSIsoft element. 
+                        $dbAccess = Get-AFSecurity -AFObject (Get-AFElement -AFDatabase $db -Name "OSIsoft")
+                    }
+                    else
+                    {
+                        $dbAccess = Get-AFSecurity -AFObject $db
+                    }
 					$tempIDs = $dbAccess | Where-Object { $_.AllowAccess -eq 'True' -and $_.Rights -match 'Write|Admin|All'}
 					foreach($ID in $tempIDs)
 					{
