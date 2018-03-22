@@ -5308,7 +5308,8 @@ specifies a CSV file.
 Alias: -cpf
 CSV file defining which computers/servers to audit and 
 for which PI System components. Headings must be included 
-in the CSV file.  See example 7 in the conceptual help.
+in the CSV file.  See "Running a batch of audits" in the 
+readme.txt in the module folder.
 .PARAMETER ObfuscateSensitiveData
 Alias: -obf
 Obfuscate or not the name of computers/servers
