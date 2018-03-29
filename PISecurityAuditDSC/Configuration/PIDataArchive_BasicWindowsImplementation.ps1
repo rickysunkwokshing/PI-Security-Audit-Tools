@@ -64,6 +64,11 @@ create PI Points.  Ideally, this should be a group.
 Windows identity to associate with PI Web Applications such as PI Vision.  Ideally, 
 this should be a group.
 
+.PARAMETER DSCIdentity
+
+Windows identity that will be used to apply configurations. This will use system
+unless a PSCredential is specified in the configuration.
+
 #>
 Configuration PIDataArchive_BasicWindowsImplementation
 {
@@ -87,8 +92,11 @@ Configuration PIDataArchive_BasicWindowsImplementation
         $PIPointsAnalysisCreatorADGroup = '',
         
         [String]
-        $PIWebAppsADGroup = ''
+        $PIWebAppsADGroup = '',
         
+        [String]
+        $DSCIdentity = 'NT Authority\System'
+
          )
 
     Import-DscResource -ModuleName PISecurityDSC
@@ -164,7 +172,8 @@ Configuration PIDataArchive_BasicWindowsImplementation
                                 @{Name=$PIInterfacesADGroup;Identity='PI Interfaces'},
                                 @{Name=$PIPointsAnalysisCreatorADGroup;Identity='PI Points&Analysis Creator'},
                                 @{Name=$PIUsersADGroup;Identity='PI Users'},
-                                @{Name=$PIWebAppsADGroup;Identity='PI Web Apps'}
+                                @{Name=$PIWebAppsADGroup;Identity='PI Web Apps'},
+                                @{Name=$DSCIdentity;Identity='piadmins'}
                             )
 
         Foreach($DesiredMapping in $DesiredMappings)
