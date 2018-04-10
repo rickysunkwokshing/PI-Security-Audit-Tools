@@ -192,7 +192,7 @@ Configuration PIDataArchive_BasicWindowsImplementation
                                 @{Name=$PIUsersADGroup;Identity='PI Users'},
                                 @{Name=$PIWebAppsADGroup;Identity='PI Web Apps'},
 								@{Name=$PIConnectorRelaysADGroup;Identity='PI Connector Relays'},
-								@{Name=$PIDataCollectionManagersADGroup;Identity='PI Data Collection Managers'}
+								@{Name=$PIDataCollectionManagersADGroup;Identity='PI Data Collection Managers'},
                                 @{Name=$DSCIdentity;Identity='piadmins'}
                             )
 
