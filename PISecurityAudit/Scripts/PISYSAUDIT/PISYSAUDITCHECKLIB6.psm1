@@ -738,24 +738,33 @@ PROCESS
 				if($null -ne $corsOrigins)
 				{
 					$corsOriginsStr = $corsOrigins.GetValue().Value
-					$corsOriginsStr = $corsOriginsStr.Trim()
-					if($corsOriginsStr -eq '*')
-					{
-						$result = $false
-						$msg = "CORS origins are unrestricted on the PI Web API."
-					}
-					else
-					{
-						$result = $true
-						$msg = "CORS origins are restricted on the PI Web API."
-					}
+					if($null -ne $corsOriginsStr)
+                    {
+                        $corsOriginsStr = $corsOriginsStr.Trim()
+					    if($corsOriginsStr -eq '*')
+					    {
+						    $result = $false
+						    $msg = "CORS origins are unrestricted on the PI Web API."
+					    }
+					    else
+					    {
+						    $result = $true
+						    $msg = "CORS origins are restricted on the PI Web API."
+					    }
+                    }
+                    else
+                    {
+                        # Null CORSOrigins attribute means CORS access is disabled
+					    $result = $true
+					    $msg = "CORS is disabled on the PI Web API."
+                    }
 				}
-				else
-				{
-					# No CORSOrigins attribute means CORS access is disabled
-					$result = $true
-					$msg = "CORS is disabled on the PI Web API."
-				}
+                else
+                {
+                    # No CORSOrigins attribute means CORS access is disabled
+			        $result = $true
+			        $msg = "CORS is disabled on the PI Web API."
+                }
 			}
 			else
 			{
