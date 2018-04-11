@@ -4,6 +4,8 @@
 
 The PI Security Audit Tools project is a framework to baseline the security configuration of your PI System.  The module (PISysAudit) can be executed locally or remotely to validate the security configuration of various PI System components: PI Data Archive, PI AF Server, PI Vision, SQL Server and the hosting OS.  
 
+![Alt text](Resources/Example-PI-Data-Archive-Detail-Report.PNG?raw=true "Example PI Data Archive Detail Report")
+
 ## Getting Started
 
 Get the latest release version of the PI Security Audit Tools from [Releases](https://github.com/osisoft/PI-Security-Audit-Tools/releases).
