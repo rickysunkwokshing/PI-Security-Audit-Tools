@@ -64,6 +64,16 @@ create PI Points.  Ideally, this should be a group.
 Windows identity to associate with PI Web Applications such as PI Vision.  Ideally, 
 this should be a group.
 
+.PARAMETER PIConnectorRelaysADGroup
+
+Windows identity to associate with PI Connector Relays.  Ideally, 
+this should be a group.
+
+.PARAMETER PIDataCollectionManagersADGroup
+
+Windows identity to associate with PI Data Collection Managers.  Ideally, 
+this should be a group.
+
 .PARAMETER DSCIdentity
 
 Windows identity that will be used to apply configurations. This will use system
@@ -93,6 +103,12 @@ Configuration PIDataArchive_BasicWindowsImplementation
         
         [String]
         $PIWebAppsADGroup = '',
+		
+		[String]
+        $PIConnectorRelaysADGroup = '',
+        
+        [String]
+        $PIDataCollectionManagersADGroup = '',
         
         [String]
         $DSCIdentity = 'NT Authority\System'
@@ -110,7 +126,9 @@ Configuration PIDataArchive_BasicWindowsImplementation
                             @{Name='PI Interfaces';Description='Identity for PI Interfaces';},
                             @{Name='PI Users';Description='Identity for the Read-only users';},
                             @{Name='PI Points&Analysis Creator';Description='Identity for PIACEService, PIAFService and users that can create and edit PI Points';}
-                            @{Name='PI Web Apps';Description='Identity for PI Vision, PI WebAPI, and PI WebAPI Crawler';}
+                            @{Name='PI Web Apps';Description='Identity for PI Vision, PI WebAPI, and PI WebAPI Crawler';},
+							@{Name='PI Connector Relays';Description='Identity for PI Connector Relays';},
+							@{Name='PI Data Collection Managers';Description='Identity for PI Data Collection Managers';}
                           )
 
         Foreach($BasicWISRole in $BasicWISRoles)
@@ -173,6 +191,8 @@ Configuration PIDataArchive_BasicWindowsImplementation
                                 @{Name=$PIPointsAnalysisCreatorADGroup;Identity='PI Points&Analysis Creator'},
                                 @{Name=$PIUsersADGroup;Identity='PI Users'},
                                 @{Name=$PIWebAppsADGroup;Identity='PI Web Apps'},
+								@{Name=$PIConnectorRelaysADGroup;Identity='PI Connector Relays'},
+								@{Name=$PIDataCollectionManagersADGroup;Identity='PI Data Collection Managers'},
                                 @{Name=$DSCIdentity;Identity='piadmins'}
                             )
 
@@ -205,18 +225,18 @@ Configuration PIDataArchive_BasicWindowsImplementation
                                     # entry can be safely ignored. 
                                     # @{Name='PIBATCHLEGACY';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PICampaign';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
-                                    @{Name='PIDBSEC';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'},
-                                    @{Name='PIDS';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Points&Analysis Creator: A(r,w)'},
+                                    @{Name='PIDBSEC';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Data Collection Managers: A(r) | PI Users: A(r) | PI Web Apps: A(r)'},
+                                    @{Name='PIDS';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Connector Relays: A(r,w) | PI Data Collection Managers: A(r) | PI Users: A(r) | PI Points&Analysis Creator: A(r,w)'},
                                     @{Name='PIHeadingSets';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PIMAPPING';Security='piadmins: A(r,w) | PI Web Apps: A(r)'},
                                     @{Name='PIModules';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PIMSGSS';Security='piadmins: A(r,w) | PIWorld: A(r,w) | PI Users: A(r,w)'},
-                                    @{Name='PIPOINT';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Buffers: A(r,w) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'},
-                                    @{Name='PIReplication';Security='piadmins: A(r,w)'},
+                                    @{Name='PIPOINT';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Connector Relays: A(r,w) | PI Data Collection Managers: A(r) | PI Users: A(r) | PI Interfaces: A(r) | PI Buffers: A(r,w) | PI Points&Analysis Creator: A(r,w) | PI Web Apps: A(r)'},
+                                    @{Name='PIReplication';Security='piadmins: A(r,w) | PI Data Collection Managers: A(r)'},
                                     @{Name='PITransferRecords';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r)'},
                                     @{Name='PITRUST';Security='piadmins: A(r,w)'},
                                     @{Name='PITUNING';Security='piadmins: A(r,w)'},
-                                    @{Name='PIUSER';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Users: A(r) | PI Web Apps: A(r)'}
+                                    @{Name='PIUSER';Security='piadmins: A(r,w) | PIWorld: A(r) | PI Connector Relays: A(r,w) | PI Data Collection Managers: A(r) | PI Users: A(r) | PI Web Apps: A(r)'}
                                   )
 
         Foreach($DatabaseSecurityRule in $DatabaseSecurityRules)
