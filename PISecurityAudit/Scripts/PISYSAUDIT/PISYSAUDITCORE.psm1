@@ -1737,6 +1737,18 @@ param(
 			return
 		}
 
+		# Check for availability of PowerShell Tools for the PI System
+		Test-PowerShellToolsForPISystemAvailable
+
+		if(-not $global:ArePowerShellToolsAvailable)
+		{
+			$msg = "Unable to locate module OSIsoft.Powershell on the computer running this script. Terminating PI Web API audit"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Web API Audit" -fn $fn -msg $msg
+			return
+		}
+
 		# Set message templates.
 		$activityMsgTemplate1 = "Check PI Web API component on '{0}' computer"
 		$activityMsg1 = [string]::Format($activityMsgTemplate1, $ComputerParams.ComputerName)
