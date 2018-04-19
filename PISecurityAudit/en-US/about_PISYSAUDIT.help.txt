@@ -254,11 +254,16 @@ https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-
 
 AU30005 - PI AF Server File Extension Whitelist
 VALIDATION: Verifies file extension whitelist for PI AF. 
-COMPLIANCE: Set the Configuration Setting FileExtensions to only include the 
+COMPLIANCE: Set the FileExtensions configuration setting to only include the 
 file extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a 
 subset thereof. This can be done with AFDiag /FileExtensions:<ExtensionList>. 
 For more information, see "AFDiag utility parameters" in the PI Live Library: 
 https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
+By default, the only noncompliant extension included is PDI, which corresponds
+to PI ProcessBook displays. Caution is recommended with PDI files as they can
+contain VBA Macros. Clients are encouraged to leverage Macro Protection with
+PI ProcessBook. For more information, see "Macro protection" in the Live Library: 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/processbook-v4/GUID-312C3C85-B06D-4271-AE9D-4FE08E093137
 
 AU30006 - PI AF Server Version
 VALIDATION: Verifies PI AF Server version. 
@@ -492,5 +497,6 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
 
 
