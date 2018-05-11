@@ -21,7 +21,7 @@
 ModuleToProcess = ''
 
 # Version number of this module.
-ModuleVersion = '2.2.0.1'
+ModuleVersion = '2.2.0.2'
 
 # ID used to uniquely identify this module
 GUID = '79552d65-86e9-4648-bbba-acf5f5f01ced'
@@ -39,7 +39,7 @@ Copyright = '(c) 2017 OSIsoft. All rights reserved.'
 Description = 'Collection of tools to audit PI System security.'
 
 # Minimum version of the Windows PowerShell engine required by this module
-PowerShellVersion = '3.0.0.0'
+PowerShellVersion = '3.0'
 
 # Name of the Windows PowerShell host required by this module
 PowerShellHostName = ''
