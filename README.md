@@ -16,9 +16,9 @@ Find setup and operation instructions in the readme.txt [here](https://github.co
 
 Check out the [Wiki](https://github.com/osisoft/PI-Security-Audit-Tools/wiki) for tutorials and more information on the project.
 
-## Discussion
+## Discussion and Support
 
-To discuss the project or ask questions, please make a comment on our [project post](https://pisquare.osisoft.com/groups/security/blog/2016/07/26/check-out-the-pi-security-audit-tools-on-github) on PI Square.
+The modules are supported through the [PI Security Audit Tools](https://github.com/osisoft/PI-Security-Audit-Tools) repository and the [PI Square Security Group](https://pisquare.osisoft.com/groups/security).  To discuss the project or ask questions, please make a comment on our [project post](https://pisquare.osisoft.com/groups/security/blog/2016/07/26/check-out-the-pi-security-audit-tools-on-github) on PI Square. Please do not contact OSIsoft Technical Support regarding the PI Security Audit Tools modules.
 
 ## Contributing
 
