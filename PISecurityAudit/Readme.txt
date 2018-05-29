@@ -70,6 +70,9 @@ To validate that the module has been successfully loaded you can test with the G
 To read the help documentation on the New-PISystemAuditReport cmdlet, type the following:  
     Get-Help New-PISystemAuditReport
 
+To see all PI System components supported by the computer parameters use the command below:  
+    Get-Help New-PISysAuditComputerParams -Parameter PISystemComponentType
+
 Similarly, retrieve help for the Kerberos Configuration Utility or the Security Configuration Export Utility
 	Get-Help Test-KerberosConfiguration
 	Get-Help Export-PISecConfig
@@ -84,7 +87,7 @@ To view the conceptual help, run the command below:
 Enter the following instruction to add a PI Data Archive component to the audit (substitute in the name of your machine for PIOmniBox):  
     $cpt = piauditparams $null "piomnibox" "pidataarchive"  
 
-If you have other components to add, you can add them to the same object.  For example, the command below also adds a PI AF Server component.  
+If you have other components to add, e.g. PIDataArchive, PIAFServer, SQLServer, PIVision, or PIWebAPI, you can add them to the same object.  The command below also adds a PI AF Server component.  
     $cpt = piauditparams $cpt "piomnibox" "piafserver"
 
 Finally, when you are done adding components, launch the audit with the piaudit command.  
