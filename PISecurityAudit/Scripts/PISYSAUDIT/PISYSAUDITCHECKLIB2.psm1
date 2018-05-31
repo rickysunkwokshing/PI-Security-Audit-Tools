@@ -1484,9 +1484,12 @@ AU20013 - PI Backup Configured
 .DESCRIPTION
 VALIDATION: Ensures that PI Backups are configured and current. <br/>
 COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and 
-data daily. It is best practice to back up to a local disk on the PI Data
-Archive machine, then copy the backup to an off-machine location. For more 
-information, see:
+data daily. Ad hoc backups with PI SMT or with the pibackup.bat script with 
+type COPY will register as not compliant because they do not update the 
+LastBackupTime attribute, and will not be detected. Incremental backups as
+installed by pibackup.bat update the LastBackupTime. It is best practice to 
+back up to a local disk on the PI Data Archive machine, then copy the backup 
+to an off-machine location. For more information, see:
 <a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -1532,7 +1535,7 @@ PROCESS
 					# Good recent backup found, check file coverage
 					if($null -ne $archiveList)
 					{
-						$arcsNotBackedUp = $archiveList | Where-Object { $null -eq $_.LastBackupTime }
+						$arcsNotBackedUp = $archiveList | Where-Object { $null -eq $_.LastBackupTime -and $_.TotalEvents -ne 0 }
 						if($arcsNotBackedUp.Count -eq 0)
 						{
 							$result = $true
