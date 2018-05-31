@@ -637,6 +637,15 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[string]
 		$InstanceName = "",
+	    [parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,
+	    [parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$UserName = "",
+	    [parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$PasswordFile = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -646,19 +655,13 @@ param(
 	
 	try
 	{
-		$className = "Win32_Service"
-		$namespace = "root\CIMV2"
-		if(($InstanceName -eq "") -or ($InstanceName.ToLower() -eq "default") -or ($InstanceName.ToLower() -eq "mssqlserver"))
-		{ $filterExpression = [string]::Format("name='{0}'", "MSSQLSERVER") }
-		else
-		{
-			# Don't forget the escape character so that the '$' is not interpreted as a variable
-			$value = ("MSSQL`$" + $InstanceName).ToUpper()
-			$filterExpression = [string]::Format("name='{0}'", $value)			
-		}
-		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		if($null -eq $WMIObject) { return $false}
-		return $true
+		$result = $false
+		# Simplest query to return a response to ensure we can query the SQL server
+		$result = (Invoke-PISysAudit_Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
+											-InstanceName $ComputerParams.InstanceName -IntegratedSecurity $ComputerParams.IntegratedSecurity `
+											-UserName $ComputerParams.SQLServerUserID -PasswordFile $ComputerParams.PasswordFile `
+											-ScalarValue 'TEST' -DBGLevel $DBGLevel) -eq 1
+		return $result
 	}
 	catch
 	{ return $false }
@@ -1469,17 +1472,6 @@ param(
 		# Validate the presence of a SQL Server
 			try
 			{
-				if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-											-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)						
-				{
-					# Return the error message.
-					$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
-					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Warning" $fn
-					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
-					return
-				}
 				
 				if (-not (Get-Module -ListAvailable -Name SQLPS))
 				{
@@ -1495,11 +1487,20 @@ param(
 				Push-Location
 				Import-Module SQLPS -DisableNameChecking
 				Pop-Location
-				# Simplest query to return a response to ensure we can query the SQL server
-				Invoke-PISysAudit_Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
+
+				if((ValidateIfHasSQLServerRole -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
 											-InstanceName $ComputerParams.InstanceName -IntegratedSecurity $ComputerParams.IntegratedSecurity `
 											-UserName $ComputerParams.SQLServerUserID -PasswordFile $ComputerParams.PasswordFile `
-											-ScalarValue 'TEST' | Out-Null
+											-dbgl $DBGLevel) -eq $false)						
+				{
+					# Return the error message.
+					$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
+					return
+				} 
 			}
 			catch
 			{
@@ -4339,6 +4340,9 @@ PROCESS
 		# Define the complete SQL Server name (Server + instance name)
 		$SQLServerName = ReturnSQLServerName $computerName $InstanceName											
 		
+		$msg = "Invoking query: $Query" 					
+	    Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 		# Integrated Security or SQL Security?
 		if($IntegratedSecurity -eq $false)
 		{
@@ -4370,12 +4374,15 @@ PROCESS
 				$pwd = GetPasswordOnDisk $PasswordFile				
 			}
 
-			$value = Invoke-Sqlcmd -Query $query -ServerInstance $SQLServerName -Username $UserName -Password $pwd | Select-Object -ExpandProperty $ScalarValue
+			$value = Invoke-Sqlcmd -Query $Query -ServerInstance $SQLServerName -Username $UserName -Password $pwd | Select-Object -ExpandProperty $ScalarValue
 		}
 		else
 		{
-			$value = Invoke-Sqlcmd -Query $query -ServerInstance $SQLServerName | Select-Object -ExpandProperty $ScalarValue
+			$value = Invoke-Sqlcmd -Query $Query -ServerInstance $SQLServerName | Select-Object -ExpandProperty $ScalarValue
 		}
+
+		$msg = "Query returned: $value" 					
+	    Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 	}
 	catch
 	{
