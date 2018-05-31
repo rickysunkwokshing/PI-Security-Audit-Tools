@@ -1480,7 +1480,7 @@ AU20013 - PI Backup Configured
 VALIDATION: Ensures that PI Backups are configured and current. <br/>
 COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and 
 data daily. Ad hoc backups with PI SMT or with the pibackup.bat script with 
-type COPY will register as compliant because they do not update the 
+type COPY will register as not compliant because they do not update the 
 LastBackupTime attribute, and will not be detected. Incremental backups as
 installed by pibackup.bat update the LastBackupTime. It is best practice to 
 back up to a local disk on the PI Data Archive machine, then copy the backup 
