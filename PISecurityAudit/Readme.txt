@@ -170,6 +170,12 @@ $cpt = piauditparams $null "myPIServer" "PIDataArchive"
 $cpt = piauditparams $cpt "myPIAFServer" "PIAFServer"
 piaudit -cpt $cpt -scid @('AU10006','AU20008')
 
+# Example 8
+# Export the PI Network Manager Statistics from the target PI Data Archive. 
+# The export includes an attribute to identify whether connections are 
+# secured with transport security or not, and if so, the ciphers used.
+Export-PISecConfig -PIDataArchiveComputerName myPIServer -DataItem PINetManagerStats
+
 #############
 # Resources #
 #############

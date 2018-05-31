@@ -167,7 +167,7 @@ The following information is exported.
 		messages logs from the PI Data Archive
 The syntax is...				 
 Export-PISecConfig [[-PIDataArchiveComputerName | -pida] <string>]
-.PARAMETER pida
+.PARAMETER PIDataArchiveComputerName
 The PI Data Archive to dump the security configuration from.
 .PARAMETER MaxResults
 Limit the number of PI messages returned.  Defaults to 1000.
@@ -178,6 +178,8 @@ are 'PIDatabaseSecurity','PIFirewall','PIUsers','PIGroups','PIIdentities',
 value is 'All'
 .EXAMPLE
 Export-PISecConfig -PIDataArchiveComputerName PIDataArchive01
+.EXAMPLE
+Export-PISecConfig -PIDataArchiveComputerName PIDataArchive01 -DataItem PINetManagerStats
 .LINK
 https://pisquare.osisoft.com
 #>

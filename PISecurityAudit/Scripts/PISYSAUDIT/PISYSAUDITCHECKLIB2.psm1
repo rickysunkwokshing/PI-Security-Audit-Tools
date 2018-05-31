@@ -1361,6 +1361,11 @@ supported version:
 	+ PI AF SDK (all versions)
 For more information, see: 
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+To query for all connections with the security status and ciphers used, 
+leverage the Export-PISecConfig cmdlet with the DataItem parameter set to 
+PINetManagerStats.  
+Export-PISecConfig -PIDataArchiveComputerName myServer -DataItem PINetManagerStats
+For more information, use "Get-Help Export-PISecConfig -Full".
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
