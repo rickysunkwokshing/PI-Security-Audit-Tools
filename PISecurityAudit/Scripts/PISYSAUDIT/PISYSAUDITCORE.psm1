@@ -4672,33 +4672,40 @@ New-PISysAuditComputerParams [[-ComputerParamsTable | -cpt] <hashtable>]
 .INPUTS
 .OUTPUTS
 <hashtable> containing the PISysAuditComputerParams objects.
-.PARAMETER cpt
+.PARAMETER ComputerParamsTable
 Parameter table defining which computers/servers
 to audit and for which PI System components. If a $null
 value is passed or the parameter is skipped, the cmdlet
 will assume to audit the local machine.
-.PARAMETER type
-PI System Component to audit.
-PI, PIDataArchive, PIServer refer to a PI Data Archive component.
-PIAF, PIAFServer, AF refer to a PI AF Server component.
-SQL, SQLServer refer to a SQL Server component.
-PIVision, Vision refer to a PI Vision server component.
-PIWebAPI, WebAPI refer to a PI Web API component.
+.PARAMETER ComputerName
+Name of the target computer with the PI System component.
+.PARAMETER PISystemComponentType
+PI System Component to audit.  All supported commponents
+with their supported aliases are listed below.
+Component       - Supported Values
+PI Data Archive - "PIServer", "PIDataArchive", "PIDA"
+PI AF Server    - "PIAFServer", "AFServer", "PIAF", "AF"
+MS SQL Server   - "SQLServer", "SQL", "PICoresightServer" 
+PI Vision       - "PIVision", "PV", "Vision", "PIVisionServer",
+                  "CoresightServer", "PICoresight", "Coresight",  
+                  "PICS", "CS","VisionServer"
+PI Web API      - "PIWebAPIServer", "PIWebAPI", "WebAPI"
+                  "WebAPIServer"
 .PARAMETER InstanceName
 Parameter to specify the instance name of your SQL Server. If a blank string
 or "default" or "mssqlserver" is passed, this will refer to the default
 instance.
 .PARAMETER IntegratedSecurity
 Use or not the Windows integrated security. Default is true.
-.PARAMETER user
+.PARAMETER SQLServerUserID
 Specify a SQL user account to use if you are not using the
 Windows integrated security.
-.PARAMETER pf
+.PARAMETER PasswordFile
 Specifiy a file that will contained a ciphered password obtained with the
 New-PISysAudit_PasswordOnDisk cmdlet. If not specify and the -user parameter
 is configured, the end-user will be prompted to enter the password once. This
 password will be kept securely in memory until the end of the execution.
-.PARAMETER showui
+.PARAMETER ShowUI
 Output messages on the command prompt or not.
 .EXAMPLE
 $cpt = New-PISysAuditComputerParams -cpt $cpt -cn "MyPIServer" -type "pi"
