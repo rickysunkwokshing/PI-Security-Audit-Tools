@@ -150,7 +150,6 @@ PROCESS
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsSite
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsApp -Value $sslFlagsApp
 			$Configuration | Add-Member -MemberType NoteProperty -Name customHeaders -Value $customHeaders
-			$Configuration | Add-Member -MemberType NoteProperty -Name Alias -Value $Alias
 			
 			return $Configuration
 		}
@@ -160,6 +159,11 @@ PROCESS
 		{ $global:PIVisionConfiguration = & $scriptBlock }
 		else
 		{ $global:PIVisionConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+		
+		if(![string]::IsNullOrEmpty($Alias))
+		{
+		    $global:PIVisionConfiguration | Add-Member -MemberType NoteProperty -Name Alias -Value $Alias
+	    }
 	}
 	catch
 	{
@@ -581,7 +585,7 @@ PROCESS
 		$serviceName = "pivision"
 		
 		# Use alias if specified, otherwise check for the custom host header
-		if($global:PIVisionConfiguration.Alias -ne "")
+		if(![string]::IsNullOrEmpty($global:PIVisionConfiguration.Alias))
 		{
 			$CustomHeader = $global:PIVisionConfiguration.Alias
 			$serviceName = "pivision_custom"
