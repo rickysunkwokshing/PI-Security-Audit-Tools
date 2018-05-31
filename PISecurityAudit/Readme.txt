@@ -133,6 +133,7 @@ $cpt = piauditparams $null "myPIServer" "PIDataArchive"
 $cpt = piauditparams $cpt "myPIAFServer" "PIAFServer"
 $cpt = piauditparams $cpt "mySQLServer" "SQLServer" -InstanceName "myinstance" # -IntegratedSecurity $false -user "sa" -pf "p1.dat"
 $cpt = piauditparams $cpt "myPIVision" "PIVisionServer"
+$cpt = piauditparams $cpt "myPIVision2" "PIVisionServer" -Alias "myPV.example.org"
 piaudit -cpt $cpt
 
 # Example 3

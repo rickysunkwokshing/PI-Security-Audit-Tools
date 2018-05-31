@@ -87,6 +87,10 @@ param(
 		[string]
 		$RemoteComputerName = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("al")]
+		[string]
+		$Alias = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)		
@@ -155,6 +159,11 @@ PROCESS
 		{ $global:PIVisionConfiguration = & $scriptBlock }
 		else
 		{ $global:PIVisionConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+		
+		if(![string]::IsNullOrEmpty($Alias))
+		{
+		    $global:PIVisionConfiguration | Add-Member -MemberType NoteProperty -Name Alias -Value $Alias
+	    }
 	}
 	catch
 	{
@@ -567,7 +576,6 @@ PROCESS
 	{		
 		$ServiceAppPoolType = $global:PIVisionConfiguration.ServiceAppPoolType  # Service AppPool Identity Type 
 		$ServiceAppPoolUser = $global:PIVisionConfiguration.ServiceAppPoolUser  # Service AppPool User
-		$WebBindings = $global:PIVisionConfiguration.Bindings # Web Site bindings.
 
 		# Using the http service class.
 		$serviceType = "http"
@@ -575,21 +583,29 @@ PROCESS
 		# Special 'service name' for PI Vision.
 		# This is needed to distinguish between SPN check for IIS Apps such as PI Vision, and Windows Services such as PI or AF.
 		$serviceName = "pivision"
-
-		# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
-		$BindingsToString = $($WebBindings) | Out-String
-
-		# Leverage WebBindings global variable and look for custom headers.
-		$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
-				
-		# Go through all bindings.
-		foreach ($match in $matches) 
+		
+		# Use alias if specified, otherwise check for the custom host header
+		if(![string]::IsNullOrEmpty($global:PIVisionConfiguration.Alias))
 		{
-			$CustomHeader = $match.Groups[1].Captures[0].Value 				
-			If ($CustomHeader) # A custom host header is used!
-			{ 
-				$serviceName = "pivision_custom"
-				break 
+			$CustomHeader = $global:PIVisionConfiguration.Alias
+			$serviceName = "pivision_custom"
+		}
+		else
+		{	
+			$WebBindings = $global:PIVisionConfiguration.Bindings 
+			# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
+			$BindingsToString = $($WebBindings) | Out-String
+			# Leverage WebBindings global variable and look for custom headers.
+			$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
+			# Go through all bindings.
+			foreach ($match in $matches) 
+			{
+				$CustomHeader = $match.Groups[1].Captures[0].Value
+				If ($CustomHeader) # A custom host header is used!
+				{ 
+					$serviceName = "pivision_custom"
+					break 
+				}
 			}
 		}
 

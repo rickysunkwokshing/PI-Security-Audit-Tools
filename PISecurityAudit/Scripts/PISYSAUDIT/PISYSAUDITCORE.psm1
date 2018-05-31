@@ -1654,7 +1654,7 @@ param(
 		try
 		{
 			Write-Progress -Activity $activityMsg1 -Status "Gathering PI Vision Configuration" -ParentId 1
-			Get-PISysAudit_GlobalPIVisionConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+			Get-PISysAudit_GlobalPIVisionConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -al $ComputerParams.Alias -DBGLevel $DBGLevel 
 		}
 		catch
 		{
@@ -3812,7 +3812,7 @@ PROCESS
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
 																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
 																-SPNShortAlias $CustomHeaderSPN -SPNLongAlias $CustomHeaderLongSPN `
-																-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
+																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 						
 				return $result			
 			} 			
@@ -4116,6 +4116,9 @@ PROCESS
 		
 		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
 		$spnCheck = $(setspn -l $accountNane 2>$null) 
+		
+		$msg = "SPN query returned: $spnCheck"					
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
 		# Null if something went wrong
 		if($null -eq $spnCheck)
@@ -4124,7 +4127,16 @@ PROCESS
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 			return $false
 		}
-		
+						
+		if($blnAlias)
+		{
+			$msg = "Searching for SPNs: $SPNShort, $SPNLong, $SPNShortAlias, $SPNLongAlias"					
+		}
+		else
+		{
+			$msg = "Searching for SPNs: $SPNShort, $SPNLong"
+		}
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 		# Loop through SPNs, trimming and ensure all lower for comparison
 		$spnCounter = 0
 		foreach($line in $spnCheck)
@@ -4450,6 +4462,13 @@ PROCESS
 																-SQLServerUserID $ComputerParameter.SQLServerUserID `
 																-PasswordFile $ComputerParameter.PasswordFile
 		}
+		ElseIf($null -ne ($ComputerParameter | Get-Member -Name Alias))
+		{
+			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
+																-ComputerName $ComputerParameter.ComputerName `
+																-PISystemComponent $ComputerParameter.PISystemComponentType `
+																-Alias $ComputerParameter.Alias
+		}
 		Else
 		{
 			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
@@ -4714,6 +4733,9 @@ is configured, the end-user will be prompted to enter the password once. This
 password will be kept securely in memory until the end of the execution.
 .PARAMETER ShowUI
 Output messages on the command prompt or not.
+.PARAMETER Alias
+Name other than the machine name used by clients to access the server.
+Presently only used by PI Vision checks.
 .EXAMPLE
 $cpt = New-PISysAuditComputerParams -cpt $cpt -cn "MyPIServer" -type "pi"
 The -cpt will use the hashtable of parameters to know how to audit
@@ -4759,6 +4781,10 @@ param(
 		[alias("pf")]
 		[string]
 		$PasswordFile = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("al")]
+		[string]
+		$Alias = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]				
 		[boolean]
 		$ShowUI = $true)
@@ -4818,52 +4844,31 @@ PROCESS
 	# ............................................................................................................	
 	# Create a custom object (PISysAuditComputerParams).
 	$tempObj = New-Object PSCustomObject
-	
-	if(($PISystemComponentType.ToLower() -eq "piserver") -or `
-		($PISystemComponentType.ToLower() -eq "pidataarchive") -or `
-		($PISystemComponentType.ToLower() -eq "pida") -or `
-		($PISystemComponentType.ToLower() -eq "dataarchive"))
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $null	
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Alias" -Value $null
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null	
+
+	if($PISystemComponentType.ToLower() -in @("piserver","pidataarchive","pida","dataarchive"))
 	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIDataArchive'
-		$AuditRoleType = "PIDataArchive"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+		$tempObj.AuditRoleType = "PIDataArchive"
 	}
-	elseif(($PISystemComponentType.ToLower() -eq "piafserver") -or `
-		($PISystemComponentType.ToLower() -eq "afserver") -or `
-		($PISystemComponentType.ToLower() -eq "piaf") -or `
-		($PISystemComponentType.ToLower() -eq "af"))
-	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIAFServer'
-		$AuditRoleType = "PIAFServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+	elseif($PISystemComponentType.ToLower() -in @("piafserver","afserver","piaf","af"))
+	{	
+		$tempObj.AuditRoleType = "PIAFServer"
 	}
-	elseif(($PISystemComponentType.ToLower() -eq "sqlserver") -or `
-		($PISystemComponentType.ToLower() -eq "sql"))
-	{		
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'SQLServer'
-		$AuditRoleType = "SQLServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $InstanceName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $IntegratedSecurity	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $SQLServerUserID
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $PasswordFile				
+	elseif($PISystemComponentType.ToLower() -in @("sqlserver","sql"))
+	{			
+		$tempObj.AuditRoleType = "SQLServer"
+		$tempObj.InstanceName = $InstanceName
+		$tempObj.IntegratedSecurity = $IntegratedSecurity	
+		$tempObj.InstanceName = $InstanceName
+		$tempObj.SQLServerUserID = $SQLServerUserID
+		$tempObj.PasswordFile = $PasswordFile		
 		
 		# Test if a user name has been passed if Window integrated security is not used
 		if($IntegratedSecurity -eq $false)
@@ -4903,48 +4908,14 @@ PROCESS
 			}
 		}	
 	}
-	elseif (($PISystemComponentType.ToLower() -eq "picoresightserver") -or `
-		($PISystemComponentType.ToLower() -eq "picoresight") -or `
-		($PISystemComponentType.ToLower() -eq "coresightserver") -or `
-		($PISystemComponentType.ToLower() -eq "coresight") -or `
-		($PISystemComponentType.ToLower() -eq "cs") -or `
-		($PISystemComponentType.ToLower() -eq "pics") -or `
-		($PISystemComponentType.ToLower() -eq "pivision") -or `
-		($PISystemComponentType.ToLower() -eq "visionserver") -or `
-		($PISystemComponentType.ToLower() -eq "vision") -or `
-		($PISystemComponentType.ToLower() -eq "pivisionserver") -or `
-		($PISystemComponentType.ToLower() -eq "pv")
-	)
-	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIVisionServer'
-		$AuditRoleType = "PIVisionServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		# Nullify all of the MS SQL specific values
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+	elseif ($PISystemComponentType.ToLower() -in @("picoresightserver","picoresight","coresightserver","coresight","cs","pics","pivision","visionserver","vision","pivisionserver","pv"))
+	{		
+		$tempObj.AuditRoleType = "PIVisionServer"	
+		$tempObj.Alias = $Alias
 	}
-	elseif (($PISystemComponentType.ToLower() -eq "piwebapiserver") -or `
-		($PISystemComponentType.ToLower() -eq "piwebapi") -or `
-		($PISystemComponentType.ToLower() -eq "webapiserver") -or `
-		($PISystemComponentType.ToLower() -eq "webapi")
-	)
+	elseif ($PISystemComponentType.ToLower() -in @("piwebapiserver","piwebapi","webapiserver","webapi"))
 	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIWebApiServer'
-		$AuditRoleType = "PIWebApiServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		# Nullify all of the MS SQL specific values
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null
+		$tempObj.AuditRoleType = "PIWebApiServer"
 	}
 
 	# Add hashtable item and computer audit if not already in params table
