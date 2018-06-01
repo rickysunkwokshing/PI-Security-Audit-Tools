@@ -312,7 +312,7 @@ PROCESS
 			$privilegeFound = $false		
 		
 			# Get the service account.
-			$listOfPrivileges = Get-PISysAudit_ServicePrivilege -lc $LocalComputer -rcn $RemoteComputerName -sn "piarchss" -dbgl $DBGLevel					
+			$listOfPrivileges = Get-PISysAudit_ServicePrivilege -lc $LocalComputer -rcn $RemoteComputerName -sn "AFService" -dbgl $DBGLevel					
 		
 			# Read each line to find granted privileges.		
 			foreach($line in $listOfPrivileges)
