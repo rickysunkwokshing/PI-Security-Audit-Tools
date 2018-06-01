@@ -3347,7 +3347,7 @@ Get the servers in the PI Data Archive or PI AF Server KST.
 	return $KnownServers
 }
 
-function Get-PISysAudit_CheckPrivilege
+function Get-PISysAudit_ServicePrivilege
 {
 <#
 .SYNOPSIS
@@ -3358,9 +3358,9 @@ Return the access token (security) of a process or service.
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]
-		[alias("an")]
+		[alias("sn")]
 		[string]
-		$AccountName,	
+		$ServiceName,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("lc")]
 		[boolean]		
@@ -3379,61 +3379,39 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{			
-		$AccountSID = Get-PISysAudit_AccountProperty -AccountName $AccountName -AccountProperty SID -lc $LocalComputer -rc $RemoteComputerName -DBGLevel $DBGLevel
-		if($null -eq $AccountSID)
+	{						
+		$FilterExpression = "name='$ServiceName'"
+		$ServiceInfo = ExecuteWMIQuery -WMIClassName Win32_Service -FilterExpression $FilterExpression -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -DBGLevel $DBGLevel																													
+		if ($null -ne ($ServiceInfo | Get-Member -Name ProcessId))
+		{
+			$ProcessId = $ServiceInfo.ProcessId
+		}
+		else
 		{
 			# Return the error message.
-			$msg = "Could not resolve the SID for $AccountName to evaluate the Privilege."
-			Write-PISysAudit_LogMessage $msg "Error" $fn
-			return $null
-		}
-		$scriptBlock = {
-					param([string]$AccountSID) 
-					if(Test-Path $($env:ProgramData + "\OSIsoft")) 
-					{ 
-						$FilePathRoot = $($env:ProgramData + "\OSIsoft")
-					}
-					elseif(Test-Path $($env:pihome64 + "\dat"))
-					{
-						$FilePathRoot = $($env:pihome64 + "\dat")
-					}
-					else
-					{
-                        return $null
-					}
-					
-                    # Specify temp files for command output and standard output, if any.
-                    $FilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege.CFG'
-                    $StandardOutputFilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege_StandardOutput.txt'
-					
-                    # Invoke the commandline utility
-                    $UtilityExecutable = $env:Windir + '\system32\secedit.exe'
-					$ArgumentList = @('/export', '/areas USER_RIGHTS', $('/cfg "' + $FilePath + '"'))
-					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -Wait -NoNewWindow -RedirectStandardOutput $StandardOutputFilePath
-					
-                    # Check command output for the account SID associated with specific rights.
-                    $FileContent = Get-Content -Path $FilePath
-                    if(Test-Path $FilePath) { Remove-Item $FilePath }
-                    if(Test-Path $StandardOutputFilePath) { Remove-Item $StandardOutputFilePath }
-                    $Privs = @()
-					Foreach($Priv in $FileContent)
-					{
-						if($Priv -like "Se*=*" -and $Priv -like $('*' + $AccountSID + '*'))
-						{
-							$Privs += $Priv.Split('=').Trim()[0]
-						}
-					}
-					return $Privs
+			$msg = "Process ID could not be identified for: $ServiceName"
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			return $null 
 		}
 
+		# Set the path to the inner script.
+		$scriptsPath = (Get-Variable "scriptsPath" -Scope "Global").Value														
+		$checkProcessPrivilegePSScript = PathConcat -ParentPath $scriptsPath -ChildPath "\Utilities\CheckProcessPrivilege.ps1"
+
+		$msg = "Command to execute is: CheckProcessPrivilege.ps1 $ProcessId"			
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 		if($LocalComputer)
-		{ $AccountPrivileges = & $scriptBlock -AccountSID $AccountSID }
+		{ 
+			$result = & $checkProcessPrivilegePSScript $ProcessId 
+		}
 		else
 		{ 
-			$AccountPrivileges = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $AccountSID
+			$result = Invoke-Command -ComputerName $RemoteComputerName -FilePath $checkProcessPrivilegePSScript -ArgumentList @( $ProcessId )
 		}
-		return $AccountPrivileges
+
+		$msg = "Privileges detected: $result"			
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 	}
 	catch
 	{
@@ -3442,7 +3420,6 @@ PROCESS
 		return $null
 	}
 	
-	# Return the result.
 	return $result
 }
 
@@ -5673,7 +5650,7 @@ Export-ModuleMember Get-PISysAudit_CertificateProperty
 Export-ModuleMember Get-PISysAudit_BoundCertificate
 Export-ModuleMember Get-PISysAudit_ResolveDnsName
 Export-ModuleMember Get-PISysAudit_GroupMembers
-Export-ModuleMember Get-PISysAudit_CheckPrivilege
+Export-ModuleMember Get-PISysAudit_ServicePrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
 Export-ModuleMember Get-PISysAudit_InstalledKBs
 Export-ModuleMember Get-PISysAudit_InstalledWin32Feature
