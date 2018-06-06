@@ -3748,66 +3748,52 @@ PROCESS
 		# Build FQDN using hostname and domain strings.
 		$fqdn = $hostname + "." + $MachineDomain
 
+		$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
+		$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+
 		# SPN check is done for PI Vision using a custom host header.
 		If ( $ServiceName -eq "pivision_custom" ) 
 		{ 
 			# Pass the AppPool identity as the service account.
 			$svcacc = $AppPool
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
-				
-			# Take Custom header information and create its short and long version.
-			If ($CustomHeader -match "\.") 
-			{
-				$CustomHeaderLong = $CustomHeader
-				$pos = $CustomHeader.IndexOf(".")
-				$CustomHeaderShort = $CustomHeader.Substring(0, $pos)
-			} 
-			Else 
-			{ 
-				$CustomHeaderShort = $CustomHeader
-				$CustomHeaderLong = $CustomHeader + "." + $MachineDomain
-			}
 
-			# Deal with the custom header - run nslookup and capture the result.
+			<# 
+				Check if the custom header is a Alias (CNAME) or Host (A) entry.
+				
+				In case of Alias (CNAME), SPNs should exist for both the Alias (CNAME)
+				and the machine the Alias (CNAME) is pointing to. Overall, there should be 3 SPNs.
+
+				With Host (A) alias, the SPN is needed for the alias. We don't want to fail the check
+				for a missing SPN if they only intend for clients to access by the alias.
+			#>
 			$AliasTypeCheck = Get-PISysAudit_ResolveDnsName -LookupName $CustomHeader -Attribute Type -DBGLevel $DBGLevel
 
-			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
 			If ($AliasTypeCheck -eq 'CNAME') 
 			{ 
-				# Verify hostnane AND FQDN SPNs are assigned to the service account.
-				#
-				# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
-				# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
-				#
-				# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
-			
-				$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
-				$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
-				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
-				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeader.ToLower())
 			
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
 																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
-																-SPNShortAlias $CustomHeaderSPN -SPNLongAlias $CustomHeaderLongSPN `
+																-SPNAlias $CustomHeaderSPN -SPNAliasType $AliasTypeCheck `
 																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 						
 				return $result			
 			} 			
 			ElseIf($AliasTypeCheck -eq 'A')
 			{ 
-				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
-				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeader.ToLower())
 
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-																-SPNShort $CustomHeaderSPN -SPNLong $CustomHeaderLongSPN `
+																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
+																-SPNAlias $CustomHeaderSPN -SPNAliasType $AliasTypeCheck `
 																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 
 				return $result
 			}
 			Else
 			{
-				$msgTemplate = "Unexpected DNS record type: {0}"	
-				$msg = [string]::Format($msgTemplate, $AliasTypeCheck)
+				$msg = "Unexpected DNS record type: $AliasTypeCheck"
 				Write-PISysAudit_LogMessage $msg "Error" $fn
 				return $null
 			}
@@ -3828,11 +3814,8 @@ PROCESS
 				$svcacc = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 			}
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
-			# Proceed with checking SPN for PI Vision or non-IIS app (PI/AF).
-			# Distinguish between Domain/Virtual account and Machine Accounts.
-			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
-			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
 
+			# Distinguish between Domain/Virtual account and Machine Accounts.
 			$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
 															-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
 															-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
@@ -3842,7 +3825,6 @@ PROCESS
 	}
 	catch
 	{
-		# Return the error message.
 		$msg = "A problem occurred using setspn.exe"	
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		return $null
@@ -4050,14 +4032,15 @@ param(
 		[alias("SPNL")]
 		[string]
 		$SPNLong,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
-		[alias("SPNSA")]
-		[string]
-		$SPNShortAlias="",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("SPNLA")]
+		[alias("SPNA")]
 		[string]
-		$SPNLongAlias="",
+		$SPNAlias="",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("SPNAT")]
+		[ValidateSet('CNAME','A','None')]
+		[string]
+		$SPNAliasType="None",
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("TargetAccountName")]
 		[string]
@@ -4074,10 +4057,19 @@ BEGIN {}
 PROCESS		
 {		
 	$fn = GetFunctionName
-	$blnAlias = $false
+
 	try
-	{
-		$blnAlias = $SPNShortAlias -ne "" -and $SPNLongAlias -ne ""
+	{	
+		# Set the list of SPNs to check.
+		switch ($SPNAliasType)
+		{
+			'CNAME' { $spnList = @($SPNShort, $SPNLong, $SPNAlias); break }
+			'A' { $spnList = @($SPNAlias); break }
+			'None' { $spnList = @($SPNShort, $SPNLong); break }
+		}
+
+		$msg = "Searching for SPNs: " + $($spnList -join ",")
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 		
 		# Define user syntax for SPN command
 		If($strSPNtargetDomain -eq 'MACHINEACCOUNT') # Use the hostname when a machine account is identified
@@ -4104,48 +4096,27 @@ PROCESS
 			Write-PISysAudit_LogMessage $msg "Error" $fn
 			return $false
 		}
-						
-		if($blnAlias)
-		{
-			$msg = "Searching for SPNs: $SPNShort, $SPNLong, $SPNShortAlias, $SPNLongAlias"					
-		}
-		else
-		{
-			$msg = "Searching for SPNs: $SPNShort, $SPNLong"
-		}
-		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+		
 		# Loop through SPNs, trimming and ensure all lower for comparison
 		$spnCounter = 0
 		foreach($line in $spnCheck)
-		{		
-			If($blnAlias){
-				switch($line.ToLower().Trim())
-				{
-					$SPNShort {$spnCounter++; break}
-					$SPNLong {$spnCounter++; break}
-					$SPNShortAlias {$spnCounter++; break}
-					$SPNLongAlias {$spnCounter++; break}
-					default {break}
-				}
-			}
-			Else
+		{
+			if($line.ToLower().Trim() -in $spnList)
 			{
-				switch($line.ToLower().Trim())
-				{
-					$SPNShort {$spnCounter++; break}
-					$SPNLong {$spnCounter++; break}
-					default {break}
-				}
-			}	
+				$spnCounter++
+			}
 		}
 
 		# Return details to improve messaging in case of failure.
-		If ($blnAlias -and $spnCounter -eq 4) { $result = $true } 
-		ElseIf ($spnCounter -eq 2) { $result = $true }
-		Else 
-		{ 
-			$result =  $false 
+		If ($spnCounter -eq $spnList.Count)
+		{
+			$result = $true
 		}
+		Else
+		{
+			$result = $false
+		}
+		
 		return $result
 	}
 	catch
