@@ -478,11 +478,17 @@ AU60004 - PI Web API HTTP Headers
 VALIDATION: Verifies that best practices for HTTP headers are implemented
 in the PI Web API. <br/>
 COMPLIANCE: Ensure that the X-Frame-Options header is set to enforce framing
-restrictions. Ensure that the Strict-Transport-Security header is set to enforce
-HTTP strict transport security (HSTS). For configuration steps, see Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8 </a> <br/>
-For additional recommendations, see KB01631: <br/>
-<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/">https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/</a>
+restrictions and the Strict-Transport-Security header is set to enforce HTTP 
+strict transport security (HSTS). Both of these protections can be configured
+as custom headers in the PI Web API. For configuration steps, see Custom 
+headers in the PI Web API Live Library documentation: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-AF281636-B731-443E-879D-202C1062932B">https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-AF281636-B731-443E-879D-202C1062932B</a> <br/>
+Information on X-Frame-Options and supported values can be found here: <br/>
+<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options">https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options</a> <br/>
+Information on HSTS and supported values can be found here: <br/>
+<a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security">https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security</a> <br/>
+For additional web security recommendations, see KB01631: <br/>
+<a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/">https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/</a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
 param(
