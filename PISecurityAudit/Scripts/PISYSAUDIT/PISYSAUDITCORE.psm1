@@ -4663,8 +4663,10 @@ MS SQL Server   - "SQLServer", "SQL", "PICoresightServer"
 PI Vision       - "PIVision", "PV", "Vision", "PIVisionServer",
                   "CoresightServer", "PICoresight", "Coresight",  
                   "PICS", "CS","VisionServer"
-PI Web API      - "PIWebAPIServer", "PIWebAPI", "WebAPI"
+PI Web API      - "PIWebAPIServer", "PIWebAPI", "WebAPI",
                   "WebAPIServer"
+Machine Only    - "MachineOnly", "Machine", "ComputerOnly",
+                  "Computer"
 .PARAMETER InstanceName
 Parameter to specify the instance name of your SQL Server. If a blank string
 or "default" or "mssqlserver" is passed, this will refer to the default
@@ -4711,7 +4713,8 @@ param(
 					"CoresightServer", "PICoresight", 
 					"Coresight", "PICS", "CS", "PIVision",
 					"PIVisionServer","Vision","VisionServer","PV",
-					"PIWebAPIServer", "PIWebAPI", "WebAPI", "WebAPIServer")]
+					"PIWebAPIServer", "PIWebAPI", "WebAPI", "WebAPIServer",
+					"MachineOnly", "Machine", "ComputerOnly", "Computer")]
 		[alias("type")]
 		[string]		
 		$PISystemComponentType,
@@ -4864,6 +4867,12 @@ PROCESS
 	elseif ($PISystemComponentType.ToLower() -in @("piwebapiserver","piwebapi","webapiserver","webapi"))
 	{
 		$tempObj.AuditRoleType = "PIWebApiServer"
+	}
+	elseif ($PISystemComponentType.ToLower() -in @("machineonly", "machine", "computeronly", "computer"))
+	{
+		# Don't add another parameter if only Machine checks are required, just use the computer audit parameter.
+		$tempObj.AuditRoleType = "MachineOnly"
+		$skipParam = $true
 	}
 
 	# Add hashtable item and computer audit if not already in params table
