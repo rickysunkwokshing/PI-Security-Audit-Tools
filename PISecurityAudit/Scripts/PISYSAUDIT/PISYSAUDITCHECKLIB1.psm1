@@ -48,9 +48,9 @@ Get functions from machine library at or below the specified level.
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1 "AU10005"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1 "AU10006"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1 "AU10007"
-    $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdate"    1 "AU10008"
+    $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdate"     1 "AU10008"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInternetAccess"     1 "AU10009"
-
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckDeviceGuard"        1 "AU10010"
 
     # Return all items at or below the specified AuditLevelInt
     return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -938,6 +938,80 @@ from the server.
     #***************************
 }
 
+function Get-PISysAudit_CheckDeviceGuard
+{
+<#  
+.SYNOPSIS
+AU10010 - Device Guard
+.DESCRIPTION
+VERIFICATION: Check to make sure that Credential Guard and HVCI are configured. <br/>
+COMPLIANCE:
+Enable Windows Defender Device Guard hardware-based security features. <br/>
+<a href="https://docs.microsoft.com/en-us/windows/security/threat-protection/windows-defender-exploit-guard/enable-virtualization-based-protection-of-code-integrity">https://docs.microsoft.com/en-us/windows/security/threat-protection/windows-defender-exploit-guard/enable-virtualization-based-protection-of-code-integrity</a> <br/>
+VirtualizationBasedSecurityStatus should be 2 (enabled & running) SecurityServicesConfigured & SecurityServicesRunning should include 1 & 2 (Credential Guard and HVCI) and policy should be set to enforce. <br/>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	try
+	{		
+		$dg = Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard
+		if($dg.SecurityServicesConfigured[0] -eq 1 -and $dg.SecurityServicesConfigured[1] -eq 2 -and $dg.SecurityServicesRunning[0] -eq 1 -and $dg.SecurityServicesRunning[1] -eq 2 -and $dg.VirtualizationBasedSecurityStatus -eq 2)
+		{
+			$result = $true
+			$msg = "Credential Guard and HVCI are configured."
+		}
+		else
+		{
+			$result = $false
+			$msg = "Credential Guard and HVCI were not configured."
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}
+	
+	# Define the results in the audit table	
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU10010" `
+									-ain "Windows Defender Device Guard." -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "Machine" -Group2 "Policy" `
+									-Severity "Medium"																																																
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
 # to export them at the bottom of this script.
@@ -1015,6 +1089,7 @@ Export-ModuleMember Get-PISysAudit_CheckManagedPI
 Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
 Export-ModuleMember Get-PISysAudit_CheckSoftwareUpdate
 Export-ModuleMember Get-PISysAudit_CheckInternetAccess
+Export-ModuleMember Get-PISysAudit_CheckDeviceGuard
 # </Do not remove>
 
 # ........................................................................
