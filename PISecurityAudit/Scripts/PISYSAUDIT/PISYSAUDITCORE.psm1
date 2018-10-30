@@ -4837,6 +4837,59 @@ https://pisquare.osisoft.com
     #***************************
 }
 
+function Invoke-PISysAudit_CimInstance {
+    <#
+.SYNOPSIS
+Invoke Get-CimInstance
+.DESCRIPTION
+Run Get-CimInstance command locally and remotely with classname and namespace
+#>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseApprovedVerbs", "", Justification="Template function; implementer expected to rename.")]
+    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
+    param(
+	    [parameter(Mandatory = $true, ParameterSetName = "Default")]
+        [alias("cl")]
+        $Class,
+	    [parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("ns")]
+        $Namespace,
+		[parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("lc")]
+        [boolean]
+        $LocalComputer,
+        [parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("rcn")]
+        [string]
+        $RemoteComputerName)
+    BEGIN {}
+    PROCESS {
+		$output = $null
+		try
+		{
+			if($LocalComputer)
+			{
+				$output = Get-CimInstance -ClassName $Class -Namespace $Namespace
+			}
+			else
+			{
+				$output = Get-CimInstance -ClassName $Class -Namespace $Namespace -ComputerName $RemoteComputerName
+			}
+			return $output
+		}
+		catch
+		{
+            # Return the error message.
+            $msg = "A problem occurred using Get-CimInstance"
+            Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			return $null
+		}
+    }
+    END {}
+    #***************************
+    #End of exported function
+    #***************************
+}
+
 # ........................................................................
 # Add your core function by replacing the Verb-PISysAudit_TemplateCore one.
 # Implement the functionality you want. Don't forget to modify the parameters
@@ -4918,6 +4971,7 @@ Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
+Export-ModuleMember Invoke-PISysAudit_CimInstance
 Export-ModuleMember New-PISysAuditObject
 Export-ModuleMember New-PISysAuditError
 Export-ModuleMember New-PISysAudit_PasswordOnDisk

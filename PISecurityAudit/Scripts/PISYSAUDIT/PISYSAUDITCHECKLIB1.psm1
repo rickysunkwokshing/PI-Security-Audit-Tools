@@ -898,7 +898,6 @@ from the server.
                 param([string]$Address)
                 Test-Connection -ComputerName $Address -Count 4 -Quiet -ErrorAction SilentlyContinue # Quiet simply returns true or false
             }
-
             if ($LocalComputer) {
                 $canConnect = & $scriptBlock -Address $testAddress
             }
@@ -975,17 +974,45 @@ PROCESS
 	$fn = GetFunctionName
 	$msg = ""
 	try
-	{		
-		$dg = Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard
-		if($dg.SecurityServicesConfigured[0] -eq 1 -and $dg.SecurityServicesConfigured[1] -eq 2 -and $dg.SecurityServicesRunning[0] -eq 1 -and $dg.SecurityServicesRunning[1] -eq 2 -and $dg.VirtualizationBasedSecurityStatus -eq 2)
+	{	
+		$os = $null
+		$dg = $null
+		if($LocalComputer)
 		{
-			$result = $true
-			$msg = "Credential Guard and HVCI are configured."
+			$os = (Invoke-PISysAudit_CimInstance -cl Win32_OperatingSystem -lc $LocalComputer -rcn $RemoteComputerName).version
+		}
+		else
+		{
+			$os = (Invoke-PISysAudit_CimInstance -cl Win32_OperatingSystem -lc $LocalComputer -rcn $RemoteComputerName).version
+		}
+		$tmp = $os.split('.')
+		$majorVersion = [int]$tmp[0]
+
+		if($majorVersion -ge 10)
+		{
+			if($LocalComputer)
+			{
+				$dg = (Invoke-PISysAudit_CimInstance -cl Win32_DeviceGuard -ns root\Microsoft\Windows\DeviceGuard -lc $LocalComputer -rcn $RemoteComputerName)
+			}
+			else
+			{
+				$dg = (Invoke-PISysAudit_CimInstance -cl Win32_DeviceGuard -ns root\Microsoft\Windows\DeviceGuard -lc $LocalComputer -rcn $RemoteComputerName)
+			}
+			if($dg.SecurityServicesConfigured[0] -eq 1 -and $dg.SecurityServicesConfigured[1] -eq 2 -and $dg.SecurityServicesRunning[0] -eq 1 -and $dg.SecurityServicesRunning[1] -eq 2 -and $dg.VirtualizationBasedSecurityStatus -eq 2)
+			{
+				$result = $true
+				$msg = "Credential Guard and HVCI are configured."
+			}
+			else
+			{
+				$result = $false
+				$msg = "Credential Guard and HVCI were not configured."
+			}
 		}
 		else
 		{
 			$result = $false
-			$msg = "Credential Guard and HVCI were not configured."
+			$msg = "Device Guard is not supported with your operating system. Please upgrade to Win10 or Server2016."
 		}
 	}
 	catch
@@ -999,7 +1026,7 @@ PROCESS
 	# Define the results in the audit table	
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU10010" `
-									-ain "Windows Defender Device Guard." -aiv $result `
+									-ain "Windows Defender Device Guard" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "Machine" -Group2 "Policy" `
 									-Severity "Medium"																																																
