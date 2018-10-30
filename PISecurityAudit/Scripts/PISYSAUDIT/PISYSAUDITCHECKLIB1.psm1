@@ -977,12 +977,12 @@ PROCESS
 	{	
 		$os = $null
 		$dg = $null
-		$os = (Invoke-PISysAudit_CimInstance -cl Win32_OperatingSystem -lc $LocalComputer -rcn $RemoteComputerName).version
+		$os = (Get-PISysAudit_CimInstance -cl Win32_OperatingSystem -lc $LocalComputer -rcn $RemoteComputerName).version
 		$tmp = $os.split('.')
 		$majorVersion = [int]$tmp[0]
 		if($majorVersion -ge 10)
 		{
-			$dg = (Invoke-PISysAudit_CimInstance -cl Win32_DeviceGuard -ns root\Microsoft\Windows\DeviceGuard -lc $LocalComputer -rcn $RemoteComputerName)
+			$dg = (Get-PISysAudit_CimInstance -cl Win32_DeviceGuard -ns root\Microsoft\Windows\DeviceGuard -lc $LocalComputer -rcn $RemoteComputerName)
 			if($dg.SecurityServicesConfigured[0] -eq 1 -and $dg.SecurityServicesConfigured[1] -eq 2 -and $dg.SecurityServicesRunning[0] -eq 1 -and $dg.SecurityServicesRunning[1] -eq 2 -and $dg.VirtualizationBasedSecurityStatus -eq 2)
 			{
 				$result = $true

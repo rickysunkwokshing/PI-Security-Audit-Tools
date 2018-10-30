@@ -4837,10 +4837,10 @@ https://pisquare.osisoft.com
     #***************************
 }
 
-function Invoke-PISysAudit_CimInstance {
+function Get-PISysAudit_CimInstance {
     <#
 .SYNOPSIS
-Invoke Get-CimInstance
+Get-CimInstance
 .DESCRIPTION
 Run Get-CimInstance command locally and remotely with classname and namespace
 #>
@@ -4965,13 +4965,13 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
+Export-ModuleMember Get-PISysAudit_CimInstance
 Export-ModuleMember Test-PISysAudit_SecurePIConnection
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
-Export-ModuleMember Invoke-PISysAudit_CimInstance
 Export-ModuleMember New-PISysAuditObject
 Export-ModuleMember New-PISysAuditError
 Export-ModuleMember New-PISysAudit_PasswordOnDisk
