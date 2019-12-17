@@ -46,7 +46,6 @@ Get functions from machine library at or below the specified level.
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckFirewallEnabled"    1 "AU10003"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckAppLockerEnabled"   1 "AU10004"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckUACEnabled"         1 "AU10005"
-    $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckManagedPI"          1 "AU10006"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckIEEnhancedSecurity" 1 "AU10007"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckSoftwareUpdate"     1 "AU10008"
     $listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInternetAccess"     1 "AU10009"
@@ -554,108 +553,6 @@ more information on specific UAC features, see: <br/>
     #***************************
 }
 
-function Get-PISysAudit_CheckManagedPI {
-    <#
-.SYNOPSIS
-AU10006 - Health Monitoring (OSIsoft NOC)
-.DESCRIPTION
-VALIDATION: Checks if PI Diagnostics and PI Agent are installed and enabled,
-indicating that the machine is monitored in the OSIsoft NOC. <br/>
-COMPLIANCE: The goal of this check is to ensure that the PI System component
-has monitoring for notification and response, of which mPI is one example. If
-an equivalent independent solution is in place for monitoring, this check can
-be safely ignored.  To ensure compliance with this check PI Agent and PI
-Diagnostics need to be installed and running on the machine so that the OSIsoft
-NOC will detect issues. <br/>
-#>
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
-    param(
-        [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
-        [alias("at")]
-        [System.Collections.HashTable]
-        $AuditTable,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("lc")]
-        [boolean]
-        $LocalComputer = $true,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("rcn")]
-        [string]
-        $RemoteComputerName = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("dbgl")]
-        [int]
-        $DBGLevel = 0)
-    BEGIN {}
-    PROCESS {
-        # Get and store the function Name.
-        $fn = GetFunctionName
-        $msg = ""
-        try {
-            $installedPrograms = Get-PISysAudit_InstalledComponent -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-            $agent = $installedPrograms | Where-Object DisplayName -EQ 'PI Agent'
-            $diagnostics = $installedPrograms | Where-Object DisplayName -EQ 'PI Diagnostics'
-            if (-not ($agent -and $diagnostics)) {
-                $result = $false
-                $msg = "PI Agent and/or PI Diagnostics not installed."
-            }
-            else {
-                $agentServiceState = Get-PISysAudit_ServiceProperty -sn 'OSISoftPIAgent' -sp State `
-                    -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-                $diagnosticsServiceState = Get-PISysAudit_ServiceProperty -sn 'PIDiagnosticsService' -sp State `
-                    -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-                if (($agentServiceState -ne 'Running') -or ($diagnosticsServiceState -ne 'Running')) {
-                    $result = $false
-                    $msg = "PI Agent and PI Diagnostics installed but one or both services are not running."
-                }
-                else {
-                    $agentVersion = $agent.DisplayVersion + '.0'
-                    $agentConfigPath = [string]::Format("C:\ProgramData\OSIsoft\PI Agent\{0}\user.config", $agentVersion)
-                    $scriptBlock = {param([string]$ConfigPath) [xml](Get-Content -Path $ConfigPath)}
-                    if ($LocalComputer) {
-                        $agentConfig = & $scriptBlock -ConfigPath $agentConfigPath
-                    }
-                    else {
-                        $agentConfig = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $agentConfigPath
-                    }
-                    $agentSettings = $agentConfig.configuration.userSettings.'SIS.Properties.Settings'.setting
-                    $agentRegistered = $agentSettings | Where-Object Name -EQ 'IsRegistered'
-                    if ($agentRegistered.value -eq 'True') {
-                        $result = $true
-                        $msg = "Machine is registered with the OSIsoft NOC."
-                    }
-                    else {
-                        $result = $false
-                        $msg = "PI Agent and PI Diagnostics installed and running, but not registered with OSIsoft NOC."
-                    }
-                }
-            }
-            if ($result -eq $false)
-            { $msg += " If there is an independent solution implemented for monitoring, then this check can be safely ignored." }
-        }
-        catch {
-            # Return the error message.
-            $msg = "A problem occurred during the processing of the validation check."
-            Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-            $result = "N/A"
-        }
-
-        # Define the results in the audit table
-        $AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
-            -at $AuditTable "AU10006" `
-            -ain "OSIsoft NOC Monitoring" -aiv $result `
-            -aif $fn -msg $msg `
-            -Group1 "Machine" -Group2 "Montitoring"`
-            -Severity "Medium"
-    }
-
-    END {}
-
-    #***************************
-    #End of exported function
-    #***************************
-}
-
 function Get-PISysAudit_CheckIEEnhancedSecurity {
     <#
 .SYNOPSIS
@@ -1097,7 +994,6 @@ Export-ModuleMember Get-PISysAudit_CheckOSInstallationType
 Export-ModuleMember Get-PISysAudit_CheckFirewallEnabled
 Export-ModuleMember Get-PISysAudit_CheckAppLockerEnabled
 Export-ModuleMember Get-PISysAudit_CheckUACEnabled
-Export-ModuleMember Get-PISysAudit_CheckManagedPI
 Export-ModuleMember Get-PISysAudit_CheckIEEnhancedSecurity
 Export-ModuleMember Get-PISysAudit_CheckSoftwareUpdate
 Export-ModuleMember Get-PISysAudit_CheckInternetAccess
